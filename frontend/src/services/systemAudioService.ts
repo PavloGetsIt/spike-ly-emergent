@@ -73,7 +73,7 @@ export class SystemAudioService {
       // Connect to WebSocket
       await this.connectWebSocket();
 
-      // Process audio and send to Deepgram
+      // Process audio and send to AssemblyAI
       this.processor.onaudioprocess = (e) => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
