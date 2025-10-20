@@ -161,13 +161,14 @@ serve(async (req) => {
 
     const jobId = result.job_id;
 
-    // Poll for results (with timeout for real-time responsiveness)
+    // Poll for results (with longer timeout for Hume AI processing)
     let jobResult = null;
     let attempts = 0;
-    const maxAttempts = 5; // Reduced for faster response
+    const maxAttempts = 10; // Increased from 5 to 10 for better reliability
+    const pollIntervalMs = 800; // Increased from 500ms to 800ms
 
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Shorter polling interval
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
       
       const statusResponse = await fetch(
         `https://api.hume.ai/v0/batch/jobs/${jobId}/predictions`,
@@ -182,17 +183,25 @@ serve(async (req) => {
         jobResult = await statusResponse.json();
         console.log(`[Hume Edge] Poll attempt ${attempts + 1}/${maxAttempts}:`, 
           jobResult && jobResult.length > 0 ? '✅ Results ready' : '⏳ Still processing...');
-        if (jobResult && jobResult.length > 0) {
+        if (jobResult && jobResult.length > 0 && jobResult[0]?.results?.predictions) {
+          console.log(`[Hume Edge] 🎉 Hume API SUCCESS after ${attempts + 1} attempts (${(attempts + 1) * pollIntervalMs}ms)`);
           break;
         }
+      } else {
+        console.warn(`[Hume Edge] Poll attempt ${attempts + 1} failed with status:`, statusResponse.status);
       }
       
       attempts++;
     }
 
-    // If polling times out, return mock data
-    if (!jobResult || jobResult.length === 0) {
-      console.log('⚠️ Polling timeout, returning mock data');
+    // If polling times out, log warning and return mock data
+    if (!jobResult || jobResult.length === 0 || !jobResult[0]?.results?.predictions) {
+      console.warn('⚠️ ==========================================');
+      console.warn('⚠️ HUME API TIMEOUT OR FAILURE');
+      console.warn(`⚠️ Polled ${maxAttempts} times over ${maxAttempts * pollIntervalMs}ms`);
+      console.warn('⚠️ Returning mock data for graceful degradation');
+      console.warn('⚠️ Check Hume AI API status and rate limits');
+      console.warn('⚠️ ==========================================');
       return new Response(
         JSON.stringify({
           prosody: {
