@@ -750,6 +750,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
           });
           
+          if (DEBUG_HUME && resp) {
+            console.log(`[DEBUG_HUME] Request ${requestId} received response:`, {
+              ok: resp.ok,
+              reason: resp.reason,
+              hasResult: !!resp.result,
+              timestamp: new Date().toISOString()
+            });
+          }
+          
           if (!resp || !resp.ok) {
             const reason = resp?.reason || 'api_error';
             if (reason === 'rate_limit') {
