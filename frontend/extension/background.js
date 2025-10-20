@@ -1,6 +1,17 @@
 import { audioCaptureManager } from './audioCapture.js';
 import { correlationEngine } from './correlationEngine.js';
 
+// ==================== DEBUG CONFIGURATION ====================
+// Set to true to enable verbose Hume AI logging
+const DEBUG_HUME = true;
+
+// Request ID generator for tracing
+let humeRequestCounter = 0;
+function generateRequestId() {
+  return `hume_${Date.now()}_${++humeRequestCounter}`;
+}
+// =============================================================
+
 let wsConnection = null;
 let activeTab = null;
 let reconnectAttempts = 0;
