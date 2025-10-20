@@ -111,7 +111,20 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Hume AI API error:', response.status, errorText);
+      console.error('==========================================');
+      console.error('❌ HUME AI API ERROR');
+      console.error('❌ Status:', response.status);
+      console.error('❌ Response:', errorText);
+      console.error('==========================================');
+      
+      // Check for specific error codes
+      if (response.status === 401 || response.status === 403) {
+        console.error('❌ Authentication error - check HUME_AI_API_KEY');
+      } else if (response.status === 429) {
+        console.error('❌ Rate limit exceeded - too many requests');
+      } else if (response.status === 402) {
+        console.error('❌ Payment required - check Hume AI billing');
+      }
       
       // Return mock data for development if API fails
       console.log('⚠️ Returning mock emotion data for development');
@@ -146,7 +159,9 @@ serve(async (req) => {
           meta: {
             dominantSignal: 'Burst',
             avgSignalStrength: 0.66,
-            correlationQuality: 'GOOD'
+            correlationQuality: 'GOOD',
+            error: 'API_ERROR',
+            status: response.status
           }
         }),
         {
