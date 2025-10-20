@@ -41,6 +41,31 @@ class CorrelationEngine {
       dominantSignal: metrics.dominantSignal,
       quality: metrics.correlationQuality
     });
+    
+    // ==================== EXTENDED DEBUG LOGGING ====================
+    if (DEBUG_HUME) {
+      console.log('[DEBUG_HUME] [Correlation] Full metrics received:', {
+        timestamp: new Date(metrics.timestamp).toISOString(),
+        excitement: metrics.excitement,
+        confidence: metrics.confidence,
+        energy: metrics.energy,
+        topEmotions: metrics.topEmotions,
+        topBursts: metrics.topBursts,
+        topLanguageEmotions: metrics.topLanguageEmotions,
+        dominantSignal: metrics.dominantSignal,
+        avgSignalStrength: metrics.avgSignalStrength,
+        correlationQuality: metrics.correlationQuality
+      });
+      
+      if (metrics.topBursts && metrics.topBursts.length > 0) {
+        console.log('[DEBUG_HUME] 💥 Correlation received BURSTS:', metrics.topBursts);
+      }
+      
+      if (metrics.topLanguageEmotions && metrics.topLanguageEmotions.length > 0) {
+        console.log('[DEBUG_HUME] 📝 Correlation received LANGUAGE EMOTIONS:', metrics.topLanguageEmotions);
+      }
+    }
+    // ================================================================
   }
 
   // Add transcript line to buffer
