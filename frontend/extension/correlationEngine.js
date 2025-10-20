@@ -1,5 +1,10 @@
 // Correlation engine for matching viewer changes with transcript + tone
 
+// ==================== DEBUG CONFIGURATION ====================
+// Import from background.js or set locally
+const DEBUG_HUME = true;
+// =============================================================
+
 // Feature flag: disable extension AI calls (web app handles this)
 const ENABLE_EXTENSION_AI = false;
 const AI_MAX_LATENCY_MS = 900; // hard deadline for AI response
