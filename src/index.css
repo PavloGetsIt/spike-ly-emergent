@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Spikely Brand - Cyberpunk Red Theme */
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Exact red from logo - #FF3333 = HSL(0, 100%, 60%) */
+    --primary: 0 100% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Darker red accent */
+    --secondary: 0 90% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 60%;
+
+    /* Bright red accent */
+    --accent: 0 100% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Slightly darker red for destructive */
+    --destructive: 0 95% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 0 100% 60%;
+
+    --success: 142 76% 36%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
+
+    --radius: 1rem;
+
+    /* Refined design tokens - Subtle elegance */
+    --gradient-bg: radial-gradient(ellipse at top, hsl(0 100% 10%) 0%, hsl(0 0% 6%) 50%, hsl(0 0% 4%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(0 100% 60%), hsl(0 95% 52%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 12% / 0.4), hsl(0 10% 8% / 0.3));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 70% 30%));
+    --gradient-metal: linear-gradient(145deg, hsl(0 0% 15%), hsl(0 5% 10%));
+    --shadow-glow: 0 0 20px hsl(0 100% 60% / 0.15);
+    --shadow-glow-lg: 0 0 30px hsl(0 100% 60% / 0.2), 0 0 15px hsl(0 100% 60% / 0.1);
+    --shadow-card: 0 4px 20px hsl(0 100% 60% / 0.08), 0 2px 8px hsl(0 0% 0% / 0.3);
+    --shadow-soft: 0 2px 12px hsl(0 100% 60% / 0.1);
+    --shadow-neon: 0 0 8px hsl(0 100% 60% / 0.3), inset 0 0 4px hsl(0 100% 60% / 0.05);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --pulse-duration: 2s;
+
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 100% 60%;
+  }
+
+  .dark {
+    /* Dark mode - Night Mode from brand (dark blue-gray background) */
+    --background: 210 20% 18%;
+    --foreground: 0 0% 98%;
+
+    --card: 210 18% 15%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 210 18% 15%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 100% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 90% 48%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 210 15% 22%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 100% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 95% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 210 15% 25%;
+    --input: 210 18% 15%;
+    --ring: 0 100% 60%;
+
+    --success: 142 76% 40%;
+    --warning: 38 92% 55%;
+    --info: 199 89% 52%;
+    
+    --gradient-bg: linear-gradient(180deg, hsl(210 20% 18%) 0%, hsl(210 18% 15%) 50%, hsl(210 20% 14%) 100%);
+    
+    --sidebar-background: 210 18% 15%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 15% 22%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 210 15% 25%;
+    --sidebar-ring: 0 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground;
+    background: var(--gradient-bg);
+    background-attachment: fixed;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 120%;
+    background: 
+      radial-gradient(circle at 20% 80%, hsl(0 100% 60% / 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 80% 20%, hsl(0 100% 60% / 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 40% 40%, hsl(0 0% 100% / 0.02) 0%, transparent 50%);
+    opacity: 1;
+    pointer-events: none;
+    z-index: 0;
+    animation: mesh-drift 30s ease-in-out infinite;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      linear-gradient(135deg, transparent 0%, hsl(0 100% 60% / 0.03) 50%, transparent 100%),
+      linear-gradient(45deg, hsl(0 0% 0% / 0.2) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes fog-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+    50% { transform: translate(5%, 5%) scale(1.1); opacity: 0.8; }
+  }
+
+  @keyframes mesh-drift {
+    0%, 100% { 
+      transform: translate(0, 0) rotate(0deg); 
+      opacity: 1; 
+    }
+    33% { 
+      transform: translate(2%, -2%) rotate(1deg); 
+      opacity: 0.9; 
+    }
+    66% { 
+      transform: translate(-2%, 2%) rotate(-1deg); 
+      opacity: 0.95; 
+    }
+  }
+
+  .spike-accent {
+    position: relative;
+  }
+
+  .spike-accent::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 10px solid hsl(0 100% 60%);
+    animation: spike-float 3s ease-in-out infinite;
+  }
+
+  @keyframes spike-float {
+    0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.7; }
+    50% { transform: translateX(-50%) translateY(-4px); opacity: 0.9; }
+  }
+
+  /* Refined rounded containers */
+  .rounded-container {
+    border-radius: 1.5rem;
+    backdrop-filter: blur(20px);
+    position: relative;
+  }
+
+  .rounded-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(0 100% 60% / 0.2), transparent, hsl(0 100% 60% / 0.1));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Subtle badge animations */
+  @keyframes badge-glow {
+    0%, 100% { 
+      transform: rotate(-1deg);
+      box-shadow: 0 0 12px hsl(0 100% 60% / 0.2);
+    }
+    50% { 
+      transform: rotate(1deg);
+      box-shadow: 0 0 16px hsl(0 100% 60% / 0.3);
+    }
+  }
+
+  .badge-fun {
+    animation: badge-glow 3s ease-in-out infinite;
+  }
+}

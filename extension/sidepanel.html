@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spikely</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Collapsed Tab (visible when panel is collapsed) -->
+  <div class="collapsed-tab" id="collapsedTab">
+    <div class="tab-logo">S</div>
+  </div>
+
+  <!-- Main Panel Container -->
+  <div class="panel-container" id="panelContainer">
+    <!-- Header with Close Button -->
+    <div class="panel-header">
+      <h2>Spikely</h2>
+      <div class="header-right">
+        <div id="systemStatusBadge" class="system-status status-idle">
+          🔴 IDLE
+        </div>
+        <button id="collapseBtn" class="collapse-btn" title="Collapse panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Viewer Tracking Card -->
+    <div class="card viewer-card">
+  <div class="threshold-controls" style="display:flex; align-items:center; gap:12px; margin-bottom:12px; padding:8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+    <span style="font-size:12px; font-weight:500; color:rgba(255,255,255,0.7); min-width:100px;">Sensitivity:</span>
+    <input type="range" id="thresholdSlider" min="1" max="15" value="3" style="flex:1;" aria-label="Viewer delta threshold" aria-valuemin="1" aria-valuemax="15" aria-valuenow="3" aria-valuetext="Plus or minus 3 viewers" />
+    <span id="thresholdBadge" style="font-size:13px; font-weight:600; color:#10b981; min-width:35px; text-align:center;">±3</span>
+  </div>
+  <div class="viewer-controls" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
+    <button id="testInsightBtn" class="test-btn">🧪 Test</button>
+    <button id="resetTrackingBtn" class="reset-btn">Reset</button>
+  </div>
+  <div class="audio-controls" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
+    <span style="font-size:12px; opacity:0.8;">Audio</span>
+    <button id="startAudioBtn" class="audio-btn">Start Audio</button>
+  </div>
+      <div class="viewer-row">
+        <div class="viewer-left">
+          <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span class="viewer-delta" id="viewerDelta">0</span>
+          <span class="threshold-badge" id="thresholdBadgeGray">±3</span>
+          <span class="viewer-count" id="viewerCount">0</span>
+        </div>
+        <div class="session-time" id="sessionTime">0:00</div>
+      </div>
+      <p class="viewer-caption">Live viewer tracking</p>
+    </div>
+
+
+    <!-- AI Insight Card -->
+    <div class="card insight-card">
+      <!-- Engine Status Indicator -->
+      <div id="engineStatus" class="engine-status" style="display: none;">
+        <div class="status-row">
+          <div class="status-pill">
+            <span class="status-spinner"></span>
+            <span id="engineStatusText">Idle</span>
+          </div>
+          <div class="status-meta">
+            <span id="statusLatency" class="latency-badge" style="display: none;"></span>
+            <span id="statusSource" class="source-badge" style="display: none;"></span>
+          </div>
+        </div>
+        <div id="statusReason" class="failure-reason" style="display: none;"></div>
+      </div>
+      
+      <div id="insightContent" class="insight-content">
+        <div class="insight-empty">
+          <svg class="empty-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <p class="empty-title">Analyzing viewer patterns</p>
+          <p class="empty-subtitle">Speak to generate insights</p>
+        </div>
+      </div>
+      
+      <!-- Cooldown Timer -->
+      <div id="cooldownTimer" class="cooldown-timer" style="display: none;">
+        🔍 Watching for changes...
+      </div>
+    </div>
+
+    <!-- Top Actions Card -->
+    <div class="card actions-card">
+      <h3 class="card-title-large">Top Actions</h3>
+      <div class="actions-grid">
+        <!-- Winning Actions -->
+        <div class="actions-column winning">
+          <div class="actions-header">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m18 15-6-6-6 6"></path>
+            </svg>
+            <span>Top Winning</span>
+          </div>
+          <div class="actions-list" id="winningActions">
+            <div class="actions-empty">No winning actions yet</div>
+          </div>
+        </div>
+
+        <!-- Losing Actions -->
+        <div class="actions-column losing">
+          <div class="actions-header">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+            <span>Top Losing</span>
+          </div>
+          <div class="actions-list" id="losingActions">
+            <div class="actions-empty">No losing actions yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot"></span>
+        <span>Connecting...</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

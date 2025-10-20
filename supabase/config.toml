@@ -1,0 +1,25 @@
+project_id = "hnvdovyiapkkjrxcxbrv"
+
+[functions.log-insight]
+verify_jwt = false
+
+[functions.log-feedback]
+verify_jwt = false
+
+[functions.generate-insight]
+verify_jwt = false
+
+[functions.websocket-relay]
+verify_jwt = false
+
+[functions.extract-viewer-count]
+verify_jwt = false
+
+[functions.realtime-token]
+verify_jwt = false
+
+[functions.hume-analyze-emotion]
+verify_jwt = false
+
+[functions.hume-analyze-text]
+verify_jwt = false
