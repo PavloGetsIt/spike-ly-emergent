@@ -135,28 +135,3 @@ async function getAssemblyToken() {
     )
   }
 }
-
-async function getGoogleToken() {
-  const apiKey = Deno.env.get('GOOGLE_CLOUD_SPEECH_KEY')
-  
-  if (!apiKey) {
-    throw new Error('GOOGLE_CLOUD_SPEECH_KEY not configured')
-  }
-
-  // Google Cloud Speech uses API key in URL
-  return new Response(
-    JSON.stringify({
-      status: 'ok',
-      provider: 'google',
-      realtime_url: `wss://speech.googleapis.com/v1/speech:streamingrecognize?key=${apiKey}`,
-      config: {
-        encoding: 'LINEAR16',
-        sampleRateHertz: 24000,
-        languageCode: 'en-US'
-      }
-    }),
-    {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  )
-}
