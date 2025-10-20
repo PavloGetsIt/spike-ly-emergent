@@ -23,10 +23,8 @@ serve(async (req) => {
       return await getDeepgramToken()
     } else if (provider === 'assembly') {
       return await getAssemblyToken()
-    } else if (provider === 'google') {
-      return await getGoogleToken()
     } else {
-      throw new Error(`Unknown provider: ${provider}`)
+      throw new Error(`Unknown provider: ${provider}. Only 'deepgram' and 'assembly' are supported.`)
     }
   } catch (error) {
     console.error('[Realtime Token] Error:', error)
