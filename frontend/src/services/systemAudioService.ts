@@ -106,7 +106,7 @@ export class SystemAudioService {
           int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
 
-        // Send to Deepgram via WebSocket
+        // Send to AssemblyAI via WebSocket
         this.ws.send(int16Data.buffer);
       };
 
