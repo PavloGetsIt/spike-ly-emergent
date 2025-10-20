@@ -617,26 +617,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       type: 'AUDIO_LEVEL',
       level: message.level
     }, () => { void chrome.runtime.lastError; });
-  } else if (message.type === 'PROSODY_METRICS') {
-    // Forward prosody metrics to side panel and correlation engine
-    console.log('[Background] Prosody metrics received:', message.metrics);
-    
-    // Add to correlation engine
-    correlationEngine.addProsodyMetrics(message.metrics);
-    
-    // Forward to side panel
-    chrome.runtime.sendMessage({
-      type: 'PROSODY_METRICS',
-      metrics: message.metrics
-    }, () => { void chrome.runtime.lastError; });
-    
-    // Forward to web app
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'PROSODY_METRICS',
-        metrics: message.metrics
-      }));
-    }
   } else if (message.type === 'SYSTEM_STATUS') {
     // Forward system status to side panel
     chrome.runtime.sendMessage({
