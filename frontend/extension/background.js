@@ -781,6 +781,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           
           const result = resp.result;
           
+          // ==================== DEBUG LOGGING ====================
+          if (DEBUG_HUME) {
+            console.log(`[DEBUG_HUME] ========================================`);
+            console.log(`[DEBUG_HUME] Request ${requestId} - Full Response Object:`);
+            console.log(`[DEBUG_HUME] ========================================`);
+            console.log(`[DEBUG_HUME] Full result:`, JSON.stringify(result, null, 2));
+            
+            console.log(`[DEBUG_HUME] Prosody data:`, {
+              exists: !!result.prosody,
+              type: typeof result.prosody,
+              hasMetrics: !!result.prosody?.metrics,
+              hasTopEmotions: !!result.prosody?.topEmotions,
+              topEmotionsType: Array.isArray(result.prosody?.topEmotions) ? 'array' : typeof result.prosody?.topEmotions,
+              topEmotionsLength: result.prosody?.topEmotions?.length
+            });
+            
+            console.log(`[DEBUG_HUME] Burst data:`, {
+              exists: !!result.burst,
+              type: typeof result.burst,
+              hasTopEmotions: !!result.burst?.topEmotions,
+              topEmotionsType: Array.isArray(result.burst?.topEmotions) ? 'array' : typeof result.burst?.topEmotions,
+              topEmotionsLength: result.burst?.topEmotions?.length,
+              topEmotions: result.burst?.topEmotions
+            });
+            
+            console.log(`[DEBUG_HUME] Language data:`, {
+              exists: !!result.language,
+              type: typeof result.language,
+              hasTopEmotions: !!result.language?.topEmotions,
+              topEmotionsType: Array.isArray(result.language?.topEmotions) ? 'array' : typeof result.language?.topEmotions,
+              topEmotionsLength: result.language?.topEmotions?.length,
+              topEmotions: result.language?.topEmotions
+            });
+          }
+          // =======================================================
+          
           // Clear backoff on success
           humeState.backoffMs = 0;
           
