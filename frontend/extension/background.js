@@ -689,6 +689,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'HUME_ANALYZE') {
     // Centralized Hume AI analysis with request gating
     (async () => {
+      const requestId = generateRequestId();
+      
       const now = Date.now();
       const cooldown = humeState.minIntervalMs + humeState.backoffMs;
       
@@ -708,6 +710,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       humeState.lastAt = now;
       console.log('[Background] Hume queued → sending (inFlight=true)');
       
+      if (DEBUG_HUME) {
+        console.log(`[DEBUG_HUME] Request ${requestId} initiated at ${new Date().toISOString()}`);
+      }      
         try {
           // Ensure offscreen document exists for Hume AI processing
           const existingContexts = await chrome.runtime.getContexts({});
