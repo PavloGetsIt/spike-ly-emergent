@@ -835,6 +835,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           
           console.log(`[Background] Prosody metrics received {quality: ${metrics.correlationQuality}, dominant: ${metrics.dominantSignal}, energy: ${metrics.energy.toFixed(2)}}`);
           
+          // ==================== EXTENDED LOGGING ====================
+          if (DEBUG_HUME) {
+            console.log(`[DEBUG_HUME] Request ${requestId} - Parsed Metrics:`, {
+              timestamp: new Date().toISOString(),
+              excitement: metrics.excitement,
+              confidence: metrics.confidence,
+              energy: metrics.energy,
+              topEmotionsCount: metrics.topEmotions.length,
+              topBurstsCount: metrics.topBursts.length,
+              topLanguageEmotionsCount: metrics.topLanguageEmotions.length,
+              dominantSignal: metrics.dominantSignal,
+              correlationQuality: metrics.correlationQuality
+            });
+            
+            if (metrics.topBursts.length > 0) {
+              console.log(`[DEBUG_HUME] 💥 VOCAL BURSTS DETECTED:`, metrics.topBursts);
+            }
+            if (metrics.topLanguageEmotions.length > 0) {
+              console.log(`[DEBUG_HUME] 📝 LANGUAGE EMOTIONS DETECTED:`, metrics.topLanguageEmotions);
+            }
+          }
+          // ==========================================================
+          
           // Add to correlation engine
           correlationEngine.addProsodyMetrics(metrics);
           
