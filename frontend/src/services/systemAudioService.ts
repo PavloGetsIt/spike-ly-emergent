@@ -54,7 +54,7 @@ export class SystemAudioService {
 
       // Set up audio context for processing
       this.audioContext = new AudioContext({
-        sampleRate: 44100, // Match Deepgram stream @ 44.1kHz
+        sampleRate: 16000, // AssemblyAI requires 16kHz
       });
 
       this.source = this.audioContext.createMediaStreamSource(this.stream);
