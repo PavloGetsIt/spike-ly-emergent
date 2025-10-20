@@ -698,12 +698,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log('[Background] Hume queued → sending (inFlight=true)');
       
         try {
+          // Ensure offscreen document exists for Hume AI processing
+          const existingContexts = await chrome.runtime.getContexts({});
+          let offscreenDocument = existingContexts.find(c => c.contextType === 'OFFSCREEN_DOCUMENT');
+          
+          if (!offscreenDocument) {
+            console.log('[Background] Creating offscreen document for Hume AI...');
+            try {
+              await chrome.offscreen.createDocument({
+                url: 'offscreen.html',
+                reasons: ['AUDIO_PLAYBACK'],
+                justification: 'Hume AI prosody analysis'
+              });
+              // Give it time to initialize
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (err) {
+              if (!err.message.includes('Only a single offscreen')) {
+                throw err;
+              }
+            }
+          }
+          
+          // Send to offscreen document for Hume AI processing
           const resp = await new Promise((resolve) => {
             chrome.runtime.sendMessage({
               type: 'HUME_ANALYZE_FETCH',
               audioBase64: message.audioBase64
             }, (r) => {
               if (chrome.runtime.lastError) {
+                console.error('[Background] Hume message error:', chrome.runtime.lastError.message);
                 resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
               } else {
                 resolve(r);
