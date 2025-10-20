@@ -128,115 +128,142 @@ export class SystemAudioService {
   }
 
   private async connectWebSocket(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const wsUrl = `wss://hnvdovyiapkkjrxcxbrv.functions.supabase.co/functions/v1/google-speech-realtime`;
-      
-      console.log('🔌 Connecting to Google Cloud Speech-to-Text WebSocket:', wsUrl);
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.onopen = () => {
-        console.log('✅ WebSocket connected - Ready to stream audio to Google Cloud');
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log('🔌 Fetching AssemblyAI token...');
         
-        // Start keep-alive ping every 5 seconds
-        this.keepAliveInterval = window.setInterval(() => {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: 'KeepAlive' }));
-          }
-        }, 5000);
+        // Get token from Supabase edge function
+        const tokenResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/realtime-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'assembly' })
+        });
+        
+        if (!tokenResponse.ok) {
+          throw new Error(`Token fetch failed: ${tokenResponse.status}`);
+        }
+        
+        const tokenData = await tokenResponse.json();
+        const wsUrl = tokenData.realtime_url;
+        
+        console.log('🔌 Connecting to AssemblyAI WebSocket...');
+        this.ws = new WebSocket(wsUrl);
 
-        resolve();
-      };
+        this.ws.onopen = () => {
+          console.log('✅ WebSocket connected - Ready to stream audio to AssemblyAI');
+          resolve();
+        };
 
-      this.ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'transcript') {
-            const text = data.transcript?.trim();
-            if (!text) return;
+        this.ws.onmessage = async (event) => {
+          try {
+            const data = JSON.parse(event.data);
             
-            // ✅ CONSOLE LOG: Print transcript immediately
-            console.log(`🎤 TRANSCRIPT [${data.isFinal ? 'FINAL' : 'interim'}]:`, text);
-            console.log(`   Confidence: ${data.confidence ? (data.confidence * 100).toFixed(1) : 'N/A'}%`);
-            
-            // Debug: STT line (final only)
-            if (data.isFinal) {
-              Debug.emit('STT_LINE', {
-                text,
-                conf: data.confidence || 0,
-                t: Date.now()
-              });
+            // AssemblyAI v3 message format
+            if (data.message_type === 'SessionBegins') {
+              console.log('✅ AssemblyAI session started:', data.session_id);
+              return;
             }
             
-            // Call callback for all transcripts (interim and final)
-            if (this.onTranscriptCallback) {
-              this.onTranscriptCallback({
-                transcript: text,
-                isFinal: data.isFinal,
-                confidence: data.confidence,
-                timestamp: data.timestamp
-              });
+            if (data.message_type === 'SessionTerminated') {
+              console.log('⚠️ AssemblyAI session terminated');
+              return;
             }
-
-            // Send final transcripts to extension
-            if (data.isFinal) {
-              const { extensionService } = await import('./extensionService');
-              if (extensionService.isConnected) {
-                extensionService.send('TRANSCRIPT', {
+            
+            // Handle transcript messages (both partial and final)
+            if (data.transcript) {
+              const text = data.transcript.trim();
+              if (!text) return;
+              
+              const isFinal = !!data.is_final;
+              const confidence = data.confidence || 0;
+              
+              // ✅ CONSOLE LOG: Print transcript immediately
+              console.log(`🎤 TRANSCRIPT [${isFinal ? 'FINAL' : 'interim'}]:`, text);
+              console.log(`   Confidence: ${(confidence * 100).toFixed(1)}%`);
+              
+              // Debug: STT line (final only)
+              if (isFinal) {
+                Debug.emit('STT_LINE', {
                   text,
-                  confidence: data.confidence,
-                  timestamp: data.timestamp
+                  conf: confidence,
+                  t: Date.now()
+                });
+              }
+              
+              // Call callback for all transcripts (interim and final)
+              if (this.onTranscriptCallback) {
+                this.onTranscriptCallback({
+                  transcript: text,
+                  isFinal,
+                  confidence,
+                  timestamp: new Date().toISOString()
+                });
+              }
+
+              // Send final transcripts to extension
+              if (isFinal) {
+                const { extensionService } = await import('./extensionService');
+                if (extensionService.isConnected) {
+                  extensionService.send('TRANSCRIPT', {
+                    text,
+                    confidence,
+                    timestamp: new Date().toISOString()
+                  });
+                }
+              }
+
+              // Store final transcripts in database
+              if (isFinal) {
+                console.log('💾 Storing final transcript in DB');
+                await this.storeTranscript({
+                  transcript: text,
+                  confidence,
+                  isFinal: true,
+                  timestamp: new Date().toISOString()
                 });
               }
             }
-
-            // Store final transcripts in database
-            if (data.isFinal) {
-              console.log('💾 Storing final transcript in DB');
-              await this.storeTranscript(data);
-            }
-          } else if (data.type === 'error') {
-            console.error('❌ Google Cloud error:', data.message);
-          } else if (data.type === 'status' && data.status === 'connected') {
-            console.log('✅ Google Cloud connected');
+          } catch (error) {
+            console.error('❌ Error parsing WebSocket message:', error);
           }
-        } catch (error) {
-          console.error('❌ Error parsing WebSocket message:', error);
-        }
-      };
+        };
 
-      this.ws.onerror = (error) => {
-        console.error('❌ WebSocket connection error:', error);
-        console.error('💡 Please ensure GOOGLE_CLOUD_SPEECH_KEY is configured correctly');
+        this.ws.onerror = (error) => {
+          console.error('❌ WebSocket connection error:', error);
+          console.error('💡 Please ensure ASSEMBLYAI_API_KEY is configured correctly');
+          reject(error);
+        };
+
+        this.ws.onclose = (event) => {
+          console.log('🔌 WebSocket closed:', event.code, event.reason || 'No reason provided');
+          if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+          }
+          
+          // Auto-reconnect after 2 seconds if closed unexpectedly and stream is active
+          if (event.code !== 1000 && this.stream && this.stream.active) {
+            console.log('🔄 WebSocket dropped - reconnecting in 2 seconds...');
+            setTimeout(() => {
+              if (this.stream && this.stream.active) {
+                console.log('🔄 Attempting reconnection...');
+                this.connectWebSocket().catch(err => {
+                  console.error('❌ Reconnection failed:', err);
+                  // Try again after 5 seconds
+                  setTimeout(() => {
+                    if (this.stream && this.stream.active) {
+                      this.connectWebSocket().catch(e => console.error('❌ Second reconnection failed:', e));
+                    }
+                  }, 5000);
+                });
+              }
+            }, 2000);
+          }
+        };
+      } catch (error) {
+        console.error('❌ Failed to initialize AssemblyAI connection:', error);
         reject(error);
-      };
-
-      this.ws.onclose = (event) => {
-        console.log('🔌 WebSocket closed:', event.code, event.reason || 'No reason provided');
-        if (this.keepAliveInterval) {
-          clearInterval(this.keepAliveInterval);
-          this.keepAliveInterval = null;
-        }
-        
-        // Auto-reconnect after 2 seconds if closed unexpectedly and stream is active
-        if (event.code !== 1000 && this.stream && this.stream.active) {
-          console.log('🔄 WebSocket dropped - reconnecting in 2 seconds...');
-          setTimeout(() => {
-            if (this.stream && this.stream.active) {
-              console.log('🔄 Attempting reconnection...');
-              this.connectWebSocket().catch(err => {
-                console.error('❌ Reconnection failed:', err);
-                // Try again after 5 seconds
-                setTimeout(() => {
-                  if (this.stream && this.stream.active) {
-                    this.connectWebSocket().catch(e => console.error('❌ Second reconnection failed:', e));
-                  }
-                }, 5000);
-              });
-            }
-          }, 2000);
-        }
-      };
+      }
     });
   }
 
