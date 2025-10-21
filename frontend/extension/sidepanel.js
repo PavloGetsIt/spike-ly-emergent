@@ -1160,8 +1160,7 @@ async function startAudioViaScreenShare() {
     console.log('🎙️ [ASSEMBLYAI v3] ✅ Ready to transcribe audio!');
     
     audioIsCapturing = true;
-    startAudioBtn.textContent = 'Stop';
-    startAudioBtn.classList.add('active');
+    updateAudioState(true);  // Use centralized state update
     startAudioBtn.disabled = false;
     if (testInsightBtn) testInsightBtn.style.display = 'inline-block';
     console.debug('[TEST:INSIGHT:UI] Button visible (fallback)');
