@@ -248,11 +248,27 @@ Based on this data, generate ONE tactical decision for the streamer to execute i
         next_move_words = insight['nextMove'].split()[:8]
         insight['nextMove'] = ' '.join(next_move_words)
         
-        # Validate no transcript bleed
-        transcript_start = ' '.join(request.transcript.lower().split()[:10])
-        if any(word in transcript_start for word in insight['emotionalLabel'].lower().split() if len(word) > 4):
-            logger.warning("⚠️ Transcript bleed detected in emotionalLabel, using fallback")
-            insight['emotionalLabel'] = "✅ Neutral" if request.viewerDelta > 0 else "❌ Neutral"
+        # Validate no transcript bleed - only check for consecutive multi-word matches
+        transcript_lower = request.transcript.lower()
+        emotional_lower = insight['emotionalLabel'].lower()
+        next_move_lower = insight['nextMove'].lower()
+        
+        # Check for 3+ consecutive word matches (actual bleed)
+        def has_consecutive_match(output: str, source: str, min_words: int = 3) -> bool:
+            output_words = output.split()
+            for i in range(len(output_words) - min_words + 1):
+                phrase = ' '.join(output_words[i:i+min_words])
+                if len(phrase) > 10 and phrase in source:
+                    return True
+            return False
+        
+        if has_consecutive_match(emotional_lower, transcript_lower, 3):
+            logger.warning("⚠️ Transcript bleed detected in emotionalLabel (3+ words), using fallback")
+            insight['emotionalLabel'] = "content spike" if request.viewerDelta > 0 else "content dip"
+        
+        if has_consecutive_match(next_move_lower, transcript_lower, 4):
+            logger.warning("⚠️ Transcript bleed detected in nextMove (4+ words), using fallback")
+            insight['nextMove'] = "Keep this energy going" if request.viewerDelta > 0 else "Try something different"
         
         logger.info(f"✅ Insight generated - Label: {insight['emotionalLabel']}, Move: {insight['nextMove']}")
         
