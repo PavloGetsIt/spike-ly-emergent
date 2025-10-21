@@ -20,6 +20,126 @@ let winningActions = [];
 let losingActions = [];
 let audioProcessor = null;
 
+let isAudioRecording = false;
+
+// ==================== UI UTILITY FUNCTIONS ====================
+
+/**
+ * Add expandable tooltip for truncated text
+ */
+function addExpandableTooltip(element, fullText) {
+  if (!element || !fullText) return;
+  
+  const isTruncated = element.scrollWidth > element.clientWidth;
+  
+  if (isTruncated) {
+    element.title = fullText;
+    element.style.cursor = 'pointer';
+    element.classList.add('truncated-text');
+    
+    let isExpanded = false;
+    
+    element.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      
+      if (isExpanded) {
+        element.textContent = fullText;
+        element.classList.add('expanded');
+      } else {
+        const truncated = fullText.length > 60 
+          ? fullText.substring(0, 57) + '...' 
+          : fullText;
+        element.textContent = truncated;
+        element.classList.remove('expanded');
+      }
+    });
+  }
+}
+
+/**
+ * Format time ago (e.g., "5s ago", "just now")
+ */
+function formatTimeAgo(timestamp) {
+  const now = Date.now();
+  const diff = Math.floor((now - timestamp) / 1000);
+  
+  if (diff < 5) return 'just now';
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+/**
+ * Update audio state display
+ */
+function updateAudioState(recording) {
+  isAudioRecording = recording;
+  
+  const audioBtn = startAudioBtn;
+  const statusDot = document.getElementById('audioStatusDot');
+  const statusLabel = document.getElementById('audioStatusLabel');
+  const btnIcon = audioBtn?.querySelector('.btn-icon');
+  const btnText = audioBtn?.querySelector('.btn-text');
+  
+  if (!audioBtn) return;
+  
+  if (recording) {
+    audioBtn.classList.add('recording');
+    statusDot?.classList.add('recording');
+    statusLabel?.classList.add('recording');
+    
+    if (statusLabel) statusLabel.textContent = 'Audio: Recording';
+    if (btnIcon) btnIcon.textContent = '⏹️';
+    if (btnText) btnText.textContent = 'Stop Audio';
+    audioBtn.setAttribute('aria-label', 'Stop audio recording');
+  } else {
+    audioBtn.classList.remove('recording');
+    statusDot?.classList.remove('recording');
+    statusLabel?.classList.remove('recording');
+    
+    if (statusLabel) statusLabel.textContent = 'Audio: Stopped';
+    if (btnIcon) btnIcon.textContent = '🎤';
+    if (btnText) btnText.textContent = 'Start Audio';
+    audioBtn.setAttribute('aria-label', 'Start audio recording');
+  }
+}
+
+/**
+ * Update viewer delta display with tooltips
+ */
+function updateViewerDeltaDisplay(delta, count, threshold) {
+  const deltaEl = viewerDelta;
+  const countEl = viewerCount;
+  const thresholdEl = thresholdBadgeGray;
+  
+  if (deltaEl) {
+    deltaEl.textContent = delta > 0 ? `+${delta}` : delta;
+    deltaEl.title = `Viewer change in last 5 seconds: ${delta > 0 ? '+' : ''}${delta}`;
+    
+    if (delta > 0) {
+      deltaEl.style.color = '#10b981';
+    } else if (delta < 0) {
+      deltaEl.style.color = '#ef4444';
+    } else {
+      deltaEl.style.color = 'rgba(255, 255, 255, 0.5)';
+    }
+  }
+  
+  if (countEl) {
+    countEl.textContent = count;
+    countEl.title = `Current live viewers: ${count}`;
+  }
+  
+  if (thresholdEl) {
+    thresholdEl.textContent = `±${threshold}`;
+    thresholdEl.title = `Sensitivity threshold: ±${threshold} viewers`;
+  }
+}
+
+// =============================================================
+
+
+
 // DOM Elements
 const viewerDelta = document.getElementById('viewerDelta');
 const viewerCount = document.getElementById('viewerCount');
