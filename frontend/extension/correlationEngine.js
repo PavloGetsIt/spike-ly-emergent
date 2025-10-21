@@ -406,16 +406,18 @@ class CorrelationEngine {
     let nextMove = '';
     let emotionalLabel = 'analyzing';
     
-    // Only call AI for high-impact events (threshold gating)
-    const isHighImpact = delta >= 15 || delta <= -15;
+    // Call AI for any significant events (based on user's sensitivity setting)
+    // User's minDelta setting determines what's "significant"
+    const isHighImpact = Math.abs(delta) >= this.minDelta;
     
     // [AI:GATE] diagnostic log with sanitized preview
     const transcriptPreview = segment.text.slice(0, 100).replace(/\n/g, ' ');
     console.log('[AI:GATE]', {
       delta,
+      minDelta: this.minDelta,
       isHighImpact,
       willCallAI: ENABLE_EXTENSION_AI && isHighImpact,
-      thresholds: { spike: 15, drop: -15 },
+      threshold: this.minDelta,
       transcriptPreview,
       topic: segment.topic,
       emotion: tone?.emotion
