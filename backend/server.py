@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
-from anthropic import Anthropic
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 import json
 
 
