@@ -142,23 +142,36 @@ function updateViewerDeltaDisplay(delta, count, threshold) {
 function setupTooltips() {
   // Viewer delta tooltip
   const deltaEl = document.getElementById('viewerDelta');
-  if (deltaEl && !deltaEl.title) {
-    deltaEl.title = 'Change in last 5 seconds';
+  if (deltaEl) {
+    const currentDelta = deltaEl.textContent || '0';
+    deltaEl.title = `Viewer change in last 5 seconds: ${currentDelta}`;
+    console.log('[UI:INIT] Delta tooltip set');
   }
   
   // Viewer count tooltip
   const countEl = document.getElementById('viewerCount');
-  if (countEl && !countEl.title) {
-    countEl.title = 'Current live viewers';
+  if (countEl) {
+    const currentCount = countEl.textContent || '0';
+    countEl.title = `Current live viewers: ${currentCount}`;
+    console.log('[UI:INIT] Count tooltip set');
   }
   
   // Threshold badge tooltip
   const thresholdGrayEl = document.getElementById('thresholdBadgeGray');
-  if (thresholdGrayEl && !thresholdGrayEl.title) {
-    thresholdGrayEl.title = 'Sensitivity threshold';
+  if (thresholdGrayEl) {
+    const currentThreshold = thresholdGrayEl.textContent || '±3';
+    thresholdGrayEl.title = `Sensitivity threshold: ${currentThreshold} viewers`;
+    console.log('[UI:INIT] Threshold tooltip set');
   }
   
-  console.log('[UI:INIT] Tooltips setup complete');
+  // Audio button tooltip
+  const audioBtn = document.getElementById('startAudioBtn');
+  if (audioBtn) {
+    audioBtn.title = 'Start or stop audio capture for transcription';
+    console.log('[UI:INIT] Audio button tooltip set');
+  }
+  
+  console.log('[UI:INIT] ✅ Tooltips setup complete');
 }
 
 /**
