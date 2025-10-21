@@ -1,8 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-002 - FORCE RELOAD TEST
-alert('🔥 NEW CODE LOADING! Version 2025-06-21-002 🔥');
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-002 (FORCE RELOAD)');
-console.log('🎯 This version includes: Audio button init, tooltips, animations');
+// VERSION: 2025-06-21-003 - AUDIO STATE FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-003 (Audio State Fix)');
+console.log('🎯 Fixed: Audio status label and dot now update correctly');
 
 import { AudioProcessor } from './audioProcessor.js';
 
