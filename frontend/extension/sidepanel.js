@@ -1,4 +1,8 @@
 // Spikely Side Panel - WebSocket Integration
+// VERSION: 2025-06-21-001 - Priority One UI Fixes
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-001');
+console.log('🎯 This version includes: Audio button init, tooltips, animations');
+
 import { AudioProcessor } from './audioProcessor.js';
 
 // Threshold configuration (dynamic, loaded from chrome.storage)
