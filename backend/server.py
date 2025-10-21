@@ -209,19 +209,20 @@ SIGNAL STRENGTH: {request.quality or 'medium'}
 
 Based on this data, generate ONE tactical decision for the streamer to execute in the next 30 seconds. Return ONLY valid JSON with no markdown or explanation."""
 
-        # Call Claude API
-        logger.info("🤖 Calling Claude Sonnet 4.5...")
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=150,
-            system=system_prompt,
-            messages=[
-                {"role": "user", "content": user_prompt}
-            ]
-        )
+        # Call Claude via Emergent Integrations
+        logger.info("🤖 Calling Claude Sonnet 4.5 via Emergent LLM...")
         
-        # Parse response
-        generated_text = response.content[0].text.strip()
+        # Create chat instance
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"insight-{datetime.now().timestamp()}",
+            system_message=system_prompt
+        ).with_model("anthropic", "claude-sonnet-4-20250514")
+        
+        # Send message
+        user_message = UserMessage(text=user_prompt)
+        generated_text = await chat.send_message(user_message)
+        
         logger.info(f"✅ Claude response: {generated_text[:100]}...")
         
         # Parse JSON
