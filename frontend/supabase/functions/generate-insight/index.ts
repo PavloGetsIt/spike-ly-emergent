@@ -267,6 +267,21 @@ Analyze this data and generate an insight following the rules above. Return ONLY
     const apiCallDuration = Date.now() - apiCallStartTime;
     const totalDuration = Date.now() - requestStartTime;
 
+    // Log raw Claude response
+    debugLog(correlationId, 'CLAUDE_RESPONSE', {
+      rawResponse: data,
+      contentText: data?.content?.[0]?.text || '',
+      usage: {
+        inputTokens: data.usage?.input_tokens || 0,
+        outputTokens: data.usage?.output_tokens || 0,
+        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
+      },
+      timing: {
+        apiCallMs: apiCallDuration,
+        totalMs: totalDuration
+      }
+    });
+
     let generatedText: string = data?.content?.[0]?.text ?? '';
     let insight: any | null = null;
 
@@ -279,7 +294,9 @@ Analyze this data and generate an insight following the rules above. Return ONLY
           // Try to salvage JSON object from any wrapper text
           const match = generatedText.match(/\{[\s\S]*\}/);
           if (match) {
-            try { insight = JSON.parse(match[0]); } catch {}
+            try { 
+              insight = JSON.parse(match[0]); 
+            } catch {}
           }
         }
       }
