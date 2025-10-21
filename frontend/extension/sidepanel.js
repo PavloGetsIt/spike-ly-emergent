@@ -136,6 +136,128 @@ function updateViewerDeltaDisplay(delta, count, threshold) {
   }
 }
 
+/**
+ * Setup tooltips for UI elements
+ */
+function setupTooltips() {
+  // Viewer delta tooltip
+  const deltaEl = document.getElementById('viewerDelta');
+  if (deltaEl && !deltaEl.title) {
+    deltaEl.title = 'Change in last 5 seconds';
+  }
+  
+  // Viewer count tooltip
+  const countEl = document.getElementById('viewerCount');
+  if (countEl && !countEl.title) {
+    countEl.title = 'Current live viewers';
+  }
+  
+  // Threshold badge tooltip
+  const thresholdGrayEl = document.getElementById('thresholdBadgeGray');
+  if (thresholdGrayEl && !thresholdGrayEl.title) {
+    thresholdGrayEl.title = 'Sensitivity threshold';
+  }
+  
+  console.log('[UI:INIT] Tooltips setup complete');
+}
+
+/**
+ * Apply pulse animation fallback via JavaScript
+ */
+function applyPulseAnimationFallback() {
+  const statusDot = document.querySelector('.status-pulse-dot');
+  const audioDot = document.querySelector('.audio-status-dot.recording');
+  
+  if (statusDot) {
+    statusDot.style.animation = 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite';
+  }
+  
+  if (audioDot) {
+    audioDot.style.animation = 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite';
+  }
+  
+  console.log('[UI:INIT] Pulse animation fallback applied');
+}
+
+/**
+ * Start timestamp updater for action items
+ */
+function startTimestampUpdater() {
+  setInterval(() => {
+    // Update action time elements
+    document.querySelectorAll('.action-time[data-timestamp]').forEach(el => {
+      const timestamp = parseInt(el.getAttribute('data-timestamp'));
+      if (timestamp) {
+        el.textContent = formatTimeAgo(timestamp);
+      }
+    });
+    
+    // Update any other timestamp elements
+    document.querySelectorAll('[data-timestamp]').forEach(el => {
+      if (!el.classList.contains('action-time')) {
+        const timestamp = parseInt(el.getAttribute('data-timestamp'));
+        if (timestamp) {
+          el.textContent = formatTimeAgo(timestamp);
+        }
+      }
+    });
+  }, 5000); // Update every 5 seconds
+  
+  console.log('[UI:INIT] Timestamp updater started');
+}
+
+/**
+ * Initialize UI features with retry logic
+ * Ensures DOM is ready before initializing tooltips and animations
+ */
+function initializeUIFeatures() {
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 200; // ms
+  let retryCount = 0;
+  
+  function attemptInit() {
+    console.log(`[UI:INIT] Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+    
+    // Check if critical DOM elements are present
+    const requiredElements = [
+      document.getElementById('viewerDelta'),
+      document.getElementById('viewerCount'),
+      document.getElementById('thresholdBadgeGray'),
+      document.getElementById('startAudioBtn')
+    ];
+    
+    const allPresent = requiredElements.every(el => el !== null);
+    
+    if (allPresent) {
+      console.log('[UI:INIT] All required DOM elements found');
+      
+      // Setup tooltips
+      setupTooltips();
+      
+      // Apply animation fallback
+      applyPulseAnimationFallback();
+      
+      // Start timestamp updater
+      startTimestampUpdater();
+      
+      console.log('[UI:INIT] ✅ Initialization complete');
+      return true;
+    } else {
+      console.warn('[UI:INIT] Some DOM elements not ready yet');
+      retryCount++;
+      
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(attemptInit, RETRY_DELAY);
+      } else {
+        console.error('[UI:INIT] ❌ Failed after maximum retries');
+      }
+      return false;
+    }
+  }
+  
+  attemptInit();
+}
+
 // =============================================================
 
 
