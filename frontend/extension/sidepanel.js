@@ -863,6 +863,9 @@ function updateInsight(data) {
   const deltaClass = isPositive ? 'positive' : 'negative';
   const deltaSign = isPositive ? '+' : '';
   
+  const truncatedText = truncate(text, 60);
+  const isTruncated = text.length > 60;
+  
   insightContent.innerHTML = `
     <div class="insight-card">
       <div class="insight-delta ${deltaClass}">
@@ -870,9 +873,17 @@ function updateInsight(data) {
         ${arrowIcon}
       </div>
       ${nextMove ? `<div class="insight-next-move">${escapeHtml(nextMove)}</div>` : ''}
-      ${text ? `<div class="insight-transcript">"${escapeHtml(truncate(text, 60))}"</div>` : ''}
+      ${text ? `<div class="insight-transcript" ${isTruncated ? `title="${escapeHtml(text)}"` : ''}>"${escapeHtml(truncatedText)}"</div>` : ''}
     </div>
   `;
+  
+  // Add expandable tooltip if text is truncated
+  if (isTruncated && text) {
+    const transcriptEl = insightContent.querySelector('.insight-transcript');
+    if (transcriptEl) {
+      addExpandableTooltip(transcriptEl, `"${text}"`);
+    }
+  }
   
   // Start cooldown timer and update status
   startCooldownTimer(5);
