@@ -136,6 +136,81 @@ function updateViewerDeltaDisplay(delta, count, threshold) {
   }
 }
 
+/**
+ * Show cooldown/monitoring status with animation
+ */
+function showCooldownStatus(state = 'watching') {
+  const cooldownEl = cooldownTimer;
+  if (!cooldownEl) return;
+  
+  const statusText = cooldownEl.querySelector('.status-text');
+  if (!statusText) return;
+  
+  cooldownEl.style.display = 'flex';
+  
+  // Remove all state classes
+  cooldownEl.classList.remove('analyzing', 'error');
+  
+  switch(state) {
+    case 'watching':
+      statusText.textContent = 'Live monitoring active';
+      break;
+    case 'analyzing':
+      cooldownEl.classList.add('analyzing');
+      statusText.textContent = 'Analyzing patterns...';
+      break;
+    case 'correlating':
+      cooldownEl.classList.add('analyzing');
+      statusText.textContent = 'Correlating insights...';
+      break;
+    case 'error':
+      cooldownEl.classList.add('error');
+      statusText.textContent = 'Monitoring paused';
+      break;
+    default:
+      statusText.textContent = 'Live monitoring active';
+  }
+}
+
+/**
+ * Hide cooldown status display
+ */
+function hideCooldownStatus() {
+  if (cooldownTimer) {
+    cooldownTimer.style.display = 'none';
+  }
+}
+
+/**
+ * Start periodic timestamp updater for relative times
+ */
+function startTimestampUpdater() {
+  setInterval(() => {
+    // Update action timestamps
+    document.querySelectorAll('.action-time[data-timestamp]').forEach(el => {
+      const timestamp = parseInt(el.getAttribute('data-timestamp'));
+      if (timestamp) {
+        el.textContent = formatTimeAgo(timestamp);
+      }
+    });
+    
+    // Update any other elements with data-timestamp attribute
+    document.querySelectorAll('[data-timestamp]:not(.action-time)').forEach(el => {
+      const timestamp = parseInt(el.getAttribute('data-timestamp'));
+      if (timestamp) {
+        const currentText = el.textContent;
+        // Only update if it looks like a time format
+        if (currentText.includes('ago') || currentText.includes('just now') || currentText.match(/^\d+[smh]/)) {
+          el.textContent = formatTimeAgo(timestamp);
+        }
+      }
+    });
+  }, 5000); // Update every 5 seconds
+}
+
+// Start the timestamp updater
+startTimestampUpdater();
+
 // =============================================================
 
 
