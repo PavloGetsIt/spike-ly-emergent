@@ -224,8 +224,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         timestamp: Date.now()
       }));
     }
-    // Also update correlation engine
-    correlationEngine.setThresholds(message.minDelta);
+    
+    // ==================== THRESHOLD FIX ====================
+    // Update correlation engine with correct object structure
+    correlationEngine.setThresholds({ 
+      minTrigger: message.minDelta 
+    });
+    console.log('[THRESHOLD:BG:APPLIED] Set correlation engine minDelta to:', message.minDelta);
+    // =======================================================
     
     // Forward to active tab (content script)
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
