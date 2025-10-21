@@ -1198,8 +1198,7 @@ if (startAudioBtn) {
         
         if (response?.success) {
       audioIsCapturing = true;
-      startAudioBtn.textContent = 'Stop';
-      startAudioBtn.classList.add('active');
+      updateAudioState(true);  // Use centralized state update
       startAudioBtn.disabled = false;
       console.log('[Spikely Side Panel] ✅ System started');
       
