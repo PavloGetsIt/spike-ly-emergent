@@ -432,7 +432,28 @@ Analyze this data and generate an insight following the rules above. Return ONLY
     });
 
   } catch (error) {
+    let correlationId = 'error_' + Date.now();
+    
+    // Try to get correlation ID from request if available
+    try {
+      const bodyText = await req.text();
+      const parsed = JSON.parse(bodyText);
+      if (parsed?.correlationId) {
+        correlationId = parsed.correlationId;
+      }
+    } catch {
+      // Use generated error ID
+    }
+    
+    debugLog(correlationId, 'ERROR', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    
     console.error('[Generate Insight] Error:', error);
+    console.error('[Generate Insight] Correlation ID:', correlationId);
     
     // Try to get payload if available, otherwise use safe defaults
     let topic = 'content';
