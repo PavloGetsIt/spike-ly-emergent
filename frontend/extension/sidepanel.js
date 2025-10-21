@@ -1242,8 +1242,7 @@ if (startAudioBtn) {
         audioProcessor.stop();
         audioProcessor = null;
         audioIsCapturing = false;
-        startAudioBtn.textContent = 'Start';
-        startAudioBtn.classList.remove('active');
+        updateAudioState(false);  // Use centralized state update
         console.log('[Spikely] ✅ System stopped');
         
         // Hide test button when system stops
