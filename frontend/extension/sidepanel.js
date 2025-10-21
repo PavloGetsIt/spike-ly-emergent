@@ -1222,7 +1222,7 @@ if (startAudioBtn) {
             // Show friendly inline error (unrecoverable)
             console.debug('[AUDIO:SP:UI] Showing inline error:', errMsg);
             alert('⚠️ Audio Capture Not Available\n\n' + errMsg);
-            startAudioBtn.textContent = 'Start';
+            updateAudioState(false);  // Use centralized state update
             startAudioBtn.disabled = false;
             isSystemStarted = false;
           }
