@@ -1155,4 +1155,96 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-connectToWebSocket();
+// ==================== PRIORITY ONE FIX: UI INITIALIZATION WITH RETRY ====================
+/**
+ * Setup tooltips for UI elements
+ */
+function setupTooltips() {
+  const viewerDeltaEl = document.getElementById('viewerDelta');
+  const viewerCountEl = document.getElementById('viewerCount');
+  const thresholdBadgeGrayEl = document.getElementById('thresholdBadgeGray');
+  
+  if (viewerDeltaEl && !viewerDeltaEl.title) {
+    viewerDeltaEl.title = 'Viewer change in last 5 seconds';
+  }
+  
+  if (viewerCountEl && !viewerCountEl.title) {
+    viewerCountEl.title = 'Current live viewers';
+  }
+  
+  if (thresholdBadgeGrayEl && !thresholdBadgeGrayEl.title) {
+    thresholdBadgeGrayEl.title = `Sensitivity threshold: ${thresholdBadgeGrayEl.textContent}`;
+  }
+  
+  console.log('[UI:INIT] Tooltips setup complete');
+}
+
+/**
+ * Apply JavaScript-based pulse animation as fallback
+ */
+function applyPulseAnimationFallback() {
+  const statusDot = document.querySelector('.status-pulse-dot');
+  const audioDot = document.querySelector('.audio-status-dot.recording');
+  
+  // Only apply if CSS animations aren't working
+  if (statusDot) {
+    const hasAnimation = getComputedStyle(statusDot).animationName !== 'none';
+    if (!hasAnimation) {
+      console.warn('[UI:INIT] CSS animation not detected, applying JS fallback');
+      // JS animation fallback would go here if needed
+    }
+  }
+  
+  console.log('[UI:INIT] Animation fallback check complete');
+}
+
+/**
+ * Initialize UI features with retry logic
+ * Ensures DOM is fully ready before applying enhancements
+ */
+async function initializeUIFeatures() {
+  const MAX_RETRIES = 5;
+  const RETRY_INTERVAL = 200; // ms
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`[UI:INIT] Attempt ${attempt}/${MAX_RETRIES}`);
+    
+    // Check if critical DOM elements are present
+    const viewerDelta = document.getElementById('viewerDelta');
+    const viewerCount = document.getElementById('viewerCount');
+    const thresholdBadgeGray = document.getElementById('thresholdBadgeGray');
+    const audioStatusDot = document.getElementById('audioStatusDot');
+    const audioStatusLabel = document.getElementById('audioStatusLabel');
+    
+    if (viewerDelta && viewerCount && thresholdBadgeGray && audioStatusDot && audioStatusLabel) {
+      console.log('[UI:INIT] ✅ All critical DOM elements found');
+      
+      // Setup UI enhancements
+      setupTooltips();
+      applyPulseAnimationFallback();
+      
+      // Initialize audio state display
+      updateAudioState(false);
+      
+      console.log('[UI:INIT] ✅ Initialization complete');
+      return true;
+    }
+    
+    console.warn(`[UI:INIT] ⚠️ Missing elements, retrying in ${RETRY_INTERVAL}ms...`);
+    await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL));
+  }
+  
+  console.error('[UI:INIT] ❌ Failed to initialize after', MAX_RETRIES, 'attempts');
+  return false;
+}
+
+// Initialize UI features before connecting to WebSocket
+initializeUIFeatures().then(() => {
+  console.log('[UI:INIT] Starting WebSocket connection...');
+  connectToWebSocket();
+}).catch(err => {
+  console.error('[UI:INIT] Initialization error:', err);
+  // Connect anyway to not block the app
+  connectToWebSocket();
+});
+// ======================================================================================
