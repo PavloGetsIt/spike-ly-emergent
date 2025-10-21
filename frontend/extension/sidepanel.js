@@ -234,6 +234,10 @@ function initializeUIFeatures() {
       // Setup tooltips
       setupTooltips();
       
+      // Initialize audio button state
+      updateAudioState(false);
+      console.log('[UI:INIT] Audio state initialized to stopped');
+      
       // Apply animation fallback
       applyPulseAnimationFallback();
       
