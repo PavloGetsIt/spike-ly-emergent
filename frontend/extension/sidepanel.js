@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-004 - BRANDING UPDATE
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-004 (Branding Update)');
-console.log('🎯 Extension: Real-time Live Stream Artificial Intelligence');
+// VERSION: 2025-06-21-005 - FASTAPI MIGRATION
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-005 (FastAPI Migration)');
+console.log('🎯 Migrated from Supabase to FastAPI backend for insights');
 
 import { AudioProcessor } from './audioProcessor.js';
 
