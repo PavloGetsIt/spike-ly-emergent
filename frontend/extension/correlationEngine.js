@@ -6,8 +6,8 @@ const DEBUG_HUME = true;
 // =============================================================
 
 // Feature flag: disable extension AI calls (web app handles this)
-const ENABLE_EXTENSION_AI = false;
-const AI_MAX_LATENCY_MS = 900; // hard deadline for AI response
+const ENABLE_EXTENSION_AI = true;  // ENABLED for Claude Sonnet 4.5
+const AI_MAX_LATENCY_MS = 1500; // 1.5s deadline for AI response
 
 class CorrelationEngine {
   constructor() {
