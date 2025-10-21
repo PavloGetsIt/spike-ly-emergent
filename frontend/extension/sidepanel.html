@@ -4,10 +4,49 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spikely</title>
-  <link rel="stylesheet" href="sidepanel.css">
+  <!-- CSS with cache busting -->
+  <link rel="stylesheet" href="sidepanel.css?v=2025102101">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Inline critical CSS animations to prevent caching issues -->
+  <style>
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.8;
+        transform: scale(1.1);
+      }
+    }
+    
+    @keyframes pulse-ring {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+      }
+    }
+    
+    /* Ensure pulse animation always works */
+    .status-pulse-dot {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+    }
+    
+    .status-pulse-dot::before {
+      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+    }
+    
+    .audio-status-dot.recording {
+      animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+    }
+  </style>
 </head>
 <body>
   <!-- Collapsed Tab (visible when panel is collapsed) -->
