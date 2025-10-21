@@ -137,56 +137,68 @@ function updateViewerDeltaDisplay(delta, count, threshold) {
 }
 
 /**
- * Show cooldown/monitoring status with animation
+ * Setup tooltips for UI elements
  */
-function showCooldownStatus(state = 'watching') {
-  const cooldownEl = cooldownTimer;
-  if (!cooldownEl) return;
-  
-  const statusText = cooldownEl.querySelector('.status-text');
-  if (!statusText) return;
-  
-  cooldownEl.style.display = 'flex';
-  
-  // Remove all state classes
-  cooldownEl.classList.remove('analyzing', 'error');
-  
-  switch(state) {
-    case 'watching':
-      statusText.textContent = 'Live monitoring active';
-      break;
-    case 'analyzing':
-      cooldownEl.classList.add('analyzing');
-      statusText.textContent = 'Analyzing patterns...';
-      break;
-    case 'correlating':
-      cooldownEl.classList.add('analyzing');
-      statusText.textContent = 'Correlating insights...';
-      break;
-    case 'error':
-      cooldownEl.classList.add('error');
-      statusText.textContent = 'Monitoring paused';
-      break;
-    default:
-      statusText.textContent = 'Live monitoring active';
+function setupTooltips() {
+  // Viewer delta tooltip
+  const deltaEl = document.getElementById('viewerDelta');
+  if (deltaEl) {
+    const currentDelta = deltaEl.textContent || '0';
+    deltaEl.title = `Viewer change in last 5 seconds: ${currentDelta}`;
+    console.log('[UI:INIT] Delta tooltip set');
   }
+  
+  // Viewer count tooltip
+  const countEl = document.getElementById('viewerCount');
+  if (countEl) {
+    const currentCount = countEl.textContent || '0';
+    countEl.title = `Current live viewers: ${currentCount}`;
+    console.log('[UI:INIT] Count tooltip set');
+  }
+  
+  // Threshold badge tooltip
+  const thresholdGrayEl = document.getElementById('thresholdBadgeGray');
+  if (thresholdGrayEl) {
+    const currentThreshold = thresholdGrayEl.textContent || '±3';
+    thresholdGrayEl.title = `Sensitivity threshold: ${currentThreshold} viewers`;
+    console.log('[UI:INIT] Threshold tooltip set');
+  }
+  
+  // Audio button tooltip
+  const audioBtn = document.getElementById('startAudioBtn');
+  if (audioBtn) {
+    audioBtn.title = 'Start or stop audio capture for transcription';
+    console.log('[UI:INIT] Audio button tooltip set');
+  }
+  
+  console.log('[UI:INIT] ✅ Tooltips setup complete');
 }
 
 /**
- * Hide cooldown status display
+ * Apply pulse animation fallback via JavaScript
  */
-function hideCooldownStatus() {
-  if (cooldownTimer) {
-    cooldownTimer.style.display = 'none';
+function applyPulseAnimationFallback() {
+  const statusDot = document.querySelector('.status-pulse-dot');
+  const audioDot = document.querySelector('.audio-status-dot');
+  
+  if (statusDot) {
+    statusDot.style.animation = 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite';
   }
+  
+  if (audioDot) {
+    // Don't apply animation initially - only when recording
+    console.log('[UI:INIT] Audio dot found, animation will apply when recording');
+  }
+  
+  console.log('[UI:INIT] Pulse animation fallback applied');
 }
 
 /**
- * Start periodic timestamp updater for relative times
+ * Start timestamp updater for action items
  */
 function startTimestampUpdater() {
   setInterval(() => {
-    // Update action timestamps
+    // Update action time elements
     document.querySelectorAll('.action-time[data-timestamp]').forEach(el => {
       const timestamp = parseInt(el.getAttribute('data-timestamp'));
       if (timestamp) {
@@ -194,22 +206,75 @@ function startTimestampUpdater() {
       }
     });
     
-    // Update any other elements with data-timestamp attribute
-    document.querySelectorAll('[data-timestamp]:not(.action-time)').forEach(el => {
-      const timestamp = parseInt(el.getAttribute('data-timestamp'));
-      if (timestamp) {
-        const currentText = el.textContent;
-        // Only update if it looks like a time format
-        if (currentText.includes('ago') || currentText.includes('just now') || currentText.match(/^\d+[smh]/)) {
+    // Update any other timestamp elements
+    document.querySelectorAll('[data-timestamp]').forEach(el => {
+      if (!el.classList.contains('action-time')) {
+        const timestamp = parseInt(el.getAttribute('data-timestamp'));
+        if (timestamp) {
           el.textContent = formatTimeAgo(timestamp);
         }
       }
     });
   }, 5000); // Update every 5 seconds
+  
+  console.log('[UI:INIT] Timestamp updater started');
 }
 
-// Start the timestamp updater
-startTimestampUpdater();
+/**
+ * Initialize UI features with retry logic
+ * Ensures DOM is ready before initializing tooltips and animations
+ */
+function initializeUIFeatures() {
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 200; // ms
+  let retryCount = 0;
+  
+  function attemptInit() {
+    console.log(`[UI:INIT] Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+    
+    // Check if critical DOM elements are present
+    const requiredElements = [
+      document.getElementById('viewerDelta'),
+      document.getElementById('viewerCount'),
+      document.getElementById('thresholdBadgeGray'),
+      document.getElementById('startAudioBtn')
+    ];
+    
+    const allPresent = requiredElements.every(el => el !== null);
+    
+    if (allPresent) {
+      console.log('[UI:INIT] All required DOM elements found');
+      
+      // Setup tooltips
+      setupTooltips();
+      
+      // Initialize audio button state
+      updateAudioState(false);
+      console.log('[UI:INIT] Audio state initialized to stopped');
+      
+      // Apply animation fallback
+      applyPulseAnimationFallback();
+      
+      // Start timestamp updater
+      startTimestampUpdater();
+      
+      console.log('[UI:INIT] ✅ Initialization complete');
+      return true;
+    } else {
+      console.warn('[UI:INIT] Some DOM elements not ready yet');
+      retryCount++;
+      
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(attemptInit, RETRY_DELAY);
+      } else {
+        console.error('[UI:INIT] ❌ Failed after maximum retries');
+      }
+      return false;
+    }
+  }
+  
+  attemptInit();
+}
 
 // =============================================================
 
@@ -816,6 +881,9 @@ function updateInsight(data) {
   const deltaClass = isPositive ? 'positive' : 'negative';
   const deltaSign = isPositive ? '+' : '';
   
+  const truncatedText = truncate(text, 60);
+  const isTruncated = text.length > 60;
+  
   insightContent.innerHTML = `
     <div class="insight-card">
       <div class="insight-delta ${deltaClass}">
@@ -823,9 +891,17 @@ function updateInsight(data) {
         ${arrowIcon}
       </div>
       ${nextMove ? `<div class="insight-next-move">${escapeHtml(nextMove)}</div>` : ''}
-      ${text ? `<div class="insight-transcript">"${escapeHtml(truncate(text, 60))}"</div>` : ''}
+      ${text ? `<div class="insight-transcript" ${isTruncated ? `title="${escapeHtml(text)}"` : ''}>"${escapeHtml(truncatedText)}"</div>` : ''}
     </div>
   `;
+  
+  // Add expandable tooltip if text is truncated
+  if (isTruncated && text) {
+    const transcriptEl = insightContent.querySelector('.insight-transcript');
+    if (transcriptEl) {
+      addExpandableTooltip(transcriptEl, `"${text}"`);
+    }
+  }
   
   // Start cooldown timer and update status
   startCooldownTimer(5);
@@ -872,15 +948,9 @@ function renderActions(type) {
       ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
     
-    // Use relative time format instead of duration
+    // Use timestamp to format relative time
     const timeText = action.timestamp ? formatTimeAgo(action.timestamp) : action.time;
     const fullTimestamp = action.timestamp ? new Date(action.timestamp).toLocaleString() : '';
-    
-    // Truncate snippet and add expandable tooltip
-    const fullSnippet = action.snippet || '';
-    const truncatedSnippet = fullSnippet.length > 50 
-      ? fullSnippet.substring(0, 47) + '...' 
-      : fullSnippet;
     
     return `
       <div class="action-item">
@@ -889,7 +959,7 @@ function renderActions(type) {
           <span class="action-label">${escapeHtml(action.label)}</span>
           <span class="action-delta ${isPositive ? 'positive' : 'negative'}">${action.delta > 0 ? '+' : ''}${action.delta}</span>
         </div>
-        <div class="action-snippet" title="${escapeHtml(fullSnippet)}">"${escapeHtml(truncatedSnippet)}"</div>
+        <div class="action-snippet" title="${escapeHtml(action.snippet)}">"${escapeHtml(action.snippet)}"</div>
         <div class="action-time" data-timestamp="${action.timestamp || ''}" title="${fullTimestamp}">${timeText}</div>
       </div>
     `;
@@ -1240,96 +1310,8 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ==================== PRIORITY ONE FIX: UI INITIALIZATION WITH RETRY ====================
-/**
- * Setup tooltips for UI elements
- */
-function setupTooltips() {
-  const viewerDeltaEl = document.getElementById('viewerDelta');
-  const viewerCountEl = document.getElementById('viewerCount');
-  const thresholdBadgeGrayEl = document.getElementById('thresholdBadgeGray');
-  
-  if (viewerDeltaEl && !viewerDeltaEl.title) {
-    viewerDeltaEl.title = 'Viewer change in last 5 seconds';
-  }
-  
-  if (viewerCountEl && !viewerCountEl.title) {
-    viewerCountEl.title = 'Current live viewers';
-  }
-  
-  if (thresholdBadgeGrayEl && !thresholdBadgeGrayEl.title) {
-    thresholdBadgeGrayEl.title = `Sensitivity threshold: ${thresholdBadgeGrayEl.textContent}`;
-  }
-  
-  console.log('[UI:INIT] Tooltips setup complete');
-}
+// Initialize UI features with retry logic
+console.log('[UI:INIT] Starting UI initialization...');
+initializeUIFeatures();
 
-/**
- * Apply JavaScript-based pulse animation as fallback
- */
-function applyPulseAnimationFallback() {
-  const statusDot = document.querySelector('.status-pulse-dot');
-  const audioDot = document.querySelector('.audio-status-dot.recording');
-  
-  // Only apply if CSS animations aren't working
-  if (statusDot) {
-    const hasAnimation = getComputedStyle(statusDot).animationName !== 'none';
-    if (!hasAnimation) {
-      console.warn('[UI:INIT] CSS animation not detected, applying JS fallback');
-      // JS animation fallback would go here if needed
-    }
-  }
-  
-  console.log('[UI:INIT] Animation fallback check complete');
-}
-
-/**
- * Initialize UI features with retry logic
- * Ensures DOM is fully ready before applying enhancements
- */
-async function initializeUIFeatures() {
-  const MAX_RETRIES = 5;
-  const RETRY_INTERVAL = 200; // ms
-  
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`[UI:INIT] Attempt ${attempt}/${MAX_RETRIES}`);
-    
-    // Check if critical DOM elements are present
-    const viewerDelta = document.getElementById('viewerDelta');
-    const viewerCount = document.getElementById('viewerCount');
-    const thresholdBadgeGray = document.getElementById('thresholdBadgeGray');
-    const audioStatusDot = document.getElementById('audioStatusDot');
-    const audioStatusLabel = document.getElementById('audioStatusLabel');
-    
-    if (viewerDelta && viewerCount && thresholdBadgeGray && audioStatusDot && audioStatusLabel) {
-      console.log('[UI:INIT] ✅ All critical DOM elements found');
-      
-      // Setup UI enhancements
-      setupTooltips();
-      applyPulseAnimationFallback();
-      
-      // Initialize audio state display
-      updateAudioState(false);
-      
-      console.log('[UI:INIT] ✅ Initialization complete');
-      return true;
-    }
-    
-    console.warn(`[UI:INIT] ⚠️ Missing elements, retrying in ${RETRY_INTERVAL}ms...`);
-    await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL));
-  }
-  
-  console.error('[UI:INIT] ❌ Failed to initialize after', MAX_RETRIES, 'attempts');
-  return false;
-}
-
-// Initialize UI features before connecting to WebSocket
-initializeUIFeatures().then(() => {
-  console.log('[UI:INIT] Starting WebSocket connection...');
-  connectToWebSocket();
-}).catch(err => {
-  console.error('[UI:INIT] Initialization error:', err);
-  // Connect anyway to not block the app
-  connectToWebSocket();
-});
-// ======================================================================================
+connectToWebSocket();
