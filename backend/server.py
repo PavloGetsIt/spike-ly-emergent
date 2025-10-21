@@ -107,10 +107,6 @@ async def generate_insight(request: InsightRequest):
         # Initialize Anthropic client
         client = Anthropic(api_key=api_key)
         
-        # Determine feedback type
-        delta_abs = abs(request.viewerDelta)
-        feedback_type = 'spike' if request.viewerDelta > 0 else ('dump' if delta_abs > 30 else 'drop')
-        
         # Build context strings
         prosody_str = "No prosody data"
         if request.prosody:
