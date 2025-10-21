@@ -483,7 +483,8 @@ class CorrelationEngine {
         }, AI_MAX_LATENCY_MS);
 
         const aiStartTime = performance.now();
-        const response = await fetch('https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight', {
+        const backendUrl = 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight';
+        const response = await fetch(backendUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
