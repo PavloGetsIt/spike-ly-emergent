@@ -35,7 +35,7 @@ supabase functions deploy generate-insight --project-ref hnvdovyiapkkjrxcxbrv
 
 ### Step 3: Set the Claude API Key Secret
 ```bash
-supabase secrets set ANTHROPIC_API_KEY=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 --project-ref hnvdovyiapkkjrxcxbrv
+supabase secrets set ANTHROPIC_API_KEY=YOUR_CLAUDE_API_KEY_HERE --project-ref hnvdovyiapkkjrxcxbrv
 ```
 
 ---
