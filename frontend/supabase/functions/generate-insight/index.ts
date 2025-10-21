@@ -3,6 +3,12 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+const DEBUG_MODE = Deno.env.get('ENABLE_CORRELATION_DEBUG') !== 'false'; // Default to true
+
+function debugLog(correlationId: string, stage: string, data: any) {
+  if (!DEBUG_MODE) return;
+  console.log(`[CORRELATION:${correlationId}:${stage}]`, JSON.stringify(data, null, 2));
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +16,7 @@ const corsHeaders = {
 };
 
 interface InsightRequest {
+  correlationId?: string;
   transcript: string;
   viewerDelta: number;
   viewerCount: number;
