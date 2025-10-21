@@ -304,3 +304,4 @@ Insight card should show:
 ✅ **Data flow verified** - AssemblyAI + Hume AI + viewer tracking all feeding correlation engine
 
 **Next:** Deploy the updated Supabase edge function and test on a live stream!
+NOTE: Replace YOUR_CLAUDE_API_KEY_HERE with your actual Claude API key when deploying.
