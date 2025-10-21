@@ -116,8 +116,37 @@ class CorrelationEngine {
     // Emit observing status
     this.emitStatus('OBSERVING');
 
+    // ==================== INSTRUMENTATION ====================
+    const tsISO = new Date().toISOString();
+    const previousCount = this.viewerBuffer.length >= 2 ? this.viewerBuffer[this.viewerBuffer.length - 2].count : count;
+    const willEmit = Math.abs(delta) >= this.minDelta;
+    
+    if (DEBUG_HUME) {
+      console.log(
+        `CORR_CHECK ts=${tsISO} threshold=${this.minDelta} prev=${previousCount} curr=${count} delta=${delta} willEmit=${willEmit}`
+      );
+    }
+    
+    // ==================== DEBUGGER HOOK ====================
+    // Enable via: window.__SPIKELY_DEBUG__ = true in console
+    if (typeof window !== 'undefined' && window.__SPIKELY_DEBUG__ === true) {
+      if (Math.abs(delta) >= Math.abs(this.minDelta)) {
+        console.debug(
+          `[DEBUG HOOK] Threshold met: delta=${delta}, threshold=${this.minDelta}. ` +
+          `Pausing at debugger (if DevTools open)...`
+        );
+        debugger;  // Pause execution for inspection
+      }
+    }
+    // =======================================================
+
     // Check if significant change
     if (Math.abs(delta) >= this.minDelta) {
+      // Log insight emission
+      console.log(
+        `INSIGHT_EMIT ts=${tsISO} type="viewer-spike" delta=${delta} threshold=${this.minDelta}`
+      );
+      
       this.emitStatus('ANALYZING');
       this.emitEngineStatus('CORRELATING');
       // Handle async without blocking
