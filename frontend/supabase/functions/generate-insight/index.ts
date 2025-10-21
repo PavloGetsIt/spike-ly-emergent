@@ -96,6 +96,7 @@ Use these patterns to inform your advice. If a pattern shows high success, encou
     
     console.log('🤖 ==========================================');
     console.log('🤖 CLAUDE INSIGHT GENERATION STARTED');
+    console.log('🤖 Correlation ID:', correlationId);
     console.log('🤖 Timestamp:', new Date().toISOString());
     console.log('🤖 Model: claude-sonnet-4-5');
     console.log('🤖 Viewer Delta:', payload.viewerDelta);
@@ -194,6 +195,22 @@ Bad insights (transcript bleed - NEVER DO THIS):
 - Feedback type: ${feedbackType}
 
 Analyze this data and generate an insight following the rules above. Return ONLY valid JSON.`;
+
+    // Log full prompts in debug mode
+    debugLog(correlationId, 'CLAUDE_REQUEST', {
+      model: 'claude-sonnet-4-5',
+      maxTokens: 150,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      requestPayload: {
+        viewerDelta: payload.viewerDelta,
+        viewerCount: payload.viewerCount,
+        prevCount: payload.prevCount,
+        transcript: payload.transcript,
+        topic: payload.topic,
+        quality: payload.quality
+      }
+    });
 
     console.log('🤖 Calling Claude API...');
     const apiCallStartTime = Date.now();
