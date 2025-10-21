@@ -2,6 +2,19 @@ import { buildSegments, countWords, hashText, type Segment } from './segmenter';
 import { enqueueHumeAnalysis } from './humeService';
 import { Debug } from './debug';
 
+// Generate unique correlation ID
+function generateCorrelationId(): string {
+  return `corr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Check if debug mode is enabled
+const DEBUG_MODE = import.meta.env.VITE_DEBUG_CORRELATION === 'true';
+
+function debugLog(correlationId: string, stage: string, data: any) {
+  if (!DEBUG_MODE) return;
+  console.log(`[CORRELATION:${correlationId}:${stage}]`, data);
+}
+
 type TranscriptLine = { t: number; text: string; conf?: number };
 type ViewerSample = { t: number; count: number };
 type TopicType = 'food' | 'fitness' | 'personal' | 'finance' | 'interaction' | 'general';
