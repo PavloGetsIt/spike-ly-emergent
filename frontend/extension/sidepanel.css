@@ -1070,6 +1070,20 @@ body {
   background: #3b82f6;
 }
 
+.cooldown-timer.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.cooldown-timer.error .status-pulse-dot {
+  background: #ef4444;
+  animation: none;
+}
+
+.cooldown-timer.error .status-pulse-dot::before {
+  display: none;
+}
+
 /* Fix 2: Audio Status Indicator */
 .audio-status-dot.recording {
   background: #ef4444;
