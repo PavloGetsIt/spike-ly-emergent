@@ -46,7 +46,7 @@ supabase secrets set ANTHROPIC_API_KEY=YOUR_CLAUDE_API_KEY_HERE --project-ref hn
 2. Click on "Edge Function Secrets" or "Secrets"
 3. Add new secret:
    - **Name:** `ANTHROPIC_API_KEY`
-   - **Value:** `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`
+   - **Value:** `YOUR_CLAUDE_API_KEY_HERE`
 4. Save
 
 ---
