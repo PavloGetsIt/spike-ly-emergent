@@ -74,6 +74,12 @@ if (thresholdSlider && thresholdBadgeDisplay) {
   thresholdSlider.addEventListener('input', (e) => {
     const value = parseInt(e.target.value);
     MIN_DELTA = value;
+    
+    // ==================== INSTRUMENTATION ====================
+    const timestamp = new Date().toISOString();
+    console.log(`SLIDER_CHANGE ts=${timestamp} value=${value}`);
+    // ==========================================================
+    
     thresholdBadgeDisplay.textContent = '±' + value;
     if (thresholdBadgeGray) thresholdBadgeGray.textContent = '±' + value;
     
