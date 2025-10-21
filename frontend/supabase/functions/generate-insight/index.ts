@@ -393,6 +393,7 @@ Analyze this data and generate an insight following the rules above. Return ONLY
 
     console.log('✅ ==========================================');
     console.log('✅ CLAUDE INSIGHT GENERATION COMPLETED');
+    console.log('✅ Correlation ID:', correlationId);
     console.log('✅ API Call Duration:', apiCallDuration, 'ms');
     console.log('✅ Total Duration:', totalDuration, 'ms');
     console.log('✅ Tokens - Input:', data.usage?.input_tokens || 'unknown');
@@ -400,8 +401,33 @@ Analyze this data and generate an insight following the rules above. Return ONLY
     console.log('✅ Emotional Label:', insight.emotionalLabel);
     console.log('✅ Next Move:', insight.nextMove);
     console.log('✅ ==========================================');
+    
+    debugLog(correlationId, 'COMPLETE', {
+      insight,
+      timing: {
+        apiCallMs: apiCallDuration,
+        totalMs: totalDuration
+      },
+      tokens: {
+        input: data.usage?.input_tokens || 0,
+        output: data.usage?.output_tokens || 0,
+        total: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
+      }
+    });
 
-    return new Response(JSON.stringify(insight), {
+    return new Response(JSON.stringify({
+      ...insight,
+      source: 'Claude',
+      correlationId,
+      timing: {
+        apiCallMs: apiCallDuration,
+        totalMs: totalDuration
+      },
+      tokens: DEBUG_MODE ? {
+        input: data.usage?.input_tokens || 0,
+        output: data.usage?.output_tokens || 0
+      } : undefined
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
