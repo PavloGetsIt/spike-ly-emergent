@@ -166,14 +166,15 @@ function setupTooltips() {
  */
 function applyPulseAnimationFallback() {
   const statusDot = document.querySelector('.status-pulse-dot');
-  const audioDot = document.querySelector('.audio-status-dot.recording');
+  const audioDot = document.querySelector('.audio-status-dot');
   
   if (statusDot) {
     statusDot.style.animation = 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite';
   }
   
   if (audioDot) {
-    audioDot.style.animation = 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite';
+    // Don't apply animation initially - only when recording
+    console.log('[UI:INIT] Audio dot found, animation will apply when recording');
   }
   
   console.log('[UI:INIT] Pulse animation fallback applied');
