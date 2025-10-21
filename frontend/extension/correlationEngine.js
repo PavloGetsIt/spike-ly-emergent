@@ -23,9 +23,20 @@ class CorrelationEngine {
 
   // Update thresholds from settings
   setThresholds(thresholds) {
+    const oldMinDelta = this.minDelta;
+    
     if (thresholds.minTrigger !== undefined) {
       this.minDelta = thresholds.minTrigger;
-      console.log('[Correlation] Updated minDelta to:', this.minDelta);
+      
+      // ==================== INSTRUMENTATION ====================
+      const timestamp = new Date().toISOString();
+      console.log(
+        `SLIDER_CHANGE ts=${timestamp} value=${this.minDelta} (previous: ${oldMinDelta})`
+      );
+      // ==========================================================
+    } else {
+      console.warn('[Correlation] setThresholds called with invalid structure:', thresholds);
+      console.warn('[Correlation] Expected: { minTrigger: number }, got:', typeof thresholds, thresholds);
     }
   }
 
