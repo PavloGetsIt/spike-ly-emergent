@@ -457,8 +457,8 @@ class CorrelationEngine {
       };
 
         console.log('🤖 ==========================================');
-        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (Extension)');
-        console.log('🤖 URL: https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight');
+        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
+        console.log('🤖 URL: https://stream-insights-2.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
         console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
         console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
