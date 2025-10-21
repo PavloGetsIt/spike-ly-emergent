@@ -1169,7 +1169,7 @@ async function startAudioViaScreenShare() {
   } catch (err) {
     console.error('[Spikely] Screen-share audio error:', err);
     alert(`Audio capture failed: ${err.message}\n\nPlease try again and make sure to check "Share tab audio".`);
-    startAudioBtn.textContent = 'Start';
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
     isSystemStarted = false;
     throw err;
