@@ -51,6 +51,17 @@ serve(async (req) => {
   try {
     const requestStartTime = Date.now();
     const payload: InsightRequest = await req.json();
+    const correlationId = payload.correlationId || `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    debugLog(correlationId, 'RECEIVED', {
+      timestamp: new Date().toISOString(),
+      viewerDelta: payload.viewerDelta,
+      viewerCount: payload.viewerCount,
+      transcriptLength: payload.transcript?.length || 0,
+      topic: payload.topic,
+      quality: payload.quality,
+      hasHistory: !!payload.recentHistory?.length
+    });
     
     // Load learned patterns from streamer_patterns table
     let patternsContext = '';
