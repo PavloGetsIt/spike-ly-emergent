@@ -994,6 +994,18 @@ body {
 
 /* ==================== UI FIXES: ANIMATIONS & ENHANCEMENTS ==================== */
 
+/* Fix 5: Ensure consistent button heights for alignment */
+.test-btn,
+.reset-btn,
+.audio-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fix 1: Pulsing Animation */
+
 /* Fix 1: Pulsing Status Indicator */
 .status-pulse-dot {
   width: 8px;
