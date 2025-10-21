@@ -1,8 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-002 - FORCE RELOAD TEST
-alert('🔥 NEW CODE LOADING! Version 2025-06-21-002 🔥');
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-002 (FORCE RELOAD)');
-console.log('🎯 This version includes: Audio button init, tooltips, animations');
+// VERSION: 2025-06-21-004 - BRANDING UPDATE
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-004 (Branding Update)');
+console.log('🎯 Extension: Real-time Live Stream Artificial Intelligence');
 
 import { AudioProcessor } from './audioProcessor.js';
 
@@ -742,8 +741,7 @@ function resetAllData() {
   audioIsCapturing = false;
   isSystemStarted = false;
   if (startAudioBtn) {
-    startAudioBtn.textContent = 'Start';
-    startAudioBtn.classList.remove('active');
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
   }
   
@@ -1160,8 +1158,7 @@ async function startAudioViaScreenShare() {
     console.log('🎙️ [ASSEMBLYAI v3] ✅ Ready to transcribe audio!');
     
     audioIsCapturing = true;
-    startAudioBtn.textContent = 'Stop';
-    startAudioBtn.classList.add('active');
+    updateAudioState(true);  // Use centralized state update
     startAudioBtn.disabled = false;
     if (testInsightBtn) testInsightBtn.style.display = 'inline-block';
     console.debug('[TEST:INSIGHT:UI] Button visible (fallback)');
@@ -1170,7 +1167,7 @@ async function startAudioViaScreenShare() {
   } catch (err) {
     console.error('[Spikely] Screen-share audio error:', err);
     alert(`Audio capture failed: ${err.message}\n\nPlease try again and make sure to check "Share tab audio".`);
-    startAudioBtn.textContent = 'Start';
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
     isSystemStarted = false;
     throw err;
@@ -1198,8 +1195,7 @@ if (startAudioBtn) {
         
         if (response?.success) {
       audioIsCapturing = true;
-      startAudioBtn.textContent = 'Stop';
-      startAudioBtn.classList.add('active');
+      updateAudioState(true);  // Use centralized state update
       startAudioBtn.disabled = false;
       console.log('[Spikely Side Panel] ✅ System started');
       
@@ -1223,7 +1219,7 @@ if (startAudioBtn) {
             // Show friendly inline error (unrecoverable)
             console.debug('[AUDIO:SP:UI] Showing inline error:', errMsg);
             alert('⚠️ Audio Capture Not Available\n\n' + errMsg);
-            startAudioBtn.textContent = 'Start';
+            updateAudioState(false);  // Use centralized state update
             startAudioBtn.disabled = false;
             isSystemStarted = false;
           }
@@ -1243,8 +1239,7 @@ if (startAudioBtn) {
         audioProcessor.stop();
         audioProcessor = null;
         audioIsCapturing = false;
-        startAudioBtn.textContent = 'Start';
-        startAudioBtn.classList.remove('active');
+        updateAudioState(false);  // Use centralized state update
         console.log('[Spikely] ✅ System stopped');
         
         // Hide test button when system stops
@@ -1255,8 +1250,7 @@ if (startAudioBtn) {
         // Stop normal tabCapture audio
         chrome.runtime.sendMessage({ type: 'STOP_AUDIO_CAPTURE' }, (response) => {
           audioIsCapturing = false;
-          startAudioBtn.textContent = 'Start';
-          startAudioBtn.classList.remove('active');
+          updateAudioState(false);  // Use centralized state update
           console.log('[Spikely] ✅ System stopped');
           
           // Hide test button when system stops
