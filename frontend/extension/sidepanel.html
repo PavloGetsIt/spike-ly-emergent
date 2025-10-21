@@ -43,9 +43,15 @@
     <button id="testInsightBtn" class="test-btn">🧪 Test</button>
     <button id="resetTrackingBtn" class="reset-btn">Reset</button>
   </div>
-  <div class="audio-controls" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
-    <span style="font-size:12px; opacity:0.8;">Audio</span>
-    <button id="startAudioBtn" class="audio-btn">Start Audio</button>
+  <div class="audio-controls" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; padding:10px 12px; background:rgba(255,255,255,0.03); border-radius:8px;">
+    <div class="audio-status-indicator" style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:500;">
+      <span class="audio-status-dot" id="audioStatusDot" style="width:8px; height:8px; border-radius:50%; background:#6b7280;"></span>
+      <span class="audio-status-label" id="audioStatusLabel" style="color:rgba(255,255,255,0.7);">Audio: Stopped</span>
+    </div>
+    <button id="startAudioBtn" class="audio-btn">
+      <span class="btn-icon">🎤</span>
+      <span class="btn-text">Start Audio</span>
+    </button>
   </div>
       <div class="viewer-row">
         <div class="viewer-left">
