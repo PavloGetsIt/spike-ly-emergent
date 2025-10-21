@@ -919,6 +919,10 @@ function renderActions(type) {
       ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
     
+    // Use timestamp to format relative time
+    const timeText = action.timestamp ? formatTimeAgo(action.timestamp) : action.time;
+    const fullTimestamp = action.timestamp ? new Date(action.timestamp).toLocaleString() : '';
+    
     return `
       <div class="action-item">
         <div class="action-header">
@@ -926,8 +930,8 @@ function renderActions(type) {
           <span class="action-label">${escapeHtml(action.label)}</span>
           <span class="action-delta ${isPositive ? 'positive' : 'negative'}">${action.delta > 0 ? '+' : ''}${action.delta}</span>
         </div>
-        <div class="action-snippet">"${escapeHtml(action.snippet)}"</div>
-        <div class="action-time">${action.time}</div>
+        <div class="action-snippet" title="${escapeHtml(action.snippet)}">"${escapeHtml(action.snippet)}"</div>
+        <div class="action-time" data-timestamp="${action.timestamp || ''}" title="${fullTimestamp}">${timeText}</div>
       </div>
     `;
   }).join('');
