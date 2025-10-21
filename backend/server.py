@@ -116,7 +116,8 @@ async def generate_insight(request: InsightRequest):
         language_str = f"Language emotion: {request.language.emotion}" if request.language and request.language.emotion else "No language emotion"
         history_str = "No recent history"
         if request.recentHistory:
-            history_str = f"Recent pattern: {', '.join([f'{h.delta:+d} ({h.emotion or 'unknown'})' for h in request.recentHistory])}"
+            history_items = [f"{h.delta:+d} ({h.emotion or 'unknown'})" for h in request.recentHistory]
+            history_str = f"Recent pattern: {', '.join(history_items)}"
         
         # Create system prompt
         system_prompt = """You are Spikely's real-time live stream AI coach. Your job is to analyze viewer behavior patterns and give streamers PRECISE, ACTIONABLE micro-decisions to spike engagement NOW.
