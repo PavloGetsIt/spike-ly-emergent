@@ -1277,4 +1277,8 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Initialize UI features with retry logic
+console.log('[UI:INIT] Starting UI initialization...');
+initializeUIFeatures();
+
 connectToWebSocket();
