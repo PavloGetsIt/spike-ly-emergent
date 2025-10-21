@@ -742,8 +742,7 @@ function resetAllData() {
   audioIsCapturing = false;
   isSystemStarted = false;
   if (startAudioBtn) {
-    startAudioBtn.textContent = 'Start';
-    startAudioBtn.classList.remove('active');
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
   }
   
