@@ -295,6 +295,17 @@ export async function pushViewer(count: number) {
       emotion: emotion.emotion
     });
     
+    // Generate correlation ID for this request
+    const correlationId = generateCorrelationId();
+    debugLog(correlationId, 'INIT', {
+      timestamp: new Date().toISOString(),
+      delta,
+      count,
+      topic,
+      emotion: emotion.emotion,
+      segmentLength: segment.text.length
+    });
+    
     // Try AI-powered insight generation first (always attempt AI, no gating by delta magnitude)
     emitEngineStatus('AI_CALLING');
     // Cancel previous AI call if still in flight (single-flight)
@@ -312,6 +323,7 @@ export async function pushViewer(count: number) {
     try {
       console.log('🤖 ==========================================');
       console.log('🤖 CALLING CLAUDE API FOR INSIGHT (Web App)');
+      console.log('🤖 Correlation ID:', correlationId);
       console.log('🤖 URL:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insight`);
       console.log('🤖 Viewer Delta:', delta);
       console.log('🤖 Language Emotion:', emotion.emotion);
@@ -319,6 +331,7 @@ export async function pushViewer(count: number) {
       console.log('🤖 ==========================================');
       
       const payload = {
+        correlationId, // Add correlation ID to payload
         transcript: truncatedTranscript,
         viewerDelta: delta,
         viewerCount: count,
@@ -336,6 +349,10 @@ export async function pushViewer(count: number) {
       aiAbortController = new AbortController();
       const timeoutId = setTimeout(() => {
         aiAbortController?.abort();
+        debugLog(correlationId, 'TIMEOUT', {
+          maxLatency: AI_MAX_LATENCY_MS,
+          message: 'Request aborted due to timeout'
+        });
         console.warn(`[AI] Timeout after ${AI_MAX_LATENCY_MS}ms → fallback`);
       }, AI_MAX_LATENCY_MS);
       
@@ -345,6 +362,7 @@ export async function pushViewer(count: number) {
       
       // [AI:FETCH:STARTING] diagnostic log with sanitized payload
       console.log('[AI:FETCH:STARTING]', {
+        correlationId,
         url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insight`,
         payloadSize: JSON.stringify(payload).length,
         transcriptPreview: sanitizedTranscript,
@@ -368,16 +386,37 @@ export async function pushViewer(count: number) {
       aiLatencies.push(aiDuration);
       if (aiLatencies.length > 100) aiLatencies.shift();
 
+      debugLog(correlationId, 'FETCH_END', {
+        status: response.status,
+        statusText: response.statusText,
+        duration: Math.round(aiDuration),
+        ok: response.ok
+      });
+
       if (response.ok) {
         const aiInsight = await response.json();
         aiCallsSucceeded++;
         aiInFlight = false;
         
+        // Enhanced debug logging of full response
+        debugLog(correlationId, 'RESPONSE', {
+          emotionalLabel: aiInsight.emotionalLabel,
+          nextMove: aiInsight.nextMove,
+          source: aiInsight.source,
+          duration: Math.round(aiDuration),
+          tokens: aiInsight.tokens
+        });
+        
         console.log('✅ ==========================================');
         console.log('✅ CLAUDE INSIGHT RECEIVED (Web App)');
+        console.log('✅ Correlation ID:', correlationId);
         console.log('✅ Response Time:', Math.round(aiDuration), 'ms');
         console.log('✅ Emotional Label:', aiInsight.emotionalLabel);
         console.log('✅ Next Move:', aiInsight.nextMove);
+        console.log('✅ Source:', aiInsight.source || 'Claude');
+        if (aiInsight.tokens) {
+          console.log('✅ Tokens:', aiInsight.tokens);
+        }
         console.log('✅ ==========================================');
         
         if (aiInsight.emotionalLabel && aiInsight.nextMove) {
@@ -391,8 +430,16 @@ export async function pushViewer(count: number) {
         aiInFlight = false;
         
         const errorText = await response.text();
+        debugLog(correlationId, 'ERROR', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.slice(0, 200),
+          duration: Math.round(aiDuration)
+        });
+        
         console.error('❌ ==========================================');
         console.error('❌ CLAUDE API FAILED (Web App)');
+        console.error('❌ Correlation ID:', correlationId);
         console.error('❌ Status:', response.status);
         console.error('❌ Error:', errorText);
         console.error('❌ Duration:', Math.round(aiDuration), 'ms');
@@ -409,9 +456,21 @@ export async function pushViewer(count: number) {
         ? (error.message || String(error)).slice(0, 100).replace(/\n/g, ' ')
         : String(error).slice(0, 100).replace(/\n/g, ' ');
       
+      // Enhanced error logging with correlation ID
+      debugLog(correlationId, 'ERROR', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        isAbortError,
+        delta,
+        topic,
+        transcriptPreview: sanitizedTranscript
+      });
+      
       if (isAbortError) {
         aiCallsAborted++;
         console.warn('[AI:FETCH:FAILED]', {
+          correlationId,
           errorName: 'AbortError',
           errorPreview: 'Timeout exceeded',
           isAbortError: true,
@@ -422,6 +481,7 @@ export async function pushViewer(count: number) {
       } else {
         aiCallsFailed++;
         console.error('[AI:FETCH:FAILED]', {
+          correlationId,
           errorName: error instanceof Error ? error.name : 'UnknownError',
           errorPreview,
           isAbortError: false,
@@ -436,8 +496,15 @@ export async function pushViewer(count: number) {
     // Fallback logic (runs if AI error)
     if (!nextMove) {
       emitEngineStatus('AI_FALLBACK');
+      debugLog(correlationId, 'FALLBACK', {
+        reason: 'AI call failed or returned invalid response',
+        delta,
+        topic
+      });
+      
       console.warn('⚠️ ==========================================');
       console.warn('⚠️ AI INSIGHT FAILED - USING FALLBACK (Web App)');
+      console.warn('⚠️ Correlation ID:', correlationId);
       console.warn('⚠️ Falling back to deterministic system');
       console.warn('⚠️ ==========================================');
       
