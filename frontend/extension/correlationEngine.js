@@ -366,6 +366,9 @@ class CorrelationEngine {
         ...insight
       });
       console.log('[Correlation] 🔍 Step 6: Message sent successfully!');
+      
+      // Reset 20-second countdown
+      this.resetCountdown();
 
       // Log as action
       chrome.runtime.sendMessage({
