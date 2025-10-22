@@ -100,10 +100,10 @@ async def generate_insight(request: InsightRequest):
     try:
         logger.info(f"🤖 Generating insight for delta: {request.viewerDelta}")
         
-        # Get Emergent LLM key
-        api_key = os.getenv('EMERGENT_LLM_KEY')
+        # Get Claude API key
+        api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
-            raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
+            raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
         
         # Build context strings
         prosody_str = "No prosody data"
