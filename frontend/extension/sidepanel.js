@@ -208,8 +208,10 @@ function updateCountdown(seconds) {
     countdownEl.id = 'countdownDisplay';
     countdownEl.className = 'countdown-display';
     countdownEl.textContent = `${seconds}s`;
+    // Force inline styles to ensure visibility
+    countdownEl.style.cssText = 'font-size: 14px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; min-width: 40px; text-align: center; display: inline-block; margin-left: auto;';
     cooldownTimer.appendChild(countdownEl);
-    console.log('[COUNTDOWN] ✅ Created and appended countdownDisplay element');
+    console.log('[COUNTDOWN] ✅ Created and appended countdownDisplay element with inline styles');
   } else {
     console.log('[COUNTDOWN] ✅ countdownDisplay element found');
     countdownEl.textContent = `${seconds}s`;
