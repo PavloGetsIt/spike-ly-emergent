@@ -512,6 +512,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         
         console.debug('[AUDIO:BG:READY] Capture complete for tab', tabId);
+        
+        // Start 20-second auto-insight timer
+        correlationEngine.startAutoInsightTimer();
+        console.log('[AUDIO:BG] 🎯 Started auto-insight timer');
+        
         sendResponse({ success: true, tabId });
         
       } catch (error) {
