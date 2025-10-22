@@ -653,11 +653,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...message
       }));
     }
-  } else if (message.type === 'THRESHOLD_UPDATE') {
-    // Update correlation engine thresholds
-    console.log('[Background] Threshold update:', message.thresholds);
-    correlationEngine.setThresholds(message.thresholds);
-    sendResponse?.({ success: true });
   } else if (message.type === 'ACTION') {
     // Forward action to side panel
     console.log('[Background] Action logged:', message.label, message.delta);
