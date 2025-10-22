@@ -988,6 +988,24 @@ class CorrelationEngine {
       }
     });
   }
+  
+  // Helper to get tone cue from emotion
+  getToneCue(tone) {
+    const toneCues = {
+      'joy': 'Stay hyped',
+      'excitement': 'Keep energy high',
+      'admiration': 'Be authentic',
+      'amusement': 'Stay playful',
+      'love': 'Be vulnerable',
+      'interest': 'Stay curious',
+      'determination': 'Stay focused',
+      'concentration': 'Be direct',
+      'calmness': 'Stay present',
+      'default': 'Build excitement'
+    };
+    
+    return toneCues[tone?.emotion] || toneCues.default;
+  }
 
   reset() {
     this.transcriptBuffer = [];
@@ -996,6 +1014,8 @@ class CorrelationEngine {
     this.lastInsightTime = 0;
     this.analysisCache.clear();
     this.prosodyHistory = [];
+    this.winningActions = [];
+    this.stopAutoInsightTimer();
     this.emitStatus('IDLE');
     console.log('[Correlation] Engine reset');
   }
