@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-22-019 - CLEAN UI
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-019 (Clean UI)');
-console.log('🎯 Removed distracting status messages (Correlating/Collecting/Failed) from UI');
+// VERSION: 2025-06-22-020 - INSIGHT DEBUG
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-020 (Insight Debug)');
+console.log('🎯 Added logging to trace why Claude insights are being replaced by fallback');
 
 import { AudioProcessor } from './audioProcessor.js';
 
