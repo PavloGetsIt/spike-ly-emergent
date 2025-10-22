@@ -32,14 +32,17 @@ class CorrelationEngine {
     this.isSystemActive = true;
     
     console.log('[Correlation] ⏰ Starting 20-second auto-insight timer');
+    console.log('[Correlation] ⏰ Timer will emit countdown and generate insights every 20s');
+    
+    // Emit initial countdown
+    this.emitCountdown(20);
     
     this.autoInsightTimer = setInterval(() => {
       console.log('[Correlation] ⏰ 20-second timer triggered - generating auto-insight');
       this.generateTimedInsight();
     }, 20000); // 20 seconds
     
-    // Emit countdown started
-    this.emitCountdown(20);
+    console.log('[Correlation] ⏰ Timer started successfully, interval ID:', this.autoInsightTimer);
   }
   
   // Stop auto-insight timer
