@@ -63,16 +63,22 @@ class CorrelationEngine {
   
   // Emit countdown update
   emitCountdown(seconds) {
+    console.log('[Correlation] ⏰ Emitting countdown update:', seconds + 's');
+    
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       chrome.runtime.sendMessage({
         type: 'COUNTDOWN_UPDATE',
         seconds: seconds,
         timestamp: Date.now()
-      }, () => {
+      }, (response) => {
         if (chrome.runtime.lastError) {
-          // Ignore errors when side panel isn't open
+          console.warn('[Correlation] ⏰ Countdown message error (side panel may not be open):', chrome.runtime.lastError.message);
+        } else {
+          console.log('[Correlation] ⏰ Countdown message sent successfully');
         }
       });
+    } else {
+      console.warn('[Correlation] ⏰ Chrome runtime not available for countdown');
     }
   }
   
