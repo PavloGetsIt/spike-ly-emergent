@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-013 - DUPLICATE FUNCTION FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-013 (Duplicate Function Fixed)');
-console.log('🎯 Removed duplicate setupTooltips function causing syntax error');
+// VERSION: 2025-06-21-014 - TIMER DEBUG LOGGING
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-014 (Timer Debug Logging)');
+console.log('🎯 Added comprehensive logging for 20s timer troubleshooting');
 
 import { AudioProcessor } from './audioProcessor.js';
 
