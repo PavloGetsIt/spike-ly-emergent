@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-22-018 - PERMANENT COUNTDOWN
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-018 (Permanent Countdown)');
-console.log('🎯 Moved countdown to always-visible location, removed collecting/correlating UI noise');
+// VERSION: 2025-06-22-019 - CLEAN UI
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-019 (Clean UI)');
+console.log('🎯 Removed distracting status messages (Correlating/Collecting/Failed) from UI');
 
 import { AudioProcessor } from './audioProcessor.js';
 
