@@ -737,6 +737,7 @@ function handleMessage(message) {
       updateEngineStatus(message.status, message.meta);
       break;
     case 'COUNTDOWN_UPDATE':
+      console.log('[SIDEPANEL] ⏰ COUNTDOWN_UPDATE received:', message.seconds + 's');
       updateCountdown(message.seconds);
       break;
     case 'FULL_RESET':
