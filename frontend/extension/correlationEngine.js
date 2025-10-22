@@ -189,6 +189,13 @@ class CorrelationEngine {
     // Generate insight (now async)
     const insight = await this.generateInsight(delta, count, segment, tone);
     
+    console.log('[Correlation] 🎯 Generated insight to send:', {
+      emotionalLabel: insight.emotionalLabel,
+      nextMove: insight.nextMove,
+      delta: insight.delta,
+      source: insight.source || 'unknown'
+    });
+    
     // Send to background script
     chrome.runtime.sendMessage({
       type: 'INSIGHT',
