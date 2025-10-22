@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-014 - TIMER DEBUG LOGGING
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-014 (Timer Debug Logging)');
-console.log('🎯 Added comprehensive logging for 20s timer troubleshooting');
+// VERSION: 2025-06-21-015 - TIMER DOM FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-015 (Timer DOM Fix)');
+console.log('🎯 Added dynamic countdown element creation as fallback for cache issues');
 
 import { AudioProcessor } from './audioProcessor.js';
 
