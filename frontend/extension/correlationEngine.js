@@ -183,34 +183,51 @@ class CorrelationEngine {
 
     this.lastInsightTime = now;
 
-    // Analyze tone with Hume AI
-    const tone = await this.analyzeTone(segment.text);
-    
-    // Generate insight (now async)
-    const insight = await this.generateInsight(delta, count, segment, tone);
-    
-    console.log('[Correlation] 🎯 Generated insight to send:', {
-      emotionalLabel: insight.emotionalLabel,
-      nextMove: insight.nextMove,
-      delta: insight.delta,
-      source: insight.source || 'unknown'
-    });
-    
-    // Send to background script
-    chrome.runtime.sendMessage({
-      type: 'INSIGHT',
-      ...insight
-    });
+    try {
+      // Analyze tone with Hume AI
+      console.log('[Correlation] 🔍 Step 1: Analyzing tone with Hume AI...');
+      const tone = await this.analyzeTone(segment.text);
+      console.log('[Correlation] 🔍 Step 2: Tone analysis complete:', tone?.emotion || 'none');
+      
+      // Generate insight (now async)
+      console.log('[Correlation] 🔍 Step 3: Generating insight...');
+      const insight = await this.generateInsight(delta, count, segment, tone);
+      console.log('[Correlation] 🔍 Step 4: Insight generated!');
+      
+      console.log('[Correlation] 🎯 Generated insight to send:', {
+        emotionalLabel: insight.emotionalLabel,
+        nextMove: insight.nextMove,
+        delta: insight.delta,
+        source: insight.source || 'unknown'
+      });
+      
+      // Send to background script
+      console.log('[Correlation] 🔍 Step 5: Sending to background script...');
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        ...insight
+      });
+      console.log('[Correlation] 🔍 Step 6: Message sent successfully!');
 
-    // Log as action
-    chrome.runtime.sendMessage({
-      type: 'ACTION',
-      label: tone.emotion || segment.topic || 'Speech',
-      delta: delta,
-      text: segment.text,
-      startTime: new Date(segment.startTime).toISOString(),
-      endTime: new Date(segment.endTime).toISOString()
-    });
+      // Log as action
+      chrome.runtime.sendMessage({
+        type: 'ACTION',
+        label: tone.emotion || segment.topic || 'Speech',
+        delta: delta,
+        text: segment.text,
+        startTime: new Date(segment.startTime).toISOString(),
+        endTime: new Date(segment.endTime).toISOString()
+      });
+      
+    } catch (error) {
+      console.error('[Correlation] ❌ ERROR in generateCorrelation:', error);
+      console.error('[Correlation] ❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 200)
+      });
+      this.emitEngineStatus('FAILED', { reason: error.message });
+    }
   }
 
   // Get recent transcript segment
@@ -399,6 +416,11 @@ class CorrelationEngine {
     
     const action = this.extractAction(segment.text);
     
+    // Prepare sanitized transcript for logging (available throughout function)
+    const words = segment.text.split(/\s+/);
+    const truncatedTranscript = words.slice(-100).join(' ');
+    const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
+    
     // [ACTION:EXTRACTED] Diagnostic log to trace potential bleed sources
     console.log('[ACTION:EXTRACTED]', {
       action: action?.slice(0, 50),
@@ -436,11 +458,6 @@ class CorrelationEngine {
       this.emitEngineStatus('AI_CALLING');
       try {
         // Prepare payload for AI insight generation
-        // Truncate transcript to last 100 words to reduce payload
-        const words = segment.text.split(/\s+/);
-        const truncatedTranscript = words.slice(-100).join(' ');
-        const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
-        
         const payload = {
           transcript: truncatedTranscript,
           viewerDelta: delta,
