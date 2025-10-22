@@ -343,6 +343,22 @@ class CorrelationEngine {
         source: insight.source || 'unknown'
       });
       
+      // Track winning actions (delta >= +10)
+      if (delta >= 10) {
+        this.winningActions.push({
+          topic: segment.topic || 'unknown',
+          emotion: tone?.emotion || 'neutral',
+          text: segment.text.substring(0, 100),
+          delta: delta,
+          tone: this.getToneCue(tone),
+          timestamp: now
+        });
+        // Keep only top 10 winning actions
+        this.winningActions.sort((a, b) => b.delta - a.delta);
+        this.winningActions = this.winningActions.slice(0, 10);
+        console.log('[Correlation] 📈 Tracked winning action:', segment.topic, '+' + delta);
+      }
+      
       // Send to background script
       console.log('[Correlation] 🔍 Step 5: Sending to background script...');
       chrome.runtime.sendMessage({
