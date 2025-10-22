@@ -873,7 +873,12 @@ function updateViewerCount(count, delta) {
 
 // Update insight
 function updateInsight(data) {
-  console.log('[Spikely Side Panel] Updating insight:', data);
+  console.log('[Spikely Side Panel] 🎯 updateInsight called with:', {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove,
+    delta: data.delta,
+    textLength: data.text?.length || 0
+  });
   
   const delta = data.delta || 0;
   
@@ -881,6 +886,12 @@ function updateInsight(data) {
   const emotionalLabel = sanitizeForDisplay(data.emotionalLabel, 3, '✅ Neutral');
   const nextMove = sanitizeForDisplay(data.nextMove, 8, 'Keep momentum');
   const text = data.text || '';
+  
+  console.log('[Spikely Side Panel] 🎯 After sanitization:', {
+    emotionalLabel,
+    nextMove,
+    delta
+  });
   
   const isPositive = delta > 0;
   const arrowIcon = isPositive 
