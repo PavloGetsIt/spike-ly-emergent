@@ -210,20 +210,21 @@ SIGNAL STRENGTH: {request.quality or 'medium'}
 
 Based on this data, generate ONE tactical decision for the streamer to execute in the next 30 seconds. Return ONLY valid JSON with no markdown or explanation."""
 
-        # Call Claude via Emergent Integrations
-        logger.info("🤖 Calling Claude Sonnet 4.5 via Emergent LLM...")
+        # Call Claude API directly
+        logger.info("🤖 Calling Claude Sonnet 4.5 with your API key...")
         
-        # Create chat instance
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"insight-{datetime.now().timestamp()}",
-            system_message=system_prompt
-        ).with_model("anthropic", "claude-sonnet-4-20250514")
+        client = Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=150,
+            system=system_prompt,
+            messages=[
+                {"role": "user", "content": user_prompt}
+            ]
+        )
         
-        # Send message
-        user_message = UserMessage(text=user_prompt)
-        generated_text = await chat.send_message(user_message)
-        
+        # Parse response
+        generated_text = response.content[0].text.strip()
         logger.info(f"✅ Claude response: {generated_text[:100]}...")
         
         # Parse JSON
@@ -231,7 +232,6 @@ Based on this data, generate ONE tactical decision for the streamer to execute i
             insight = json.loads(generated_text)
         except json.JSONDecodeError:
             # Try to extract JSON from markdown or wrapper text
-            import re
             match = re.search(r'\{[\s\S]*\}', generated_text)
             if match:
                 insight = json.loads(match.group(0))
