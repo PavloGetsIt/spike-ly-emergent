@@ -190,38 +190,21 @@ function updateCountdown(seconds) {
   
   countdownSeconds = seconds;
   
-  // Get cooldown timer container first
-  const cooldownTimer = document.getElementById('cooldownTimer');
-  if (!cooldownTimer) {
-    console.error('[COUNTDOWN] ❌ cooldownTimer container NOT FOUND - cannot create countdown!');
-    return;
+  // Show permanent countdown container
+  const permanentCountdown = document.getElementById('permanentCountdown');
+  if (permanentCountdown) {
+    permanentCountdown.style.display = 'flex';
+    console.log('[COUNTDOWN] ✅ Permanent countdown container shown');
   }
   
-  console.log('[COUNTDOWN] ✅ Cooldown timer container found');
-  
-  // Get or create countdown display element
-  let countdownEl = document.getElementById('countdownDisplay');
-  
-  if (!countdownEl) {
-    console.warn('[COUNTDOWN] ⚠️ countdownDisplay element not found, creating dynamically');
-    countdownEl = document.createElement('span');
-    countdownEl.id = 'countdownDisplay';
-    countdownEl.className = 'countdown-display';
+  // Update countdown display
+  const countdownEl = document.getElementById('countdownDisplay');
+  if (countdownEl) {
     countdownEl.textContent = `${seconds}s`;
-    // Force inline styles to ensure visibility
-    countdownEl.style.cssText = 'font-size: 14px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px; min-width: 40px; text-align: center; display: inline-block; margin-left: auto;';
-    cooldownTimer.appendChild(countdownEl);
-    console.log('[COUNTDOWN] ✅ Created and appended countdownDisplay element with inline styles');
+    console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
   } else {
-    console.log('[COUNTDOWN] ✅ countdownDisplay element found');
-    countdownEl.textContent = `${seconds}s`;
+    console.error('[COUNTDOWN] ❌ countdownDisplay element still not found!');
   }
-  
-  console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
-  
-  // Show cooldown timer container
-  cooldownTimer.style.display = 'flex';
-  console.log('[COUNTDOWN] ✅ Cooldown timer container shown');
   
   // Start countdown interval if not already running
   if (!countdownInterval && seconds > 0) {
