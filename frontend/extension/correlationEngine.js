@@ -693,6 +693,7 @@ class CorrelationEngine {
           if (aiInsight.emotionalLabel && aiInsight.nextMove) {
             emotionalLabel = aiInsight.emotionalLabel;
             nextMove = aiInsight.nextMove;
+            console.log('[Correlation] ✅ Using Claude insight - Label:', emotionalLabel, 'Move:', nextMove);
           } else {
             throw new Error('Invalid AI response format');
           }
