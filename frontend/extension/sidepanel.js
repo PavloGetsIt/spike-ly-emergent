@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-006 - CLAUDE INSIGHTS FIXED
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-006 (Claude Insights Fixed)');
-console.log('🎯 Backend: FastAPI with Claude Sonnet 4.5');
+// VERSION: 2025-06-21-007 - THRESHOLD DEBUG
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-007 (Threshold Debug)');
+console.log('🎯 Added detailed threshold and insight logging');
 
 import { AudioProcessor } from './audioProcessor.js';
 
