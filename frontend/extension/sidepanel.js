@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-22-016 - TIMER FIX FINAL
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-016 (Timer Fix Final)');
-console.log('🎯 Fixed: Variable scoping issue in countdown creation');
+// VERSION: 2025-06-22-017 - INLINE STYLES FORCE
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-017 (Inline Styles Force)');
+console.log('🎯 Added inline CSS to countdown element to bypass stylesheet caching');
 
 import { AudioProcessor } from './audioProcessor.js';
 
