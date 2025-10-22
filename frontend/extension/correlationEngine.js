@@ -6,8 +6,8 @@ const DEBUG_HUME = true;
 // =============================================================
 
 // Feature flag: disable extension AI calls (web app handles this)
-const ENABLE_EXTENSION_AI = false;
-const AI_MAX_LATENCY_MS = 900; // hard deadline for AI response
+const ENABLE_EXTENSION_AI = true;  // ENABLED for Claude Sonnet 4.5
+const AI_MAX_LATENCY_MS = 1500; // 1.5s deadline for AI response
 
 class CorrelationEngine {
   constructor() {
@@ -183,27 +183,51 @@ class CorrelationEngine {
 
     this.lastInsightTime = now;
 
-    // Analyze tone with Hume AI
-    const tone = await this.analyzeTone(segment.text);
-    
-    // Generate insight (now async)
-    const insight = await this.generateInsight(delta, count, segment, tone);
-    
-    // Send to background script
-    chrome.runtime.sendMessage({
-      type: 'INSIGHT',
-      ...insight
-    });
+    try {
+      // Analyze tone with Hume AI
+      console.log('[Correlation] 🔍 Step 1: Analyzing tone with Hume AI...');
+      const tone = await this.analyzeTone(segment.text);
+      console.log('[Correlation] 🔍 Step 2: Tone analysis complete:', tone?.emotion || 'none');
+      
+      // Generate insight (now async)
+      console.log('[Correlation] 🔍 Step 3: Generating insight...');
+      const insight = await this.generateInsight(delta, count, segment, tone);
+      console.log('[Correlation] 🔍 Step 4: Insight generated!');
+      
+      console.log('[Correlation] 🎯 Generated insight to send:', {
+        emotionalLabel: insight.emotionalLabel,
+        nextMove: insight.nextMove,
+        delta: insight.delta,
+        source: insight.source || 'unknown'
+      });
+      
+      // Send to background script
+      console.log('[Correlation] 🔍 Step 5: Sending to background script...');
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        ...insight
+      });
+      console.log('[Correlation] 🔍 Step 6: Message sent successfully!');
 
-    // Log as action
-    chrome.runtime.sendMessage({
-      type: 'ACTION',
-      label: tone.emotion || segment.topic || 'Speech',
-      delta: delta,
-      text: segment.text,
-      startTime: new Date(segment.startTime).toISOString(),
-      endTime: new Date(segment.endTime).toISOString()
-    });
+      // Log as action
+      chrome.runtime.sendMessage({
+        type: 'ACTION',
+        label: tone.emotion || segment.topic || 'Speech',
+        delta: delta,
+        text: segment.text,
+        startTime: new Date(segment.startTime).toISOString(),
+        endTime: new Date(segment.endTime).toISOString()
+      });
+      
+    } catch (error) {
+      console.error('[Correlation] ❌ ERROR in generateCorrelation:', error);
+      console.error('[Correlation] ❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 200)
+      });
+      this.emitEngineStatus('FAILED', { reason: error.message });
+    }
   }
 
   // Get recent transcript segment
@@ -392,6 +416,11 @@ class CorrelationEngine {
     
     const action = this.extractAction(segment.text);
     
+    // Prepare sanitized transcript for logging (available throughout function)
+    const words = segment.text.split(/\s+/);
+    const truncatedTranscript = words.slice(-100).join(' ');
+    const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
+    
     // [ACTION:EXTRACTED] Diagnostic log to trace potential bleed sources
     console.log('[ACTION:EXTRACTED]', {
       action: action?.slice(0, 50),
@@ -405,17 +434,19 @@ class CorrelationEngine {
     
     let nextMove = '';
     let emotionalLabel = 'analyzing';
-    
-    // Only call AI for high-impact events (threshold gating)
-    const isHighImpact = delta >= 15 || delta <= -15;
+    // Call AI for any significant events (based on user's sensitivity setting)
+    // User's minDelta setting determines what's "significant"
+    const isHighImpact = Math.abs(delta) >= this.minDelta;
     
     // [AI:GATE] diagnostic log with sanitized preview
     const transcriptPreview = segment.text.slice(0, 100).replace(/\n/g, ' ');
-    console.log('[AI:GATE]', {
+    console.log('[AI:GATE] 🎯 Checking AI call threshold:', {
       delta,
+      minDelta: this.minDelta,
+      absDelta: Math.abs(delta),
       isHighImpact,
       willCallAI: ENABLE_EXTENSION_AI && isHighImpact,
-      thresholds: { spike: 15, drop: -15 },
+      calculation: `|${delta}| >= ${this.minDelta} = ${isHighImpact}`,
       transcriptPreview,
       topic: segment.topic,
       emotion: tone?.emotion
@@ -427,11 +458,6 @@ class CorrelationEngine {
       this.emitEngineStatus('AI_CALLING');
       try {
         // Prepare payload for AI insight generation
-        // Truncate transcript to last 100 words to reduce payload
-        const words = segment.text.split(/\s+/);
-        const truncatedTranscript = words.slice(-100).join(' ');
-        const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
-        
         const payload = {
           transcript: truncatedTranscript,
           viewerDelta: delta,
@@ -455,8 +481,8 @@ class CorrelationEngine {
       };
 
         console.log('🤖 ==========================================');
-        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (Extension)');
-        console.log('🤖 URL: https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight');
+        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
+        console.log('🤖 URL: https://stream-insights-2.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
         console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
         console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
@@ -465,7 +491,7 @@ class CorrelationEngine {
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
-          url: 'https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight',
+          url: 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight',
           payloadSize: JSON.stringify(payload).length,
           transcriptPreview: sanitizedTranscript,
           delta: payload.viewerDelta,
@@ -481,7 +507,8 @@ class CorrelationEngine {
         }, AI_MAX_LATENCY_MS);
 
         const aiStartTime = performance.now();
-        const response = await fetch('https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight', {
+        const backendUrl = 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight';
+        const response = await fetch(backendUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Spikely - Multi-Platform Viewer Tracker",
+  "name": "Spikely",
   "version": "1.0.0",
-  "description": "Real-time viewer tracking for TikTok, Twitch, Kick, and YouTube Live",
+  "description": "Real-time Live Stream Artificial Intelligence",
   "permissions": ["storage", "activeTab", "tabs", "sidePanel", "scripting", "webNavigation", "contextMenus", "tabCapture", "offscreen"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
