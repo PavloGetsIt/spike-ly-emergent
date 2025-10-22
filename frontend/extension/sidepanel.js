@@ -1019,6 +1019,13 @@ function updateInsight(data) {
     }
   }
   
+  // Show cooldown timer with countdown
+  const cooldownEl = document.getElementById('cooldownTimer');
+  if (cooldownEl) {
+    cooldownEl.style.display = 'flex';
+    console.log('[COUNTDOWN] ⏰ Cooldown timer displayed');
+  }
+  
   // Start cooldown timer and update status
   startCooldownTimer(5);
   updateSystemStatus('ANALYZING');
