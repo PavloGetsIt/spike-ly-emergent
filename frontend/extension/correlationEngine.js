@@ -644,7 +644,7 @@ class CorrelationEngine {
 
         console.log('🤖 ==========================================');
         console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
-        console.log('🤖 URL: https://stream-insights-2.preview.emergentagent.com/api/generate-insight');
+        console.log('🤖 URL: https://project-continuity-5.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
         console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
         console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
@@ -653,7 +653,7 @@ class CorrelationEngine {
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
-          url: 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight',
+          url: 'https://project-continuity-5.preview.emergentagent.com/api/generate-insight',
           payloadSize: JSON.stringify(payload).length,
           transcriptPreview: sanitizedTranscript,
           delta: payload.viewerDelta,
@@ -669,7 +669,7 @@ class CorrelationEngine {
         }, AI_MAX_LATENCY_MS);
 
         const aiStartTime = performance.now();
-        const backendUrl = 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight';
+        const backendUrl = 'https://project-continuity-5.preview.emergentagent.com/api/generate-insight';
         const response = await fetch(backendUrl, {
           method: 'POST',
           headers: {

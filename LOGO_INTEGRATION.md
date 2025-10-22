@@ -126,7 +126,7 @@ Already configured with correct paths:
 3. Logo should show red eye with spike design
 
 ### Web App Logo:
-1. Visit: https://stream-insights-2.preview.emergentagent.com
+1. Visit: https://project-continuity-5.preview.emergentagent.com
 2. Header should display Spikely logo
 3. Browser tab should show favicon
 

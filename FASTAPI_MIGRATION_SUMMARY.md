@@ -40,7 +40,7 @@ Examples:
 
 **Test with:**
 ```bash
-curl -X POST https://stream-insights-2.preview.emergentagent.com/api/generate-insight \
+curl -X POST https://project-continuity-5.preview.emergentagent.com/api/generate-insight \
   -H "Content-Type: application/json" \
   -d '{"transcript": "test", "viewerDelta": 10, "viewerCount": 100, "prevCount": 90}'
 ```

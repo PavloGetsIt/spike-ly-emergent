@@ -126,7 +126,7 @@ Supabase Edge Functions (still in use for Hume AI)
 - Originally used Supabase edge function for insights
 - Migrated to FastAPI backend for easier deployment (no external deployment needed)
 - Endpoint: POST /api/generate-insight
-- **URL:** https://stream-insights-2.preview.emergentagent.com/api/generate-insight
+- **URL:** https://project-continuity-5.preview.emergentagent.com/api/generate-insight
 - **Files:** server.py, correlationEngine.js
 
 **Claude Sonnet 4.5 Integration:**
@@ -485,7 +485,7 @@ Based on deployment history and user feedback:
 
 **Frontend (.env):**
 ```
-REACT_APP_BACKEND_URL=https://stream-insights-2.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://project-continuity-5.preview.emergentagent.com
 ```
 
 **Backend (.env):**
