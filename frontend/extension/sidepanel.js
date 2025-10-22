@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-009 - CRITICAL FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-009 (Critical Fix)');
-console.log('🎯 Fixed: undefined sanitizedTranscript variable');
+// VERSION: 2025-06-21-010 - AUTO INSIGHT TIMER
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-010 (Auto Insight Timer)');
+console.log('🎯 Features: 20s auto-insights, countdown display, winning action reminders');
 
 import { AudioProcessor } from './audioProcessor.js';
 
