@@ -467,7 +467,7 @@ class CorrelationEngine {
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
-          url: 'https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight',
+          url: 'https://stream-insights-2.preview.emergentagent.com/api/generate-insight',
           payloadSize: JSON.stringify(payload).length,
           transcriptPreview: sanitizedTranscript,
           delta: payload.viewerDelta,
