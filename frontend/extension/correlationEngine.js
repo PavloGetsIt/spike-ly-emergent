@@ -19,6 +19,9 @@ class CorrelationEngine {
     this.analysisCache = new Map(); // Cache Hume AI results
     this.prosodyHistory = []; // Last 10 prosody samples
     this.minDelta = 3; // Default trigger threshold (will be loaded from storage)
+    this.autoInsightTimer = null; // 20-second auto-insight timer
+    this.winningActions = []; // Track high-performing actions for reminders
+    this.isSystemActive = false; // Track if system is running
     
     // Load threshold from storage on init
     this.loadThresholdFromStorage();
@@ -36,6 +39,128 @@ class CorrelationEngine {
         }
       });
     }
+  }
+  
+  // Start auto-insight timer (generates insights every 20s)
+  startAutoInsightTimer() {
+    this.stopAutoInsightTimer(); // Clear any existing timer
+    this.isSystemActive = true;
+    
+    console.log('[Correlation] ⏰ Starting 20-second auto-insight timer');
+    
+    this.autoInsightTimer = setInterval(() => {
+      console.log('[Correlation] ⏰ 20-second timer triggered - generating auto-insight');
+      this.generateTimedInsight();
+    }, 20000); // 20 seconds
+    
+    // Emit countdown started
+    this.emitCountdown(20);
+  }
+  
+  // Stop auto-insight timer
+  stopAutoInsightTimer() {
+    if (this.autoInsightTimer) {
+      clearInterval(this.autoInsightTimer);
+      this.autoInsightTimer = null;
+      this.isSystemActive = false;
+      console.log('[Correlation] ⏰ Auto-insight timer stopped');
+    }
+  }
+  
+  // Reset countdown (called when new insight is generated)
+  resetCountdown() {
+    console.log('[Correlation] ⏰ Countdown reset to 20 seconds');
+    this.emitCountdown(20);
+  }
+  
+  // Emit countdown update
+  emitCountdown(seconds) {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        type: 'COUNTDOWN_UPDATE',
+        seconds: seconds,
+        timestamp: Date.now()
+      }, () => {
+        if (chrome.runtime.lastError) {
+          // Ignore errors when side panel isn't open
+        }
+      });
+    }
+  }
+  
+  // Generate timed insight (called by 20s timer)
+  async generateTimedInsight() {
+    const now = Date.now();
+    
+    // Get most recent viewer data
+    const latestViewer = this.viewerBuffer[this.viewerBuffer.length - 1];
+    if (!latestViewer) {
+      console.log('[Correlation] ⏰ No viewer data, skipping timed insight');
+      return;
+    }
+    
+    // Get transcript from last 20 seconds
+    const segment = this.getRecentSegment(now, 20000);
+    
+    // If no meaningful data, send reminder of winning actions
+    if (!segment || segment.wordCount < 5) {
+      console.log('[Correlation] ⏰ No recent transcript - sending reminder');
+      this.sendReminderInsight(latestViewer.count, latestViewer.delta);
+      this.resetCountdown();
+      return;
+    }
+    
+    // Generate normal insight with delta = 0 (timer-triggered)
+    console.log('[Correlation] ⏰ Generating timed insight with data');
+    const tone = await this.analyzeTone(segment.text);
+    const insight = await this.generateInsight(0, latestViewer.count, segment, tone, true); // true = timed mode
+    
+    console.log('[Correlation] 🎯 Timed insight generated:', {
+      emotionalLabel: insight.emotionalLabel,
+      nextMove: insight.nextMove
+    });
+    
+    // Send insight
+    chrome.runtime.sendMessage({
+      type: 'INSIGHT',
+      ...insight,
+      isTimedInsight: true
+    });
+    
+    this.resetCountdown();
+  }
+  
+  // Send reminder of winning actions
+  sendReminderInsight(count, delta) {
+    if (this.winningActions.length === 0) {
+      // No winning actions yet, send generic reminder
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        delta: 0,
+        emotionalLabel: 'Keep engaging',
+        nextMove: 'Ask viewers a question. Create buzz',
+        text: '',
+        isReminder: true,
+        source: 'reminder'
+      });
+      return;
+    }
+    
+    // Get top winning action
+    const topAction = this.winningActions[0];
+    
+    chrome.runtime.sendMessage({
+      type: 'INSIGHT',
+      delta: 0,
+      emotionalLabel: `${topAction.topic} worked`,
+      nextMove: `Try ${topAction.topic} again. ${topAction.tone}`,
+      text: topAction.text || '',
+      isReminder: true,
+      source: 'reminder',
+      originalDelta: topAction.delta
+    });
+    
+    console.log('[Correlation] 📌 Sent reminder of winning action:', topAction.topic);
   }
 
   // Update thresholds from settings
