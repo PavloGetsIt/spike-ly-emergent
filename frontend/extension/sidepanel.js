@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-012 - AUDIO BUTTON CRITICAL FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-012 (Audio Button Critical Fix)');
-console.log('🎯 Removed ALL Chrome API calls from constructor - no more race conditions');
+// VERSION: 2025-06-21-013 - DUPLICATE FUNCTION FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-013 (Duplicate Function Fixed)');
+console.log('🎯 Removed duplicate setupTooltips function causing syntax error');
 
 import { AudioProcessor } from './audioProcessor.js';
 
