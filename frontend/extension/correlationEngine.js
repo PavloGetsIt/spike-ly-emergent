@@ -18,42 +18,12 @@ class CorrelationEngine {
     this.minInsightInterval = 20000; // 20 seconds between insights
     this.analysisCache = new Map(); // Cache Hume AI results
     this.prosodyHistory = []; // Last 10 prosody samples
-    this.minDelta = 3; // Default trigger threshold (will be loaded from storage)
+    this.minDelta = 3; // Default trigger threshold (updated by slider)
     this.autoInsightTimer = null; // 20-second auto-insight timer
     this.winningActions = []; // Track high-performing actions for reminders
     this.isSystemActive = false; // Track if system is running
-    this.storageLoaded = false; // Track if storage has been loaded
     
-    // Load threshold from storage AFTER a delay to ensure Chrome APIs ready
-    setTimeout(() => this.loadThresholdFromStorage(), 100);
-  }
-  
-  // Load minDelta from chrome.storage
-  loadThresholdFromStorage() {
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      try {
-        chrome.storage.local.get(['minDelta'], (result) => {
-          if (chrome.runtime.lastError) {
-            console.warn('[Correlation] Storage load error:', chrome.runtime.lastError);
-            this.storageLoaded = true;
-            return;
-          }
-          
-          if (result.minDelta !== undefined) {
-            this.minDelta = result.minDelta;
-            console.log('[Correlation] 🎯 Loaded threshold from storage:', this.minDelta);
-          } else {
-            console.log('[Correlation] 🎯 Using default threshold:', this.minDelta);
-          }
-          this.storageLoaded = true;
-        });
-      } catch (err) {
-        console.error('[Correlation] Failed to load from storage:', err);
-        this.storageLoaded = true;
-      }
-    } else {
-      this.storageLoaded = true;
-    }
+    console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
   }
   
   // Start auto-insight timer (generates insights every 20s)
