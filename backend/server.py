@@ -282,28 +282,52 @@ Based on this data, generate ONE tactical decision for the streamer to execute i
     except Exception as e:
         logger.error(f"❌ Insight generation error: {str(e)}")
         
+        # Check if it's a rate limit error
+        error_str = str(e).lower()
+        is_rate_limited = 'rate' in error_str and 'limit' in error_str
+        
+        if is_rate_limited:
+            logger.warning("⚠️ Rate limited - using enhanced fallback")
+        
         # Fallback to deterministic insight
         topic_words = {
             'food': 'cooking', 'fitness': 'workout', 'finance': 'money',
-            'personal': 'story', 'interaction': 'chat', 'general': 'content'
+            'personal': 'story', 'interaction': 'chat', 'general': 'content',
+            'gaming': 'gaming', 'makeup': 'makeup', 'music': 'music'
         }
         topic = request.topic or 'general'
         topic_word = topic_words.get(topic, 'content')
         
+        delta_abs = abs(request.viewerDelta)
+        
         if request.viewerDelta > 0:
-            emotional_label = f"{topic_word} engaged"
-            next_move = f"Do more {topic_word} talk"
-        elif abs(request.viewerDelta) > 30:
-            emotional_label = f"{topic_word} dump"
-            next_move = f"Stop {topic_word}. Change topic now"
+            # Positive - be specific about the win
+            if request.viewerDelta >= 20:
+                emotional_label = f"{topic_word} wins big"
+                next_move = f"Double down {topic_word}. Stay hyped"
+            elif request.viewerDelta >= 10:
+                emotional_label = f"{topic_word} works"
+                next_move = f"Show more {topic_word}. Keep energy"
+            else:
+                emotional_label = f"{topic_word} gains"
+                next_move = f"Keep {topic_word} going. Stay present"
+        elif delta_abs > 30:
+            # Dump - urgent pivot
+            emotional_label = f"{topic_word} kills vibe"
+            next_move = "Start giveaway now. Boost energy fast"
+        elif request.viewerDelta < 0:
+            # Drop - constructive pivot
+            emotional_label = f"{topic_word} dips"
+            next_move = "Pivot to Q&A. Build excitement"
         else:
-            emotional_label = f"{topic_word} dip"
-            next_move = f"Less {topic_word}. Boost energy"
+            # Flatline
+            emotional_label = "energy steady"
+            next_move = "Ask quick question. Create buzz"
         
         return InsightResponse(
             emotionalLabel=emotional_label,
             nextMove=next_move,
-            source="fallback"
+            source="fallback" if not is_rate_limited else "fallback_rate_limited"
         )
 
 # ==================== END CORRELATION ENGINE ====================
