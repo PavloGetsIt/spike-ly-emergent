@@ -602,8 +602,8 @@ class CorrelationEngine {
     let nextMove = '';
     let emotionalLabel = 'analyzing';
     // Call AI for any significant events (based on user's sensitivity setting)
-    // User's minDelta setting determines what's "significant"
-    const isHighImpact = Math.abs(delta) >= this.minDelta;
+    // OR for timed insights (delta = 0 but isTimedMode = true)
+    const isHighImpact = Math.abs(delta) >= this.minDelta || isTimedMode;
     
     // [AI:GATE] diagnostic log with sanitized preview
     const transcriptPreview = segment.text.slice(0, 100).replace(/\n/g, ' ');
@@ -611,9 +611,10 @@ class CorrelationEngine {
       delta,
       minDelta: this.minDelta,
       absDelta: Math.abs(delta),
+      isTimedMode,
       isHighImpact,
       willCallAI: ENABLE_EXTENSION_AI && isHighImpact,
-      calculation: `|${delta}| >= ${this.minDelta} = ${isHighImpact}`,
+      calculation: isTimedMode ? 'Timed mode - always call AI' : `|${delta}| >= ${this.minDelta} = ${isHighImpact}`,
       transcriptPreview,
       topic: segment.topic,
       emotion: tone?.emotion
