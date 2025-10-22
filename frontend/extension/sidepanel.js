@@ -178,6 +178,99 @@ function setupTooltips() {
   console.log('[UI:INIT] ✅ Tooltips setup complete');
 }
 
+// ==================== COUNTDOWN TIMER ====================
+let countdownSeconds = 20;
+let countdownInterval = null;
+
+/**
+ * Update countdown display
+ */
+function updateCountdown(seconds) {
+  countdownSeconds = seconds;
+  const countdownEl = document.getElementById('countdownDisplay');
+  if (countdownEl) {
+    countdownEl.textContent = `${seconds}s`;
+    console.log('[COUNTDOWN] Updated to:', seconds + 's');
+  }
+  
+  // Start countdown interval if not already running
+  if (!countdownInterval && seconds > 0) {
+    startCountdownInterval();
+  }
+}
+
+/**
+ * Start countdown interval (decrements every second)
+ */
+function startCountdownInterval() {
+  stopCountdownInterval(); // Clear any existing
+  
+  countdownInterval = setInterval(() => {
+    countdownSeconds--;
+    
+    const countdownEl = document.getElementById('countdownDisplay');
+    if (countdownEl) {
+      countdownEl.textContent = `${countdownSeconds}s`;
+    }
+    
+    // Stop at 0
+    if (countdownSeconds <= 0) {
+      stopCountdownInterval();
+    }
+  }, 1000); // Update every second
+  
+  console.log('[COUNTDOWN] ⏰ Interval started');
+}
+
+/**
+ * Stop countdown interval
+ */
+function stopCountdownInterval() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+}
+// =========================================================
+
+/**
+ * Setup tooltips for UI elements
+ */
+function setupTooltips() {
+  // Viewer delta tooltip
+  const deltaEl = document.getElementById('viewerDelta');
+  if (deltaEl) {
+    const currentDelta = deltaEl.textContent || '0';
+    deltaEl.title = `Viewer change in last 5 seconds: ${currentDelta}`;
+    console.log('[UI:INIT] Delta tooltip set');
+  }
+  
+  // Viewer count tooltip
+  const countEl = document.getElementById('viewerCount');
+  if (countEl) {
+    const currentCount = countEl.textContent || '0';
+    countEl.title = `Current live viewers: ${currentCount}`;
+    console.log('[UI:INIT] Count tooltip set');
+  }
+  
+  // Threshold badge tooltip
+  const thresholdGrayEl = document.getElementById('thresholdBadgeGray');
+  if (thresholdGrayEl) {
+    const currentThreshold = thresholdGrayEl.textContent || '±3';
+    thresholdGrayEl.title = `Sensitivity threshold: ${currentThreshold} viewers`;
+    console.log('[UI:INIT] Threshold tooltip set');
+  }
+  
+  // Audio button tooltip
+  const audioBtn = document.getElementById('startAudioBtn');
+  if (audioBtn) {
+    audioBtn.title = 'Start or stop audio capture for transcription';
+    console.log('[UI:INIT] Audio button tooltip set');
+  }
+  
+  console.log('[UI:INIT] ✅ Tooltips setup complete');
+}
+
 /**
  * Apply pulse animation fallback via JavaScript
  */
