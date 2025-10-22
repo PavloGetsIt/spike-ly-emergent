@@ -189,37 +189,37 @@ function updateCountdown(seconds) {
   console.log('[COUNTDOWN] ⏰ updateCountdown called with:', seconds + 's');
   
   countdownSeconds = seconds;
+  
+  // Get cooldown timer container first
+  const cooldownTimer = document.getElementById('cooldownTimer');
+  if (!cooldownTimer) {
+    console.error('[COUNTDOWN] ❌ cooldownTimer container NOT FOUND - cannot create countdown!');
+    return;
+  }
+  
+  console.log('[COUNTDOWN] ✅ Cooldown timer container found');
+  
+  // Get or create countdown display element
   let countdownEl = document.getElementById('countdownDisplay');
   
-  // If element doesn't exist, create it dynamically
   if (!countdownEl) {
     console.warn('[COUNTDOWN] ⚠️ countdownDisplay element not found, creating dynamically');
-    const cooldownTimer = document.getElementById('cooldownTimer');
-    if (cooldownTimer) {
-      countdownEl = document.createElement('span');
-      countdownEl.id = 'countdownDisplay';
-      countdownEl.className = 'countdown-display';
-      cooldownTimer.appendChild(countdownEl);
-      console.log('[COUNTDOWN] ✅ Created countdownDisplay element dynamically');
-    } else {
-      console.error('[COUNTDOWN] ❌ cooldownTimer container also not found!');
-      return;
-    }
+    countdownEl = document.createElement('span');
+    countdownEl.id = 'countdownDisplay';
+    countdownEl.className = 'countdown-display';
+    countdownEl.textContent = `${seconds}s`;
+    cooldownTimer.appendChild(countdownEl);
+    console.log('[COUNTDOWN] ✅ Created and appended countdownDisplay element');
+  } else {
+    console.log('[COUNTDOWN] ✅ countdownDisplay element found');
+    countdownEl.textContent = `${seconds}s`;
   }
   
-  if (countdownEl) {
-    countdownEl.textContent = `${seconds}s`;
-    console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
-  }
+  console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
   
   // Show cooldown timer container
-  const cooldownTimer = document.getElementById('cooldownTimer');
-  if (cooldownTimer) {
-    cooldownTimer.style.display = 'flex';
-    console.log('[COUNTDOWN] ✅ Cooldown timer container shown');
-  } else {
-    console.error('[COUNTDOWN] ❌ cooldownTimer element NOT FOUND in DOM!');
-  }
+  cooldownTimer.style.display = 'flex';
+  console.log('[COUNTDOWN] ✅ Cooldown timer container shown');
   
   // Start countdown interval if not already running
   if (!countdownInterval && seconds > 0) {
