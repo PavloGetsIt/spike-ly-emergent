@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-007 - THRESHOLD DEBUG
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-007 (Threshold Debug)');
-console.log('🎯 Added detailed threshold and insight logging');
+// VERSION: 2025-06-21-008 - ERROR HANDLING
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-008 (Error Handling)');
+console.log('🎯 Added comprehensive error logging for debugging');
 
 import { AudioProcessor } from './audioProcessor.js';
 
