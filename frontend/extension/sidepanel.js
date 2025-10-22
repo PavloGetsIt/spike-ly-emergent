@@ -186,11 +186,25 @@ let countdownInterval = null;
  * Update countdown display
  */
 function updateCountdown(seconds) {
+  console.log('[COUNTDOWN] ⏰ updateCountdown called with:', seconds + 's');
+  
   countdownSeconds = seconds;
   const countdownEl = document.getElementById('countdownDisplay');
+  
   if (countdownEl) {
     countdownEl.textContent = `${seconds}s`;
-    console.log('[COUNTDOWN] Updated to:', seconds + 's');
+    console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
+  } else {
+    console.error('[COUNTDOWN] ❌ countdownDisplay element NOT FOUND in DOM!');
+  }
+  
+  // Show cooldown timer container
+  const cooldownTimer = document.getElementById('cooldownTimer');
+  if (cooldownTimer) {
+    cooldownTimer.style.display = 'flex';
+    console.log('[COUNTDOWN] ✅ Cooldown timer container shown');
+  } else {
+    console.error('[COUNTDOWN] ❌ cooldownTimer element NOT FOUND in DOM!');
   }
   
   // Start countdown interval if not already running
