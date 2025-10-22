@@ -189,13 +189,27 @@ function updateCountdown(seconds) {
   console.log('[COUNTDOWN] ⏰ updateCountdown called with:', seconds + 's');
   
   countdownSeconds = seconds;
-  const countdownEl = document.getElementById('countdownDisplay');
+  let countdownEl = document.getElementById('countdownDisplay');
+  
+  // If element doesn't exist, create it dynamically
+  if (!countdownEl) {
+    console.warn('[COUNTDOWN] ⚠️ countdownDisplay element not found, creating dynamically');
+    const cooldownTimer = document.getElementById('cooldownTimer');
+    if (cooldownTimer) {
+      countdownEl = document.createElement('span');
+      countdownEl.id = 'countdownDisplay';
+      countdownEl.className = 'countdown-display';
+      cooldownTimer.appendChild(countdownEl);
+      console.log('[COUNTDOWN] ✅ Created countdownDisplay element dynamically');
+    } else {
+      console.error('[COUNTDOWN] ❌ cooldownTimer container also not found!');
+      return;
+    }
+  }
   
   if (countdownEl) {
     countdownEl.textContent = `${seconds}s`;
     console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
-  } else {
-    console.error('[COUNTDOWN] ❌ countdownDisplay element NOT FOUND in DOM!');
   }
   
   // Show cooldown timer container
