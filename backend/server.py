@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from anthropic import Anthropic
 import json
+import re
 
 
 ROOT_DIR = Path(__file__).parent
