@@ -183,31 +183,38 @@ class CorrelationEngine {
 
     this.lastInsightTime = now;
 
-    // Analyze tone with Hume AI
-    const tone = await this.analyzeTone(segment.text);
-    
-    // Generate insight (now async)
-    const insight = await this.generateInsight(delta, count, segment, tone);
-    
-    console.log('[Correlation] 🎯 Generated insight to send:', {
-      emotionalLabel: insight.emotionalLabel,
-      nextMove: insight.nextMove,
-      delta: insight.delta,
-      source: insight.source || 'unknown'
-    });
-    
-    // Send to background script
-    chrome.runtime.sendMessage({
-      type: 'INSIGHT',
-      ...insight
-    });
+    try {
+      // Analyze tone with Hume AI
+      console.log('[Correlation] 🔍 Step 1: Analyzing tone with Hume AI...');
+      const tone = await this.analyzeTone(segment.text);
+      console.log('[Correlation] 🔍 Step 2: Tone analysis complete:', tone?.emotion || 'none');
+      
+      // Generate insight (now async)
+      console.log('[Correlation] 🔍 Step 3: Generating insight...');
+      const insight = await this.generateInsight(delta, count, segment, tone);
+      console.log('[Correlation] 🔍 Step 4: Insight generated!');
+      
+      console.log('[Correlation] 🎯 Generated insight to send:', {
+        emotionalLabel: insight.emotionalLabel,
+        nextMove: insight.nextMove,
+        delta: insight.delta,
+        source: insight.source || 'unknown'
+      });
+      
+      // Send to background script
+      console.log('[Correlation] 🔍 Step 5: Sending to background script...');
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        ...insight
+      });
+      console.log('[Correlation] 🔍 Step 6: Message sent successfully!');
 
-    // Log as action
-    chrome.runtime.sendMessage({
-      type: 'ACTION',
-      label: tone.emotion || segment.topic || 'Speech',
-      delta: delta,
-      text: segment.text,
+      // Log as action
+      chrome.runtime.sendMessage({
+        type: 'ACTION',
+        label: tone.emotion || segment.topic || 'Speech',
+        delta: delta,
+        text: segment.text,
       startTime: new Date(segment.startTime).toISOString(),
       endTime: new Date(segment.endTime).toISOString()
     });
