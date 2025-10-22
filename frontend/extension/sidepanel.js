@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-005 - FASTAPI MIGRATION
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-005 (FastAPI Migration)');
-console.log('🎯 Migrated from Supabase to FastAPI backend for insights');
+// VERSION: 2025-06-21-006 - CLAUDE INSIGHTS FIXED
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-006 (Claude Insights Fixed)');
+console.log('🎯 Backend: FastAPI with Claude Sonnet 4.5');
 
 import { AudioProcessor } from './audioProcessor.js';
 
