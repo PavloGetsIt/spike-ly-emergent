@@ -682,6 +682,9 @@ function handleMessage(message) {
     case 'ENGINE_STATUS':
       updateEngineStatus(message.status, message.meta);
       break;
+    case 'COUNTDOWN_UPDATE':
+      updateCountdown(message.seconds);
+      break;
     case 'FULL_RESET':
       resetAllData();
       break;
