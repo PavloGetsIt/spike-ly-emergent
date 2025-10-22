@@ -18,7 +18,24 @@ class CorrelationEngine {
     this.minInsightInterval = 20000; // 20 seconds between insights
     this.analysisCache = new Map(); // Cache Hume AI results
     this.prosodyHistory = []; // Last 10 prosody samples
-    this.minDelta = 10; // Configurable trigger threshold
+    this.minDelta = 3; // Default trigger threshold (will be loaded from storage)
+    
+    // Load threshold from storage on init
+    this.loadThresholdFromStorage();
+  }
+  
+  // Load minDelta from chrome.storage
+  loadThresholdFromStorage() {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.get(['minDelta'], (result) => {
+        if (result.minDelta !== undefined) {
+          this.minDelta = result.minDelta;
+          console.log('[Correlation] 🎯 Loaded threshold from storage:', this.minDelta);
+        } else {
+          console.log('[Correlation] 🎯 Using default threshold:', this.minDelta);
+        }
+      });
+    }
   }
 
   // Update thresholds from settings
