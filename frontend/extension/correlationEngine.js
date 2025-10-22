@@ -572,8 +572,14 @@ class CorrelationEngine {
   }
 
   // Generate insight based on delta, segment, and tone using AI
-  async generateInsight(delta, count, segment, tone) {
-    console.log('[CorrelationEngine] 🎯 Generating AI insight', { delta, count, segmentLength: segment?.text.length, tone });
+  async generateInsight(delta, count, segment, tone, isTimedMode = false) {
+    console.log('[CorrelationEngine] 🎯 Generating AI insight', { 
+      delta, 
+      count, 
+      segmentLength: segment?.text.length, 
+      tone,
+      isTimedMode 
+    });
     
     const action = this.extractAction(segment.text);
     
