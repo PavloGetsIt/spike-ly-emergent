@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-22-017 - INLINE STYLES FORCE
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-017 (Inline Styles Force)');
-console.log('🎯 Added inline CSS to countdown element to bypass stylesheet caching');
+// VERSION: 2025-06-22-018 - PERMANENT COUNTDOWN
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-018 (Permanent Countdown)');
+console.log('🎯 Moved countdown to always-visible location, removed collecting/correlating UI noise');
 
 import { AudioProcessor } from './audioProcessor.js';
 
