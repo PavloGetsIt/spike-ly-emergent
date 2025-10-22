@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-010 - AUTO INSIGHT TIMER
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-010 (Auto Insight Timer)');
-console.log('🎯 Features: 20s auto-insights, countdown display, winning action reminders');
+// VERSION: 2025-06-21-011 - AUDIO FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-011 (Audio Button Fix)');
+console.log('🎯 Fixed: Chrome API race condition in correlationEngine initialization');
 
 import { AudioProcessor } from './audioProcessor.js';
 
