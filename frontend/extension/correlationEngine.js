@@ -215,9 +215,19 @@ class CorrelationEngine {
         label: tone.emotion || segment.topic || 'Speech',
         delta: delta,
         text: segment.text,
-      startTime: new Date(segment.startTime).toISOString(),
-      endTime: new Date(segment.endTime).toISOString()
-    });
+        startTime: new Date(segment.startTime).toISOString(),
+        endTime: new Date(segment.endTime).toISOString()
+      });
+      
+    } catch (error) {
+      console.error('[Correlation] ❌ ERROR in generateCorrelation:', error);
+      console.error('[Correlation] ❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 200)
+      });
+      this.emitEngineStatus('FAILED', { reason: error.message });
+    }
   }
 
   // Get recent transcript segment
