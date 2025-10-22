@@ -762,6 +762,8 @@ class CorrelationEngine {
     }
 
     // Fallback logic (runs if AI disabled, low-impact, or error)
+    console.log('[Correlation] 🔍 Before fallback check - emotionalLabel:', emotionalLabel, 'nextMove:', nextMove ? nextMove.substring(0, 50) : 'null');
+    
     if (!nextMove) {
       console.warn('⚠️ ==========================================');
       console.warn('⚠️ AI INSIGHT FAILED OR DISABLED - USING FALLBACK');
