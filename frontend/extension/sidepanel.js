@@ -657,6 +657,12 @@ function handleMessage(message) {
       }
       break;
     case 'INSIGHT':
+      console.log('[SIDEPANEL] 🎯 INSIGHT received:', {
+        emotionalLabel: message.emotionalLabel,
+        nextMove: message.nextMove,
+        delta: message.delta,
+        text: message.text?.substring(0, 50)
+      });
       updateInsight(message);
       break;
     case 'ACTION':
