@@ -346,6 +346,20 @@ Based on this data, generate ONE tactical decision for the streamer to execute i
             logger.warning("⚠️ Transcript bleed detected in nextMove (4+ words), using fallback")
             insight['nextMove'] = "Keep this energy going" if request.viewerDelta > 0 else "Try something different"
         
+        # Check for repetition against recent insights
+        if request.recentInsights and len(request.recentInsights) > 0:
+            for recent in request.recentInsights[-3:]:
+                recent_lower = recent.lower()
+                # Check if new insight is too similar (> 60% word overlap)
+                new_words = set(next_move_lower.split())
+                recent_words = set(recent_lower.split())
+                if len(new_words) > 0:
+                    overlap = len(new_words & recent_words) / len(new_words)
+                    if overlap > 0.6:
+                        logger.warning(f"⚠️ Repetition detected: '{insight['nextMove']}' too similar to '{recent}' ({overlap:.0%} match)")
+                        # Force variation by prepending "Try: "
+                        insight['nextMove'] = f"Try: {insight['nextMove']}"[:50]
+        
         logger.info(f"✅ Insight generated - Label: {insight['emotionalLabel']}, Move: {insight['nextMove']}")
         
         return InsightResponse(
