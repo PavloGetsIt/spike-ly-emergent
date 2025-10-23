@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-025 - INSTANT VIEWER COUNT
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-025 (Instant Viewer Count)');
-console.log('🎯 Fixed: Viewer count now displays instantly (< 1s), no 5s warm-up delay');
+// VERSION: 2025-10-23-026 - DIAGNOSTIC LOGGING
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-026 (Diagnostic Logging)');
+console.log('🎯 Full transcript logging, Claude output analysis, insight quality detection');
 
 import { AudioProcessor } from './audioProcessor.js';
 
