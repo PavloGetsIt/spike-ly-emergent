@@ -117,6 +117,22 @@ async def generate_insight(request: InsightRequest):
     try:
         logger.info(f"🤖 Generating insight for delta: {request.viewerDelta}")
         
+        # 📊 DIAGNOSTIC LOGGING - Full request analysis
+        logger.info("=" * 80)
+        logger.info("📊 DIAGNOSTIC: INCOMING REQUEST ANALYSIS")
+        logger.info("=" * 80)
+        logger.info(f"📊 Transcript: {request.transcript[:200]}...")
+        logger.info(f"📊 Transcript length: {len(request.transcript)} chars")
+        logger.info(f"📊 Transcript word count: {len(request.transcript.split())}")
+        logger.info(f"📊 Viewer Delta: {request.viewerDelta}")
+        logger.info(f"📊 Topic: {request.topic}")
+        logger.info(f"📊 Keywords Sent: {request.keywordsSaid}")
+        logger.info(f"📊 Recent Insights: {request.recentInsights}")
+        logger.info(f"📊 Winning Topics: {request.winningTopics}")
+        logger.info(f"📊 Transcript Quality: {request.transcriptQuality}")
+        logger.info(f"📊 Unique Word Ratio: {request.uniqueWordRatio}")
+        logger.info("=" * 80)
+        
         # Get Claude API key
         api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
