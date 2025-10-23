@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-023 - ULTRA-SPECIFIC INSIGHTS
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-023 (Ultra-Specific Insights)');
-console.log('🎯 3-step reasoning, generic insight rejection, concrete noun extraction');
+// VERSION: 2025-10-23-024 - VIEWER COUNT DECIMAL FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-024 (Viewer Count Decimal Fix)');
+console.log('🎯 Fixed: 1.2K now parses as 1200 (not 1000)');
 
 import { AudioProcessor } from './audioProcessor.js';
 
