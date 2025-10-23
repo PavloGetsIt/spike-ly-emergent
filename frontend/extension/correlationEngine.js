@@ -830,7 +830,20 @@ class CorrelationEngine {
           console.log('✅ Response Time:', Math.round(aiDuration), 'ms');
           console.log('✅ Emotional Label:', aiInsight.emotionalLabel);
           console.log('✅ Next Move:', aiInsight.nextMove);
+          console.log('✅ Source:', aiInsight.source);
           console.log('✅ ==========================================');
+          
+          // 📊 DIAGNOSTIC: Analyze Claude's output quality
+          console.log('📊 ==========================================');
+          console.log('📊 DIAGNOSTIC: CLAUDE OUTPUT ANALYSIS');
+          console.log('📊 ==========================================');
+          console.log('📊 Is Generic Check:');
+          const genericPhrases = ['pivot to', 'keep energy', 'stay hyped', 'build excitement', 'show more', 'talk more'];
+          const isGenericLooking = genericPhrases.some(phrase => aiInsight.nextMove.toLowerCase().includes(phrase));
+          console.log('📊   Contains generic phrase:', isGenericLooking, '- Phrase:', aiInsight.nextMove);
+          console.log('📊   Word count:', aiInsight.nextMove.split(/\s+/).length);
+          console.log('📊   Has specific noun/question:', /ask ['"][^'"]+['"]|show [a-z]+ [a-z]+|tell [a-z]+ story/i.test(aiInsight.nextMove));
+          console.log('📊 ==========================================');
           
           if (aiInsight.emotionalLabel && aiInsight.nextMove) {
             emotionalLabel = aiInsight.emotionalLabel;
