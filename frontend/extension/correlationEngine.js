@@ -746,7 +746,11 @@ class CorrelationEngine {
       console.log('[Extension AI] Enabled and high-impact event, calling AI...');
       this.emitEngineStatus('AI_CALLING');
       try {
-        // Prepare payload for AI insight generation
+        // Extract keywords and analyze transcript quality
+        const keywords = this.extractKeywords(segment.text);
+        const transcriptAnalysis = this.analyzeTranscriptQuality(segment.text);
+        
+        // Prepare payload for AI insight generation with ENHANCED CONTEXT
         const payload = {
           transcript: truncatedTranscript,
           viewerDelta: delta,
@@ -766,7 +770,13 @@ class CorrelationEngine {
         recentHistory: this.prosodyHistory.slice(-7).map((h, i) => ({
           delta: this.viewerBuffer[this.viewerBuffer.length - 7 + i]?.delta || 0,
           emotion: h.top_emotion
-        }))
+        })),
+        // NEW FIELDS for dynamic insights
+        keywordsSaid: keywords,
+        recentInsights: this.recentInsights,
+        winningTopics: this.winningTopics,
+        transcriptQuality: transcriptAnalysis.quality,
+        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio
       };
 
         console.log('🤖 ==========================================');
@@ -774,6 +784,10 @@ class CorrelationEngine {
         console.log('🤖 URL: https://project-continuity-5.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
         console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
+        console.log('🤖 Keywords Detected:', keywords.join(', ') || 'none');
+        console.log('🤖 Transcript Quality:', transcriptAnalysis.quality);
+        console.log('🤖 Recent Insights:', this.recentInsights.length);
+        console.log('🤖 Winning Topics:', this.winningTopics.length);
         console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
         console.log('🤖 Signal Quality:', payload.quality);
         console.log('🤖 ==========================================');
