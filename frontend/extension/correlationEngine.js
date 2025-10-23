@@ -783,11 +783,12 @@ class CorrelationEngine {
         console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
         console.log('🤖 URL: https://project-continuity-5.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
-        console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
-        console.log('🤖 Keywords Detected:', keywords.join(', ') || 'none');
-        console.log('🤖 Transcript Quality:', transcriptAnalysis.quality);
-        console.log('🤖 Recent Insights:', this.recentInsights.length);
-        console.log('🤖 Winning Topics:', this.winningTopics.length);
+        console.log('🤖 Transcript (FULL):', payload.transcript);  // Show FULL transcript for analysis
+        console.log('🤖 Transcript Length:', payload.transcript.length, 'chars,', payload.transcript.split(/\s+/).length, 'words');
+        console.log('🤖 Keywords Detected:', keywords.join(', ') || 'NONE');
+        console.log('🤖 Transcript Quality:', transcriptAnalysis.quality, 'Unique:', (transcriptAnalysis.uniqueWordRatio * 100).toFixed(0) + '%');
+        console.log('🤖 Recent Insights to Avoid:', this.recentInsights);
+        console.log('🤖 Winning Topics:', this.winningTopics);
         console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
         console.log('🤖 Signal Quality:', payload.quality);
         console.log('🤖 ==========================================');
