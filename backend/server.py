@@ -97,6 +97,12 @@ class InsightRequest(BaseModel):
     topic: Optional[str] = None
     quality: Optional[str] = None
     recentHistory: Optional[List[HistoryItem]] = None
+    # New fields for dynamic insights
+    keywordsSaid: Optional[List[str]] = None
+    recentInsights: Optional[List[str]] = None
+    winningTopics: Optional[List[str]] = None
+    transcriptQuality: Optional[str] = None
+    uniqueWordRatio: Optional[float] = None
 
 class InsightResponse(BaseModel):
     emotionalLabel: str
