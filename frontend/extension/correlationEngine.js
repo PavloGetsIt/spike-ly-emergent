@@ -25,7 +25,27 @@ class CorrelationEngine {
     this.winningActions = []; // Track high-performing actions for reminders
     this.isSystemActive = false; // Track if system is running
     
+    // NEW: Dynamic insights tracking
+    this.recentInsights = []; // Last 5 insights for anti-repetition
+    this.winningTopics = []; // Topics that caused +10 spikes
+    this.keywordLibrary = this.initializeKeywordLibrary();
+    
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
+    console.log('[Correlation] 🎯 Dynamic insights mode enabled');
+  }
+  
+  // Initialize keyword library for topic detection
+  initializeKeywordLibrary() {
+    return {
+      gaming: ['game', 'gaming', 'play', 'playing', 'level', 'controller', 'setup', 'fps', 'strategy', 'rpg', 'mmorpg', 'valorant', 'fortnite', 'minecraft', 'cod', 'elden ring', 'boss', 'raid', 'quest', 'loot', 'rank', 'ranked', 'competitive', 'esports', 'pro', 'graphics card', 'gpu', 'cpu', 'pc', 'console', 'ps5', 'xbox'],
+      makeup: ['makeup', 'lipstick', 'foundation', 'contour', 'blend', 'blending', 'palette', 'eyeshadow', 'mascara', 'eyeliner', 'highlighter', 'bronzer', 'concealer', 'primer', 'beauty', 'cosmetic', 'glam', 'tutorial', 'brush', 'sponge', 'skincare', 'skin'],
+      cooking: ['cook', 'cooking', 'recipe', 'ingredient', 'taste', 'bake', 'baking', 'flavor', 'dish', 'meal', 'food', 'chef', 'kitchen', 'oven', 'stove', 'pan', 'sauce', 'spice', 'seasoning', 'pasta', 'chicken', 'beef', 'vegetable', 'dessert', 'dinner'],
+      personal: ['story', 'life', 'family', 'friend', 'relationship', 'feel', 'feeling', 'emotion', 'personal', 'experience', 'happened', 'childhood', 'growing up', 'parents', 'sibling', 'memory', 'remember', 'funny', 'crazy', 'wild', 'believe', 'true'],
+      tech: ['tech', 'technology', 'phone', 'computer', 'app', 'software', 'code', 'coding', 'programming', 'developer', 'iphone', 'android', 'laptop', 'tablet', 'gadget', 'device', 'camera', 'video', 'audio', 'review', 'specs', 'feature'],
+      fitness: ['workout', 'exercise', 'gym', 'muscle', 'cardio', 'reps', 'sets', 'lifting', 'weights', 'training', 'fitness', 'health', 'diet', 'protein', 'gains', 'shredded', 'bulk', 'cut', 'squat', 'bench', 'deadlift', 'yoga', 'running'],
+      interaction: ['chat', 'question', 'ask', 'asking', 'answer', 'comment', 'viewers', 'audience', 'everyone', 'guys', 'yall', 'community', 'follow', 'subscribe', 'like', 'share', 'giveaway', 'prize', 'winner', 'poll'],
+      product: ['product', 'brand', 'sponsored', 'link', 'buy', 'purchase', 'discount', 'code', 'promo', 'deal', 'unbox', 'unboxing', 'review', 'recommend', 'worth', 'price', 'cost', 'expensive', 'cheap', 'quality']
+    };
   }
   
   // Start auto-insight timer (generates insights every 20s)
