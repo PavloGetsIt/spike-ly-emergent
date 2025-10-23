@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-024 - VIEWER COUNT DECIMAL FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-024 (Viewer Count Decimal Fix)');
-console.log('🎯 Fixed: 1.2K now parses as 1200 (not 1000)');
+// VERSION: 2025-10-23-025 - INSTANT VIEWER COUNT
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-025 (Instant Viewer Count)');
+console.log('🎯 Fixed: Viewer count now displays instantly (< 1s), no 5s warm-up delay');
 
 import { AudioProcessor } from './audioProcessor.js';
 
