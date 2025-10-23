@@ -373,7 +373,14 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         
         # Parse response
         generated_text = response.content[0].text.strip()
-        logger.info(f"✅ Claude response: {generated_text[:100]}...")
+        logger.info(f"✅ Claude raw response: {generated_text[:200]}...")
+        
+        # 📊 DIAGNOSTIC: Full Claude response
+        logger.info("=" * 80)
+        logger.info("📊 DIAGNOSTIC: CLAUDE RAW OUTPUT")
+        logger.info("=" * 80)
+        logger.info(f"📊 Full Claude Response: {generated_text}")
+        logger.info("=" * 80)
         
         # Parse JSON
         try:
@@ -385,6 +392,14 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
                 insight = json.loads(match.group(0))
             else:
                 raise ValueError("Invalid JSON response from Claude")
+        
+        # 📊 DIAGNOSTIC: Parsed insight
+        logger.info("=" * 80)
+        logger.info("📊 DIAGNOSTIC: PARSED INSIGHT")
+        logger.info("=" * 80)
+        logger.info(f"📊 emotionalLabel: {insight.get('emotionalLabel')}")
+        logger.info(f"📊 nextMove: {insight.get('nextMove')}")
+        logger.info("=" * 80)
         
         # Validate and enforce constraints
         if not insight.get('emotionalLabel') or not insight.get('nextMove'):
