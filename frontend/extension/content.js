@@ -636,6 +636,18 @@ function startTracking() {
             initialValue: testParse 
           });
           
+          // ⚡ INSTANT SEND: Send initial value immediately (don't wait for warm-up)
+          if (testParse > 0) {
+            safeSendMessage({
+              type: 'VIEWER_COUNT',
+              count: testParse,
+              delta: 0,
+              timestamp: Date.now(),
+              source: 'initial_instant'
+            });
+            console.log(`[VC:INSTANT] ⚡ Sent initial count immediately: ${testParse} (no warm-up wait)`);
+          }
+          
           // Setup observer first
           setupMutationObserver();
           
