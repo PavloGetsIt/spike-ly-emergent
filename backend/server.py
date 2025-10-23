@@ -170,14 +170,42 @@ Stay hyped, Go vulnerable, Build excitement, Keep energy up, Soften tone, Be aut
 TOPIC CATEGORIES:
 Gaming, makeup, cooking, fitness, story, chat, giveaway, product, tutorial, Q&A, personal, tech, music, art, review, reaction, news, gossip, advice, challenge
 
-INSIGHT STRUCTURE EXAMPLES:
+INSIGHT STRUCTURE EXAMPLES (ULTRA-SPECIFIC):
 
 **SPIKE (viewers increasing +5 or more):**
-Pattern detected → Amplify with SPECIFIC action referencing transcript
-- If transcript mentions "playing Valorant": {"emotionalLabel": "Valorant talk wins", "nextMove": "Ask about rank system. Stay hyped"}
-- If transcript mentions "eyeshadow palette": {"emotionalLabel": "palette demo spikes", "nextMove": "Show color swatches. Build excitement"}
-- If transcript mentions "family trip": {"emotionalLabel": "personal story connects", "nextMove": "Share funny moments. Be authentic"}
-- If transcript mentions "new iPhone": {"emotionalLabel": "product hype works", "nextMove": "Test camera features. Create buzz"}
+Pattern detected → Amplify with CONCRETE action they can do in 30 seconds
+- Transcript: "playing Valorant on my PC" → {"emotionalLabel": "Valorant talk wins", "nextMove": "Ask 'What agents you main?'. React big"}
+- Transcript: "this eyeshadow palette" → {"emotionalLabel": "palette demo spikes", "nextMove": "Hold palette to camera. Show shimmer"}
+- Transcript: "vacation with my family" → {"emotionalLabel": "story connects", "nextMove": "Tell the TSA security story. Laugh"}
+- Transcript: "bought new iPhone" → {"emotionalLabel": "product hype works", "nextMove": "Open camera app. Test portrait mode"}
+- Transcript: "cooking chicken recipe" → {"emotionalLabel": "recipe interest high", "nextMove": "Taste test on camera. React honest"}
+
+**DROP (viewers decreasing -5 to -15):**
+Pattern detected → Pivot with SPECIFIC new action
+- Transcript: "technical bug issues" → {"emotionalLabel": "complaints dip", "nextMove": "Pull up giveaway. Announce winner time"}
+- Transcript: "explaining code for 5 minutes" → {"emotionalLabel": "pacing slows", "nextMove": "Run the code now. Show results"}
+- Transcript: "same topic repeated" → {"emotionalLabel": "topic exhausted", "nextMove": "Read top chat question. Answer it"}
+
+**DUMP (viewers dropping -20 or more):**
+Urgent → HIGH ENERGY concrete recovery action
+- Transcript: "dead silence for 30s" → {"emotionalLabel": "silence kills", "nextMove": "Start poll: 'Yes or No?'. Count votes"}
+- Transcript: "stream lagging/frozen" → {"emotionalLabel": "tech problems drop", "nextMove": "Show backup clip. Talk over it"}
+
+**FLATLINE (viewers stable ±3):**
+Create engagement with SPECIFIC question/action
+- Transcript: "chatting casually" → {"emotionalLabel": "energy steady", "nextMove": "Call out @username. Ask their opinion"}
+- Transcript: "background music playing" → {"emotionalLabel": "passive watching", "nextMove": "Announce: 'Big reveal in 30s'. Tease it"}
+
+🎯 KEY PATTERN TO FOLLOW:
+[Action Verb] [Specific Noun/Question/Thing] + [Physical execution cue]
+
+EXAMPLES:
+✅ "Ask 'What's your rank?'. Read answers loud"
+✅ "Hold bottle to camera. Point at ingredients"
+✅ "Tell airport TSA story. Act it out"
+✅ "Answer 'how to start streaming'. Give 3 quick tips"
+✅ "Show controller setup. Explain each button"
+✅ "Read top donation. Thank them by name"
 
 **DROP (viewers decreasing -5 to -15):**
 Pattern detected → Constructive pivot with VARIETY
