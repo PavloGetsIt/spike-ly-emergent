@@ -225,12 +225,14 @@ function normalizeAndParse(textOrElement) {
         .replace(/[·\s,]/g, '');
 
       const suffixMatch = (el.textContent || '').toLowerCase().match(/([km])/);
-      let parsed = parseInt(digits, 10);
+      // FIX: Use parseFloat instead of parseInt to preserve decimals (1.2K → 1200, not 1000)
+      let parsed = parseFloat(digits);
       if (!isNaN(parsed) && parsed > 0) {
         if (suffixMatch?.[1] === 'k') parsed *= 1000;
         if (suffixMatch?.[1] === 'm') parsed *= 1000000;
-        best = parsed;
-        console.debug(`[TT:PARSE] Split-digit: "${digits}" → ${parsed}`);
+        // Round to nearest integer for final count
+        best = Math.round(parsed);
+        console.debug(`[TT:PARSE] Split-digit: "${digits}" + suffix "${suffixMatch?.[1] || 'none'}" → ${best}`);
       }
     }
 
