@@ -111,6 +111,14 @@ class CorrelationEngine {
     const tone = await this.analyzeTone(segment.text);
     const insight = await this.generateInsight(0, latestViewer.count, segment, tone, true); // true = timed mode
     
+    // Handle case where Claude fails and returns null
+    if (!insight) {
+      console.log('[Correlation] ⏰ Timed insight generation failed (Claude unavailable) - sending reminder');
+      this.sendReminderInsight(latestViewer.count, latestViewer.delta);
+      this.resetCountdown();
+      return;
+    }
+    
     console.log('[Correlation] 🎯 Timed insight generated:', {
       emotionalLabel: insight.emotionalLabel,
       nextMove: insight.nextMove
