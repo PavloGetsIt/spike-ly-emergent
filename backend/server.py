@@ -340,7 +340,7 @@ EXAMPLES OF WHAT WE NEED:
 - "Answer 'how did you start'. Give 3 tips"
 - "Show your controller. Explain button mapping"
 
-Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from transcript. Tell them EXACTLY what to do in next 30 seconds.
+Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from transcript. Tell them EXACTLY what to do in next 30 seconds."""
 
         # Call Claude API directly
         logger.info("🤖 Calling Claude Sonnet 4.5 with your API key...")
