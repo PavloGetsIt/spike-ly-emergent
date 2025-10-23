@@ -1,6 +1,6 @@
 // Correlation engine for matching viewer changes with transcript + tone
-// VERSION: 2025-06-22-021 - CLAUDE QUALITY ONLY MODE
-// Removed ALL fallback logic - only Claude Sonnet 4.5 insights shown
+// VERSION: 2025-10-23-022 - DYNAMIC INSIGHTS FULL IMPLEMENTATION
+// Features: Keyword detection, anti-repetition, 40s buffer, quality filtering, winning topics
 
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
