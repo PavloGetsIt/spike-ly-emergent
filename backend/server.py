@@ -489,6 +489,15 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         
         logger.info(f"✅ Insight generated - Label: {insight['emotionalLabel']}, Move: {insight['nextMove']}")
         
+        # 📊 DIAGNOSTIC: Final output to extension
+        logger.info("=" * 80)
+        logger.info("📊 DIAGNOSTIC: FINAL OUTPUT TO EXTENSION")
+        logger.info("=" * 80)
+        logger.info(f"📊 emotionalLabel: {insight['emotionalLabel']}")
+        logger.info(f"📊 nextMove: {insight['nextMove']}")
+        logger.info(f"📊 source: claude")
+        logger.info("=" * 80)
+        
         return InsightResponse(
             emotionalLabel=insight['emotionalLabel'],
             nextMove=insight['nextMove'],
