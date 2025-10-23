@@ -199,12 +199,12 @@ class CorrelationEngine {
       return;
     }
     
-    // Get transcript from last 20 seconds
-    const segment = this.getRecentSegment(now, 20000);
+    // Get transcript from last 40 seconds (increased from 20s for better context)
+    const segment = this.getRecentSegment(now, 40000);
     
     // If no meaningful data, send reminder of winning actions
-    if (!segment || segment.wordCount < 5) {
-      console.log('[Correlation] ⏰ No recent transcript - sending reminder');
+    if (!segment || segment.wordCount < 30) {
+      console.log('[Correlation] ⏰ No recent transcript or too short (<30 words) - sending reminder');
       this.sendReminderInsight(latestViewer.count, latestViewer.delta);
       this.resetCountdown();
       return;
