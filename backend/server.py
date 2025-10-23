@@ -275,15 +275,44 @@ SIGNAL STRENGTH: {request.quality or 'medium'}
 {winning_topics_str}
 
 ---
-TASK: Generate a UNIQUE tactical insight that:
-1. References SPECIFIC words/topics from the transcript above
-2. Is DIFFERENT from recent insights listed
-3. Uses NEW verb + cue combinations
-4. Gives actionable micro-decision for next 30 seconds
+🎯 ULTRA-SPECIFIC TACTICAL INSIGHT GENERATION:
 
-Remember: Extract specific nouns from transcript and build advice around those, not generic concepts.
+STEP 1 - EXTRACT SPECIFICS from transcript:
+- What SPECIFIC game/product/topic did they mention? (exact name)
+- What SPECIFIC question could viewers answer?
+- What SPECIFIC action are they doing right now?
+- What SPECIFIC story/moment did they reference?
 
-Based on this data, generate ONE tactical decision for the streamer to execute in the next 30 seconds. Return ONLY valid JSON with no markdown or explanation."""
+STEP 2 - CREATE TACTICAL ACTION using those specifics:
+- DON'T say "Ask about gaming" → SAY "Ask 'What rank are you?'"
+- DON'T say "Show product" → SAY "Hold up the bottle. Show label"
+- DON'T say "Tell story" → SAY "Tell the airport security story"
+- DON'T say "Pivot to Q&A" → SAY "Answer top chat question now"
+
+STEP 3 - ADD SPECIFIC EXECUTION CUE:
+- Not "Stay hyped" → "Read answers out loud"
+- Not "Keep energy" → "Lean into camera"
+- Not "Build excitement" → "Count down from 3"
+
+REQUIRED FORMAT:
+emotionalLabel: [detected pattern, max 3 words]
+nextMove: [SPECIFIC action with noun] + [HOW to execute it]
+
+EXAMPLES OF WHAT WE NEED:
+
+❌ BAD (vague):
+- "Pivot to Q&A. Build excitement" 
+- "Show more story. Keep energy"
+- "Talk about gaming. Stay hyped"
+
+✅ GOOD (specific):
+- "Ask 'What's your setup?'. Read answers loud"
+- "Tell your first stream fail. Be vulnerable"
+- "Hold product to camera. Point at features"
+- "Answer 'how did you start'. Give 3 tips"
+- "Show your controller. Explain button mapping"
+
+Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from transcript. Tell them EXACTLY what to do in next 30 seconds.
 
         # Call Claude API directly
         logger.info("🤖 Calling Claude Sonnet 4.5 with your API key...")
