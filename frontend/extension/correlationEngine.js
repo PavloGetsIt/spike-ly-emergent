@@ -48,6 +48,90 @@ class CorrelationEngine {
     };
   }
   
+  // Filter filler words from transcript
+  filterFillerWords(text) {
+    const fillerWords = ['um', 'uh', 'like', 'you know', 'i mean', 'basically', 'literally', 'actually', 'honestly', 'yeah', 'yep', 'okay', 'ok', 'so', 'well', 'right'];
+    let filtered = text.toLowerCase();
+    
+    // Remove filler phrases first
+    fillerWords.forEach(filler => {
+      const regex = new RegExp(`\\b${filler}\\b`, 'gi');
+      filtered = filtered.replace(regex, ' ');
+    });
+    
+    // Clean up multiple spaces
+    filtered = filtered.replace(/\s+/g, ' ').trim();
+    
+    return filtered;
+  }
+  
+  // Extract keywords from transcript
+  extractKeywords(text) {
+    const textLower = text.toLowerCase();
+    const foundKeywords = new Set();
+    
+    // Check each category
+    for (const [category, keywords] of Object.entries(this.keywordLibrary)) {
+      for (const keyword of keywords) {
+        if (textLower.includes(keyword)) {
+          foundKeywords.add(category);
+          break; // One keyword per category is enough
+        }
+      }
+    }
+    
+    return Array.from(foundKeywords);
+  }
+  
+  // Calculate transcript quality metrics
+  analyzeTranscriptQuality(text) {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const wordCount = words.length;
+    
+    if (wordCount < 10) {
+      return { quality: 'LOW', uniqueWordRatio: 0, wordCount };
+    }
+    
+    // Calculate unique word ratio
+    const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+    const uniqueWordRatio = uniqueWords.size / wordCount;
+    
+    // Determine quality
+    let quality = 'LOW';
+    if (wordCount >= 30 && uniqueWordRatio > 0.5) {
+      quality = 'HIGH';
+    } else if (wordCount >= 20 || uniqueWordRatio > 0.4) {
+      quality = 'MEDIUM';
+    }
+    
+    return { quality, uniqueWordRatio, wordCount };
+  }
+  
+  // Track insight for anti-repetition
+  trackInsight(insight) {
+    if (insight && insight.nextMove) {
+      this.recentInsights.push(insight.nextMove);
+      // Keep only last 5
+      if (this.recentInsights.length > 5) {
+        this.recentInsights.shift();
+      }
+      console.log('[Correlation] 📝 Tracked insight. Recent:', this.recentInsights.length);
+    }
+  }
+  
+  // Track winning topics
+  trackWinningTopic(topic, delta, keywords) {
+    if (delta >= 10 && keywords && keywords.length > 0) {
+      const topicStr = `${keywords[0]} ${delta >= 20 ? '+' + delta : 'works'}`;
+      this.winningTopics.push(topicStr);
+      // Keep only last 5
+      if (this.winningTopics.length > 5) {
+        this.winningTopics.shift();
+      }
+      console.log('[Correlation] ✅ Tracked winning topic:', topicStr);
+    }
+  }
+  
   // Start auto-insight timer (generates insights every 20s)
   startAutoInsightTimer() {
     this.stopAutoInsightTimer(); // Clear any existing timer
