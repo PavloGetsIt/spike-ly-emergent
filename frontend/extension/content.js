@@ -273,6 +273,42 @@ function parseTextToCount(text) {
   return result;
 }
 
+// Run parser validation tests on load
+function validateParserFix() {
+  const tests = [
+    { input: "953", expected: 953 },
+    { input: "1K", expected: 1000 },
+    { input: "1.0K", expected: 1000 },
+    { input: "1.2K", expected: 1200 },
+    { input: "1.5K", expected: 1500 },
+    { input: "1.9K", expected: 1900 },
+    { input: "15K", expected: 15000 },
+    { input: "15.3K", expected: 15300 },
+    { input: "1M", expected: 1000000 },
+    { input: "1.5M", expected: 1500000 },
+    { input: "1.2m", expected: 1200000 },
+    { input: "2.5k", expected: 2500 }
+  ];
+  
+  console.log('[TT:PARSE] 🧪 Running parser validation tests...');
+  let passed = 0;
+  let failed = 0;
+  
+  tests.forEach(({ input, expected }) => {
+    const result = parseTextToCount(input);
+    if (result === expected) {
+      console.log(`[TT:PARSE] ✅ "${input}" → ${result} (expected ${expected})`);
+      passed++;
+    } else {
+      console.error(`[TT:PARSE] ❌ "${input}" → ${result} (expected ${expected})`);
+      failed++;
+    }
+  });
+  
+  console.log(`[TT:PARSE] 🧪 Test Results: ${passed}/${tests.length} passed, ${failed} failed`);
+  return failed === 0;
+}
+
 // Legacy alias for backward compatibility
 function parseViewerCount(textOrElement) {
   const result = normalizeAndParse(textOrElement);
