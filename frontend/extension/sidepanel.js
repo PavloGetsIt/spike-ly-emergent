@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-022 - DYNAMIC INSIGHTS
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-022 (Dynamic Insights)');
-console.log('🎯 Keyword detection, anti-repetition, 40s transcript buffer, quality filtering');
+// VERSION: 2025-10-23-023 - ULTRA-SPECIFIC INSIGHTS
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-023 (Ultra-Specific Insights)');
+console.log('🎯 3-step reasoning, generic insight rejection, concrete noun extraction');
 
 import { AudioProcessor } from './audioProcessor.js';
 
