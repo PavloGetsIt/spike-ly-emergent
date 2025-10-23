@@ -520,7 +520,12 @@ class CorrelationEngine {
       return null;
     }
 
-    const text = relevantLines.map(l => l.text).join(' ');
+    // Join and filter filler words
+    const rawText = relevantLines.map(l => l.text).join(' ');
+    const filteredText = this.filterFillerWords(rawText);
+    
+    // Use filtered text for word count and analysis
+    const text = filteredText.length > 20 ? filteredText : rawText; // Fallback to raw if filtering removed too much
     const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
     return {
