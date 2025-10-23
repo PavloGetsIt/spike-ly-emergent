@@ -761,123 +761,26 @@ class CorrelationEngine {
       this.emitEngineStatus('AI_FALLBACK', { reason: 'AI disabled or low-impact' });
     }
 
-    // Fallback logic (runs if AI disabled, low-impact, or error)
-    console.log('[Correlation] 🔍 Before fallback check - emotionalLabel:', emotionalLabel, 'nextMove:', nextMove ? nextMove.substring(0, 50) : 'null');
+    // Claude Quality Check - NO FALLBACK LOGIC
+    console.log('[Correlation] 🔍 Quality Check - emotionalLabel:', emotionalLabel, 'nextMove:', nextMove ? nextMove.substring(0, 50) : 'null');
     
     if (!nextMove) {
       console.warn('⚠️ ==========================================');
-      console.warn('⚠️ AI INSIGHT FAILED OR DISABLED - USING FALLBACK');
-      console.warn('⚠️ Falling back to template system');
+      console.warn('⚠️ CLAUDE INSIGHT FAILED - SKIPPING INSIGHT');
+      console.warn('⚠️ No low-quality fallback - waiting for next Claude insight');
       console.warn('⚠️ ==========================================');
       
-      // Fallback to prosody or tone-based feedback
-      const isDrop = delta < 0;
-      const isDump = delta < -30;
-      const isSpike = delta > 20;
-      
-      // Use prosody if quality is GOOD or better
-      if (prosody && (prosody.correlationQuality === 'EXCELLENT' || prosody.correlationQuality === 'GOOD')) {
-        console.log(`[Correlation] Using ${prosody.correlationQuality} quality prosody signal`);
-        
-        if (isSpike) {
-          nextMove = this.generateSpikeFeedback(action, delta, prosody);
-        } else if (isDump) {
-          nextMove = this.generateDumpFeedback(action, delta);
-        } else if (isDrop) {
-          nextMove = this.generateDropFeedback(action, delta, prosody, tone);
-        }
-        emotionalLabel = prosody.top_emotion || 'unknown';
-      }
-      
-      // Try FAIR quality for significant drops
-      if (!nextMove && prosody && prosody.correlationQuality === 'FAIR' && delta < -20) {
-        console.log('[Correlation] Using FAIR quality prosody for drop');
-        nextMove = this.generateDropFeedback(action, delta, prosody, tone);
-        emotionalLabel = prosody.top_emotion || 'unknown';
-      }
-      
-      // Fallback to transcript-based insights
-      if (!nextMove) {
-        if (isDump) {
-          nextMove = this.generateDumpFeedback(action, delta);
-        } else if (isDrop) {
-          nextMove = this.generateDropFeedback(action, delta, null, tone);
-        } else if (isSpike) {
-          nextMove = this.generateSpikeFeedback(action, delta, null);
-        } else {
-          // NEVER use raw transcript - use safe defaults instead
-          nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-        }
-        emotionalLabel = tone?.emotion || segment.topic || 'general';
-      }
-      
-      // [FALLBACK:GENERATED] diagnostic log
-      console.log('[FALLBACK:GENERATED]', {
-        emotionalLabel: (emotionalLabel || '').slice(0, 50),
-        nextMove: (nextMove || '').slice(0, 50),
-        emotion: tone?.emotion,
-        delta
-      });
-      
-      // Defensive validation: ensure non-empty strings
-      if (!emotionalLabel || typeof emotionalLabel !== 'string' || emotionalLabel.trim() === '') {
-        emotionalLabel = delta > 0 ? 'content spike' : 'content drop';
-        console.warn('[FALLBACK:INVALID] emotionalLabel was invalid, using default');
-      }
-      if (!nextMove || typeof nextMove !== 'string' || nextMove.trim() === '') {
-        nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-        console.warn('[FALLBACK:INVALID] nextMove was invalid, using default');
-      }
-      
-      // Truncate to safe length (max 200 chars)
-      emotionalLabel = emotionalLabel.slice(0, 200);
-      nextMove = nextMove.slice(0, 200);
-      
-      // [FALLBACK:BLEED_DETECTED] Check for transcript bleed (2+ consecutive words OR >40% word overlap)
-      const detectBleed = (output, source) => {
-        const outputWords = output.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-        const sourceWords = source.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-        const sourceText = sourceWords.join(' ');
-        
-        // Check for 2+ consecutive matching words (stricter than 3+)
-        for (let i = 0; i < outputWords.length - 1; i++) {
-          const pair = outputWords.slice(i, i + 2).join(' ');
-          if (pair.length > 4 && sourceText.includes(pair)) {
-            console.warn('[BLEED:DETECTED:2WORDS]', { pair, output: output.slice(0, 50) });
-            return true;
-          }
-        }
-        
-        // Check for word frequency: if >40% of output words appear in source
-        const matchingWords = outputWords.filter(word => 
-          word.length > 3 && sourceWords.includes(word)
-        );
-        const overlapPercent = (matchingWords.length / outputWords.length) * 100;
-        
-        if (overlapPercent > 40) {
-          console.warn('[BLEED:DETECTED:WORDFREQ]', { 
-            overlapPercent: overlapPercent.toFixed(1),
-            matchingWords: matchingWords.slice(0, 5).join(', '),
-            output: output.slice(0, 50)
-          });
-          return true;
-        }
-        
-        return false;
-      };
-      
-      if (detectBleed(emotionalLabel, segment.text)) {
-        console.warn('[FALLBACK:BLEED_DETECTED] emotionalLabel contains transcript, replacing');
-        emotionalLabel = delta > 0 ? 'content spike' : 'content drop';
-      }
-      if (detectBleed(nextMove, segment.text)) {
-        console.warn('[FALLBACK:BLEED_DETECTED] nextMove contains transcript, replacing');
-        nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-      }
-      
-      // Apply urgency styling
-      nextMove = this.applyUrgency(nextMove, urgency);
+      // Do NOT generate insight if Claude failed
+      // Return null to skip this insight generation
+      return null;
     }
+    
+    // If we reach here, Claude succeeded - use Claude insight only
+    console.log('✅ ==========================================');
+    console.log('✅ USING CLAUDE INSIGHT (Quality-Only Mode)');
+    console.log('✅ Label:', emotionalLabel);
+    console.log('✅ Move:', nextMove);
+    console.log('✅ ==========================================');
 
     // Final sanitization pass before emit (catches any remaining bleed)
     const sanitizeAgainstTranscript = (output, source) => {
