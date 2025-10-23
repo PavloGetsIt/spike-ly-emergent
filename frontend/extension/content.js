@@ -261,7 +261,8 @@ function parseTextToCount(text) {
   if (suffix === 'k') num *= 1000;
   if (suffix === 'm') num *= 1000000;
   
-  const result = Math.floor(num);
+  // Use Math.round for better accuracy (1.2K → 1200, not 1000)
+  const result = Math.round(num);
   
   if (!isFinite(result) || isNaN(result) || result < 0) {
     console.debug(`[TT:PARSE] ✗ Invalid: "${text}" → NaN/Inf/negative`);
