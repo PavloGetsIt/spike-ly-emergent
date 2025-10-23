@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-22-021 - CLAUDE QUALITY ONLY
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-22-021 (Claude Quality Only)');
-console.log('🎯 Removed ALL fallback logic - only showing Claude quality insights');
+// VERSION: 2025-10-23-022 - DYNAMIC INSIGHTS
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-022 (Dynamic Insights)');
+console.log('🎯 Keyword detection, anti-repetition, 40s transcript buffer, quality filtering');
 
 import { AudioProcessor } from './audioProcessor.js';
 
