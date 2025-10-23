@@ -422,11 +422,11 @@ class CorrelationEngine {
 
     console.log(`[Correlation] Significant change detected: ${delta > 0 ? '+' : ''}${delta}`);
 
-    // Get recent transcript segment (last 25 seconds)
-    const segment = this.getRecentSegment(timestamp, 25000);
+    // Get recent transcript segment (last 40 seconds for better context)
+    const segment = this.getRecentSegment(timestamp, 40000);
     
-    if (!segment || segment.wordCount < 5) {
-      console.log('[Correlation] Not enough transcript data for insight');
+    if (!segment || segment.wordCount < 30) {
+      console.log('[Correlation] Not enough transcript data for insight (<30 words)');
       this.emitEngineStatus('FAILED', { reason: 'Insufficient transcript' });
       return;
     }
