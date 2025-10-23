@@ -782,40 +782,9 @@ class CorrelationEngine {
     console.log('✅ Move:', nextMove);
     console.log('✅ ==========================================');
 
-    // Final sanitization pass before emit (catches any remaining bleed)
-    const sanitizeAgainstTranscript = (output, source) => {
-      if (!output || !source) return output;
-      
-      const outputWords = output.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      const sourceWords = source.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      const sourceText = sourceWords.join(' ');
-      
-      // Check for 2+ consecutive word matches
-      for (let i = 0; i < outputWords.length - 1; i++) {
-        const pair = outputWords.slice(i, i + 2).join(' ');
-        if (pair.length > 4 && sourceText.includes(pair)) {
-          console.warn('[SANITIZE:BLEED]', { pair, output: output.slice(0, 50) });
-          return delta > 0 ? 'Keep this momentum' : 'Pivot to engaging content';
-        }
-      }
-      
-      // Check word frequency
-      const matchingWords = outputWords.filter(word => 
-        word.length > 3 && sourceWords.includes(word)
-      );
-      const overlapPercent = (matchingWords.length / outputWords.length) * 100;
-      
-      if (overlapPercent > 40) {
-        console.warn('[SANITIZE:WORDFREQ]', { overlapPercent: overlapPercent.toFixed(1) });
-        return delta > 0 ? 'Keep this momentum' : 'Pivot to engaging content';
-      }
-      
-      return output;
-    };
-    
-    // Apply final sanitization
-    emotionalLabel = sanitizeAgainstTranscript(emotionalLabel, segment.text);
-    nextMove = sanitizeAgainstTranscript(nextMove, segment.text);
+    // Trust Claude insights - NO sanitization that could replace them
+    // Backend already handles transcript bleed detection
+    console.log('[Correlation] ✅ Trusting Claude insight as-is (no frontend sanitization)');
 
     // [EMIT:PRE] Final validation diagnostic before emit
     const sanitizedEmotionalLabel = typeof emotionalLabel === 'string' 
