@@ -696,7 +696,17 @@ function handleMessage(message) {
       console.debug('[VC:SP:RX] VIEWER_COUNT', { count: message.count, delta: message.delta });
       console.log('[Spikely Side Panel] VIEWER_COUNT payload:', { count: message.count, delta: message.delta });
       
-      // Handle warm-up phase UI
+      // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
+      if (message.source === 'initial_instant') {
+        console.log('[SIDEPANEL] ⚡ Initial count received INSTANTLY:', message.count);
+        firstCountReceived = true;
+        isInWarmup = false;
+        updateEngineStatus('IDLE', {});
+        updateViewerCount(message.count, 0);
+        break;
+      }
+      
+      // Handle warm-up phase UI (for subsequent updates)
       if (isSystemStarted && message.count === 0 && !firstCountReceived) {
         // During warm-up: show "Collecting..."
         updateEngineStatus('COLLECTING', {});
