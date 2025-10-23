@@ -374,11 +374,50 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         if not insight.get('emotionalLabel') or not insight.get('nextMove'):
             raise ValueError("Missing required fields in insight")
         
+        # REJECT GENERIC INSIGHTS - Force specificity
+        next_move_lower = insight['nextMove'].lower()
+        generic_phrases = [
+            'pivot to q&a',
+            'build excitement',
+            'keep energy',
+            'stay hyped',
+            'be engaging',
+            'do more',
+            'try something',
+            'switch topics',
+            'talk more',
+            'show more'
+        ]
+        
+        # Check if insight is too generic (contains generic phrase without specifics)
+        is_generic = False
+        for phrase in generic_phrases:
+            # If insight ONLY contains the generic phrase (not combined with specifics)
+            if phrase in next_move_lower and len(next_move_lower.split()) <= 4:
+                is_generic = True
+                logger.warning(f"⚠️ REJECTED generic insight: '{insight['nextMove']}' - too vague")
+                break
+        
+        # If generic AND no nouns detected, force a more specific version
+        if is_generic:
+            # Try to extract any noun from transcript to add specificity
+            transcript_words = request.transcript.lower().split()
+            # Simple noun extraction (words that might be specific topics)
+            potential_nouns = [w for w in transcript_words if len(w) > 4 and w not in ['about', 'their', 'really', 'think', 'going', 'doing', 'saying']]
+            if potential_nouns:
+                specific_noun = potential_nouns[0]
+                insight['nextMove'] = f"Talk about {specific_noun}. {insight['nextMove'].split('.')[-1].strip()}"
+                logger.info(f"✅ Added specificity: '{insight['nextMove']}'")
+            else:
+                # Last resort: Force a question format
+                insight['nextMove'] = "Ask viewers a question. Read answers"
+                logger.warning("⚠️ Forced question format due to lack of specifics")
+        
         # Enforce word limits
         emotional_words = insight['emotionalLabel'].split()[:3]
         insight['emotionalLabel'] = ' '.join(emotional_words)
         
-        next_move_words = insight['nextMove'].split()[:8]
+        next_move_words = insight['nextMove'].split()[:12]  # Increased to allow for specificity
         insight['nextMove'] = ' '.join(next_move_words)
         
         # Validate no transcript bleed - only check for consecutive multi-word matches
