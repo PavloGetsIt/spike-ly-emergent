@@ -227,10 +227,31 @@ GOOD EXAMPLES (specific and tactical):
 
 Return ONLY valid JSON. No markdown, no explanations."""
 
-        # Create user prompt
+        # Build context strings for new fields
+        keywords_str = "No keywords detected"
+        if request.keywordsSaid and len(request.keywordsSaid) > 0:
+            keywords_str = f"Detected topics: {', '.join(request.keywordsSaid[:5])}"
+        
+        recent_insights_str = "No recent insights (first insight of session)"
+        if request.recentInsights and len(request.recentInsights) > 0:
+            recent_insights_str = f"🚫 DON'T REPEAT THESE: {', '.join(request.recentInsights[-3:])}"
+        
+        winning_topics_str = "No winning patterns yet"
+        if request.winningTopics and len(request.winningTopics) > 0:
+            winning_topics_str = f"✅ What worked before: {', '.join(request.winningTopics[:3])}"
+        
+        quality_indicator = ""
+        if request.transcriptQuality:
+            quality_indicator = f"Transcript quality: {request.transcriptQuality}"
+            if request.uniqueWordRatio:
+                quality_indicator += f" (word variety: {request.uniqueWordRatio:.0%})"
+        
+        # Create user prompt with enriched context
         user_prompt = f"""LIVE STREAM DATA:
 
-WHAT THEY SAID: "{request.transcript}"
+WHAT THEY SAID (exact words): "{request.transcript}"
+
+{keywords_str}
 
 VIEWER IMPACT: {request.viewerDelta:+d} viewers ({request.prevCount} → {request.viewerCount})
 
@@ -246,7 +267,21 @@ RECENT PATTERN: {history_str}
 
 SIGNAL STRENGTH: {request.quality or 'medium'}
 
+{quality_indicator}
+
 ---
+🎯 CONTEXT FOR VARIETY:
+{recent_insights_str}
+{winning_topics_str}
+
+---
+TASK: Generate a UNIQUE tactical insight that:
+1. References SPECIFIC words/topics from the transcript above
+2. Is DIFFERENT from recent insights listed
+3. Uses NEW verb + cue combinations
+4. Gives actionable micro-decision for next 30 seconds
+
+Remember: Extract specific nouns from transcript and build advice around those, not generic concepts.
 
 Based on this data, generate ONE tactical decision for the streamer to execute in the next 30 seconds. Return ONLY valid JSON with no markdown or explanation."""
 
