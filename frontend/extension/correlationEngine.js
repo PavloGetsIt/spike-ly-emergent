@@ -338,6 +338,14 @@ class CorrelationEngine {
       // Generate insight (now async)
       console.log('[Correlation] 🔍 Step 3: Generating insight...');
       const insight = await this.generateInsight(delta, count, segment, tone);
+      
+      // Handle case where Claude fails and returns null
+      if (!insight) {
+        console.log('[Correlation] ❌ Insight generation failed (Claude unavailable) - skipping');
+        this.emitEngineStatus('FAILED', { reason: 'Claude API unavailable' });
+        return;
+      }
+      
       console.log('[Correlation] 🔍 Step 4: Insight generated!');
       
       console.log('[Correlation] 🎯 Generated insight to send:', {
