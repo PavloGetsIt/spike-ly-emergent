@@ -1,4 +1,6 @@
 // Correlation engine for matching viewer changes with transcript + tone
+// VERSION: 2025-06-22-021 - CLAUDE QUALITY ONLY MODE
+// Removed ALL fallback logic - only Claude Sonnet 4.5 insights shown
 
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
