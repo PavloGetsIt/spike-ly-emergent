@@ -835,6 +835,14 @@ class CorrelationEngine {
             emotionalLabel = aiInsight.emotionalLabel;
             nextMove = aiInsight.nextMove;
             console.log('[Correlation] ✅ Using Claude insight - Label:', emotionalLabel, 'Move:', nextMove);
+            
+            // Track this insight for anti-repetition
+            this.trackInsight(aiInsight);
+            
+            // Track as winning topic if it's a spike
+            if (delta >= 10 && keywords.length > 0) {
+              this.trackWinningTopic(segment.topic, delta, keywords);
+            }
           } else {
             throw new Error('Invalid AI response format');
           }
