@@ -8,17 +8,17 @@
   } catch (_) {}
 
 // ============================================================================
-// TIKTOK VIEWER COUNT STARTUP FIX - Configuration
+// TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
 // ============================================================================
 const TT_CONFIG = {
-  WARMUP_MS: 1500,                    // Warm-up duration
-  WARMUP_MIN_TICKS: 3,                // Minimum mutation ticks before completion
+  WARMUP_MS: 500,                     // Warm-up duration (REDUCED from 1500ms for instant display)
+  WARMUP_MIN_TICKS: 1,                // Minimum mutation ticks (REDUCED from 3 for speed)
   EMIT_MIN_INTERVAL_MS: 500,          // Rate limit: emit at most every 500ms (2Hz)
   MAX_REASONABLE_VIEWERS: 500000,     // Range guard upper bound
   OUTLIER_SIGMA: 5,                   // Outlier detection: median ± 5*MAD
-  MUTATION_DEBOUNCE_MS: 200,          // Debounce mutation observer
+  MUTATION_DEBOUNCE_MS: 100,          // Debounce mutation observer (REDUCED from 200ms)
   NODE_RESELECT_TIMEOUT_MS: 2500,     // Re-run selector if no samples after 2.5s
-  STUCK_WARNING_TIMEOUT_MS: 5000,     // Emit "OBSERVING" status if stuck after 5s
+  STUCK_WARNING_TIMEOUT_MS: 3000,     // Emit "OBSERVING" status if stuck (REDUCED from 5000ms)
   ZERO_GATE_CONSECUTIVE: 2,           // Require 2 consecutive zeros
   ZERO_GATE_DURATION_MS: 1000,        // Over at least 1s duration
   CONSECUTIVE_OVERRIDE: 2,            // Accept outlier if 2 consecutive samples agree
