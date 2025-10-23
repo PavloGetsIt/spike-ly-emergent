@@ -837,7 +837,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 024 (Viewer Count Decimal Fix)');
+console.log('[Spikely] Content script loaded - Version 025 (Instant Viewer Count)');
 
 // Run parser validation tests
 validateParserFix();
