@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-026 - DIAGNOSTIC LOGGING
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-026 (Diagnostic Logging)');
-console.log('🎯 Full transcript logging, Claude output analysis, insight quality detection');
+// VERSION: 2025-10-23-027-DIAGNOSTIC
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-027-DIAGNOSTIC');
+console.log('🔬 DIAGNOSTIC MODE: Validators disabled, 3000ms timeout, full raw Claude logging');
 
 import { AudioProcessor } from './audioProcessor.js';
 
