@@ -835,10 +835,12 @@ class CorrelationEngine {
           const aiInsight = await response.json();
           console.log('✅ ==========================================');
           console.log('✅ CLAUDE INSIGHT RECEIVED (Extension)');
+          console.log('✅ CORRELATION_ID:', correlationId);
           console.log('✅ Response Time:', Math.round(aiDuration), 'ms');
           console.log('✅ Emotional Label:', aiInsight.emotionalLabel);
           console.log('✅ Next Move:', aiInsight.nextMove);
           console.log('✅ Source:', aiInsight.source);
+          console.log('✅ Backend CorrelationId:', aiInsight.correlationId || 'not returned');
           console.log('✅ ==========================================');
           
           // 📊 DIAGNOSTIC: Analyze Claude's output quality
