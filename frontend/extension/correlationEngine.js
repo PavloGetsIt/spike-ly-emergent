@@ -9,7 +9,7 @@ const DEBUG_HUME = true;
 
 // Feature flag: disable extension AI calls (web app handles this)
 const ENABLE_EXTENSION_AI = true;  // ENABLED for Claude Sonnet 4.5
-const AI_MAX_LATENCY_MS = 2000; // Production: 2s timeout (balance speed vs quality)
+const AI_MAX_LATENCY_MS = 2500; // Balanced: 2.5s timeout (increased from 2000ms to reduce timeouts)
 
 class CorrelationEngine {
   constructor() {
