@@ -830,22 +830,10 @@ class CorrelationEngine {
           console.log('✅ Backend CorrelationId:', aiInsight.correlationId || 'not returned');
           console.log('✅ ==========================================');
           
-          // 📊 DIAGNOSTIC: Analyze Claude's output quality
-          console.log('📊 ==========================================');
-          console.log('📊 DIAGNOSTIC: CLAUDE OUTPUT ANALYSIS');
-          console.log('📊 ==========================================');
-          console.log('📊 Is Generic Check:');
-          const genericPhrases = ['pivot to', 'keep energy', 'stay hyped', 'build excitement', 'show more', 'talk more'];
-          const isGenericLooking = genericPhrases.some(phrase => aiInsight.nextMove.toLowerCase().includes(phrase));
-          console.log('📊   Contains generic phrase:', isGenericLooking, '- Phrase:', aiInsight.nextMove);
-          console.log('📊   Word count:', aiInsight.nextMove.split(/\s+/).length);
-          console.log('📊   Has specific noun/question:', /ask ['"][^'"]+['"]|show [a-z]+ [a-z]+|tell [a-z]+ story/i.test(aiInsight.nextMove));
-          console.log('📊 ==========================================');
-          
           if (aiInsight.emotionalLabel && aiInsight.nextMove) {
             emotionalLabel = aiInsight.emotionalLabel;
             nextMove = aiInsight.nextMove;
-            console.log('[Correlation] ✅ Using Claude insight - Label:', emotionalLabel, 'Move:', nextMove);
+            console.log('✅ Claude insight | CID:', correlationId, '| Move:', nextMove.substring(0, 50));
             
             // Track this insight for anti-repetition
             this.trackInsight(aiInsight);
