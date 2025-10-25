@@ -788,6 +788,7 @@ class CorrelationEngine {
 
         console.log('🤖 ==========================================');
         console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
+        console.log('🤖 CORRELATION_ID:', correlationId);
         console.log('🤖 URL: https://project-continuity-5.preview.emergentagent.com/api/generate-insight');
         console.log('🤖 Viewer Delta:', payload.viewerDelta);
         console.log('🤖 Transcript (FULL):', payload.transcript);  // Show FULL transcript for analysis
