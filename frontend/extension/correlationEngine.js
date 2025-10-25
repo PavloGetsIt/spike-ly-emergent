@@ -848,6 +848,25 @@ class CorrelationEngine {
     // Prepare sanitized transcript for logging (available throughout function)
     const words = segment.text.split(/\s+/);
     const truncatedTranscript = words.slice(-100).join(' ');
+    
+    // ==================== ROUTING LOGIC: Calculate Transcript Score ====================
+    // Extract keywords first
+    const keywords = this.extractKeywords(segment.text);
+    const transcriptScore = this.calculateTranscriptScore(segment.text, keywords);
+    
+    console.log(`[Routing] Decision Point | Score: ${transcriptScore.tier} (${transcriptScore.score}) | Delta: ${delta}`);
+    
+    // Route based on transcript quality
+    if (transcriptScore.tier === 'LOW') {
+      console.log('[Routing] ⏭️ SKIP - Transcript quality too low (score < 3) - No insight per preference');
+      return null;  // Skip insight for LOW quality (per "no insight" preference)
+    }
+    
+    // For HIGH and MEDIUM, attempt Claude first
+    const shouldUseClaude = transcriptScore.tier === 'HIGH' || transcriptScore.tier === 'MEDIUM';
+    const allowTemplateFallback = transcriptScore.tier === 'MEDIUM';
+    
+    console.log(`[Routing] Strategy: ${shouldUseClaude ? 'Claude' : 'Skip'} | Fallback: ${allowTemplateFallback ? 'Template' : 'None'}`);
     const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
     
     // [ACTION:EXTRACTED] Diagnostic log to trace potential bleed sources
