@@ -112,6 +112,7 @@ class InsightResponse(BaseModel):
     emotionalLabel: str
     nextMove: str
     source: str = "claude"
+    correlationId: Optional[str] = None
 
 @api_router.post("/generate-insight", response_model=InsightResponse)
 async def generate_insight(request: InsightRequest):
@@ -119,7 +120,13 @@ async def generate_insight(request: InsightRequest):
     Generate tactical live stream insights using Claude Sonnet 4.5
     """
     try:
+        # Generate unique correlationId
+        global correlation_counter
+        correlation_counter += 1
+        correlation_id = f"{int(time.time() * 1000)}-{correlation_counter:04d}"
+        
         logger.info(f"🤖 Generating insight for delta: {request.viewerDelta}")
+        logger.info(f"📊 CORRELATION_ID: {correlation_id}")
         
         # 📊 DIAGNOSTIC LOGGING - Full request analysis
         logger.info("=" * 80)
