@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-10-23-027-DIAGNOSTIC
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-23-027-DIAGNOSTIC');
-console.log('🔬 DIAGNOSTIC MODE: Validators disabled, 3000ms timeout, full raw Claude logging');
+// VERSION: 2025-10-24-028-SMOKE-TEST
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-10-24-028-SMOKE-TEST');
+console.log('🔬 SMOKE TEST MODE: CorrelationId enabled, 3000ms timeout, validators disabled');
 
 import { AudioProcessor } from './audioProcessor.js';
 
