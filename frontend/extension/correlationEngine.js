@@ -30,6 +30,9 @@ class CorrelationEngine {
     this.winningTopics = []; // Topics that caused +10 spikes
     this.keywordLibrary = this.initializeKeywordLibrary();
     
+    // CorrelationId tracking
+    this.insightSequence = 0; // Sequence counter for unique IDs
+    
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
     console.log('[Correlation] 🎯 Dynamic insights mode enabled');
   }
