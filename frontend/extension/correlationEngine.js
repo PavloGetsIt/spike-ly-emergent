@@ -786,20 +786,7 @@ class CorrelationEngine {
         uniqueWordRatio: transcriptAnalysis.uniqueWordRatio
       };
 
-        console.log('🤖 ==========================================');
-        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (FastAPI Backend)');
-        console.log('🤖 CORRELATION_ID:', correlationId);
-        console.log('🤖 URL: https://project-continuity-5.preview.emergentagent.com/api/generate-insight');
-        console.log('🤖 Viewer Delta:', payload.viewerDelta);
-        console.log('🤖 Transcript (FULL):', payload.transcript);  // Show FULL transcript for analysis
-        console.log('🤖 Transcript Length:', payload.transcript.length, 'chars,', payload.transcript.split(/\s+/).length, 'words');
-        console.log('🤖 Keywords Detected:', keywords.join(', ') || 'NONE');
-        console.log('🤖 Transcript Quality:', transcriptAnalysis.quality, 'Unique:', (transcriptAnalysis.uniqueWordRatio * 100).toFixed(0) + '%');
-        console.log('🤖 Recent Insights to Avoid:', this.recentInsights);
-        console.log('🤖 Winning Topics:', this.winningTopics);
-        console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
-        console.log('🤖 Signal Quality:', payload.quality);
-        console.log('🤖 ==========================================');
+        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none');
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
