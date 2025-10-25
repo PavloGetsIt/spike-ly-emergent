@@ -749,6 +749,10 @@ class CorrelationEngine {
       console.log('[Extension AI] Enabled and high-impact event, calling AI...');
       this.emitEngineStatus('AI_CALLING');
       try {
+        // Generate unique correlationId for this insight
+        const correlationId = `${Date.now()}-${String(++this.insightSequence).padStart(4, '0')}`;
+        console.log(`📊 CORRELATION_ID: ${correlationId}`);
+        
         // Extract keywords and analyze transcript quality
         const keywords = this.extractKeywords(segment.text);
         const transcriptAnalysis = this.analyzeTranscriptQuality(segment.text);
