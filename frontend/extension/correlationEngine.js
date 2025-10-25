@@ -1075,9 +1075,10 @@ class CorrelationEngine {
       console.warn('⚠️ Transcript Score:', transcriptScore.tier, '| Allow Fallback:', allowTemplateFallback);
       console.warn('⚠️ ==========================================');
       
-      // If MEDIUM quality and Claude failed, use template fallback
-      if (allowTemplateFallback) {
-        console.log('[Routing] 🔄 MEDIUM quality + Claude failed → Using template fallback');
+      // Use template fallback for MEDIUM or HIGH (better than skipping)
+      // Only skip for LOW quality
+      if (transcriptScore.tier === 'MEDIUM' || transcriptScore.tier === 'HIGH') {
+        console.log('[Routing] 🔄', transcriptScore.tier, 'quality + Claude failed → Using template fallback');
         const templateInsight = this.selectTemplate(keywords, delta);
         
         if (templateInsight) {
@@ -1089,15 +1090,16 @@ class CorrelationEngine {
           return null;
         }
       } else {
-        // HIGH quality but Claude failed - skip insight (don't use templates for rich content)
-        console.warn('⚠️ HIGH quality transcript but Claude failed - skipping (no template fallback)');
+        // LOW quality - skip insight (per "no insight" preference)
+        console.warn('⚠️ LOW quality transcript and Claude failed - skipping (no template for low quality)');
         return null;
       }
     }
     
     // If we reach here, we have an insight (from Claude or template)
+    const insightSource = emotionalLabel.includes('template') || nextMove.includes('template') ? 'template' : 'Claude';
     console.log('✅ ==========================================');
-    console.log('✅ USING INSIGHT | Source:', nextMove.includes('template') ? 'Template' : 'Claude');
+    console.log('✅ USING INSIGHT | Source:', insightSource);
     console.log('✅ Label:', emotionalLabel);
     console.log('✅ Move:', nextMove);
     console.log('✅ ==========================================');
