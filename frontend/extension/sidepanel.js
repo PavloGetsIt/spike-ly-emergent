@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 1.1-ROUTING-MVP
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1-ROUTING-MVP');
-console.log('📊 Routing: HIGH→Claude, MEDIUM→Claude+Template, LOW→Skip | 30 templates loaded');
+// VERSION: 1.1.1-FREQUENCY-FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.1-FREQUENCY-FIX');
+console.log('⚡ Timeout: 2500ms | HIGH threshold: >=6 | Template fallback: MEDIUM+HIGH');
 
 import { AudioProcessor } from './audioProcessor.js';
 
