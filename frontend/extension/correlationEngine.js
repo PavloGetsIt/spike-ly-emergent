@@ -233,12 +233,12 @@ class CorrelationEngine {
     const keywordBonus = keywords.length * 2; // Keywords worth 2 nouns each
     const score = nounCount + keywordBonus;
     
-    // Determine quality tier
+    // Determine quality tier (LOWERED THRESHOLD: 6 instead of 8)
     let tier;
-    if (score >= 8) {
-      tier = 'HIGH';    // Rich content with 8+ nouns/keywords
+    if (score >= 6) {
+      tier = 'HIGH';    // Rich content with 6+ nouns/keywords (lowered from 8)
     } else if (score >= 3) {
-      tier = 'MEDIUM';  // Some content with 3-7 nouns/keywords
+      tier = 'MEDIUM';  // Some content with 3-5 nouns/keywords
     } else {
       tier = 'LOW';     // Pure filler with 0-2 nouns/keywords
     }
