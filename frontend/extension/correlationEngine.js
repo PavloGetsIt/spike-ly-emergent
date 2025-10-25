@@ -110,6 +110,36 @@ class CorrelationEngine {
     return { quality, uniqueWordRatio, wordCount };
   }
   
+  // Calculate transcript score for routing decisions
+  calculateTranscriptScore(text, keywords) {
+    // Count potential nouns (words > 4 chars that aren't filler/common)
+    const fillerWords = ['about', 'their', 'really', 'think', 'going', 'doing', 'saying', 'there', 'where', 'which', 'would', 'should', 'could', 'these', 'those', 'thank', 'thanks'];
+    const words = text.toLowerCase().split(/\s+/);
+    const nouns = words.filter(w => 
+      w.length > 4 && 
+      !fillerWords.includes(w) &&
+      !/^(um|uh|like|yeah|okay|well)$/.test(w)
+    );
+    
+    const nounCount = nouns.length;
+    const keywordBonus = keywords.length * 2; // Keywords worth 2 nouns each
+    const score = nounCount + keywordBonus;
+    
+    // Determine quality tier
+    let tier;
+    if (score >= 8) {
+      tier = 'HIGH';    // Rich content with 8+ nouns/keywords
+    } else if (score >= 3) {
+      tier = 'MEDIUM';  // Some content with 3-7 nouns/keywords
+    } else {
+      tier = 'LOW';     // Pure filler with 0-2 nouns/keywords
+    }
+    
+    console.log(`[Routing] Transcript Score: ${tier} | Nouns: ${nounCount} | Keywords: ${keywords.length} | Total: ${score}`);
+    
+    return { tier, score, nounCount, keywordBonus };
+  }
+  
   // Track insight for anti-repetition
   trackInsight(insight) {
     if (insight && insight.nextMove) {
