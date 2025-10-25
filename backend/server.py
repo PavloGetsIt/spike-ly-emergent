@@ -12,6 +12,10 @@ from datetime import datetime
 from anthropic import Anthropic
 import json
 import re
+import time
+
+# Global correlation counter for unique IDs
+correlation_counter = 0
 
 
 ROOT_DIR = Path(__file__).parent
