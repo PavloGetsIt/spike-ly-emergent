@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 1.0-PRODUCTION
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.0-PRODUCTION');
-console.log('✅ Ultra-specific insights enabled, validators optimized, 100% actionability');
+// VERSION: 1.1-ROUTING-MVP
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1-ROUTING-MVP');
+console.log('📊 Routing: HIGH→Claude, MEDIUM→Claude+Template, LOW→Skip | 30 templates loaded');
 
 import { AudioProcessor } from './audioProcessor.js';
 
