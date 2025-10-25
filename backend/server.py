@@ -516,12 +516,14 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         logger.info(f"📊 emotionalLabel: {insight['emotionalLabel']}")
         logger.info(f"📊 nextMove: {insight['nextMove']}")
         logger.info(f"📊 source: claude")
+        logger.info(f"📊 correlationId: {correlation_id}")
         logger.info("=" * 80)
         
         return InsightResponse(
             emotionalLabel=insight['emotionalLabel'],
             nextMove=insight['nextMove'],
-            source="claude"
+            source="claude",
+            correlationId=correlation_id
         )
         
     except Exception as e:
