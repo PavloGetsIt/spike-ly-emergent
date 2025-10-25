@@ -1071,18 +1071,33 @@ class CorrelationEngine {
     
     if (!nextMove) {
       console.warn('⚠️ ==========================================');
-      console.warn('⚠️ CLAUDE INSIGHT FAILED - SKIPPING INSIGHT');
-      console.warn('⚠️ No low-quality fallback - waiting for next Claude insight');
+      console.warn('⚠️ CLAUDE INSIGHT FAILED');
+      console.warn('⚠️ Transcript Score:', transcriptScore.tier, '| Allow Fallback:', allowTemplateFallback);
       console.warn('⚠️ ==========================================');
       
-      // Do NOT generate insight if Claude failed
-      // Return null to skip this insight generation
-      return null;
+      // If MEDIUM quality and Claude failed, use template fallback
+      if (allowTemplateFallback) {
+        console.log('[Routing] 🔄 MEDIUM quality + Claude failed → Using template fallback');
+        const templateInsight = this.selectTemplate(keywords, delta);
+        
+        if (templateInsight) {
+          console.log('[Template] ✅ Using template:', templateInsight.templateId, '| Move:', templateInsight.nextMove);
+          emotionalLabel = templateInsight.emotionalLabel;
+          nextMove = templateInsight.nextMove;
+        } else {
+          console.warn('[Template] ❌ No template available - skipping insight');
+          return null;
+        }
+      } else {
+        // HIGH quality but Claude failed - skip insight (don't use templates for rich content)
+        console.warn('⚠️ HIGH quality transcript but Claude failed - skipping (no template fallback)');
+        return null;
+      }
     }
     
-    // If we reach here, Claude succeeded - use Claude insight only
+    // If we reach here, we have an insight (from Claude or template)
     console.log('✅ ==========================================');
-    console.log('✅ USING CLAUDE INSIGHT (Quality-Only Mode)');
+    console.log('✅ USING INSIGHT | Source:', nextMove.includes('template') ? 'Template' : 'Claude');
     console.log('✅ Label:', emotionalLabel);
     console.log('✅ Move:', nextMove);
     console.log('✅ ==========================================');
