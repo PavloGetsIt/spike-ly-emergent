@@ -1018,13 +1018,39 @@ function updateInsight(data) {
 
 // Add action to winning/losing list
 function addAction(action) {
+  // Build better label (NEVER use "Neutral" or "Unknown")
+  let betterLabel = 'Chat';  // Default fallback
+  
+  // Priority: Keywords > Label > Topic
+  if (action.keywords && action.keywords.length > 0) {
+    // Use first keyword, capitalize
+    betterLabel = action.keywords[0].charAt(0).toUpperCase() + action.keywords[0].slice(1);
+  } else if (action.label && 
+             action.label.toLowerCase() !== 'neutral' && 
+             action.label.toLowerCase() !== 'unknown' &&
+             action.label.toLowerCase() !== 'speech') {
+    // Use provided label if it's meaningful
+    betterLabel = action.label.charAt(0).toUpperCase() + action.label.slice(1);
+  } else if (action.topic && 
+             action.topic.toLowerCase() !== 'general' && 
+             action.topic.toLowerCase() !== 'speech') {
+    // Use topic if meaningful
+    betterLabel = action.topic.charAt(0).toUpperCase() + action.topic.slice(1);
+  }
+  
+  // Add "talk" suffix if single word to make it clearer
+  if (betterLabel.split(' ').length === 1 && betterLabel !== 'Chat') {
+    betterLabel = betterLabel + ' talk';
+  }
+  
   const actionItem = {
     id: `${Date.now()}-${Math.random()}`,
-    label: action.label || action.topic || 'Unknown',
+    label: betterLabel,  // Use improved label
     delta: action.delta,
     snippet: truncate(action.text || '', 40),
     time: formatActionTime(action.startTime, action.endTime),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    keywords: action.keywords || []
   };
   
   if (action.delta > 0) {
