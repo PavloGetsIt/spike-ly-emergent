@@ -1,7 +1,7 @@
-// Spikely Side Panel - WebSocket Integration
-// VERSION: 1.1.2-TOP-ACTIONS-ENHANCED
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.2-TOP-ACTIONS-ENHANCED');
-console.log('📊 Top 3 actions, pattern summary, better labels, expandable text');
+// Spikely Side Panel - WebSocket Integration  
+// VERSION: 1.1.3-NO-NEUTRAL
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.3-NO-NEUTRAL');
+console.log('🏷️ Labels: Keywords→Topic→Emotion (never Neutral/Unknown)');
 
 import { AudioProcessor } from './audioProcessor.js';
 
