@@ -1132,6 +1132,84 @@ function formatActionTime(startTime, endTime) {
   return `${timeStr} (${durationStr})`;
 }
 
+// Update pattern summary based on top actions
+function updatePatternSummary() {
+  // Find or create pattern summary container
+  let summaryContainer = document.getElementById('patternSummary');
+  
+  if (!summaryContainer) {
+    // Create pattern summary container above Top Actions
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    summaryContainer = document.createElement('div');
+    summaryContainer.id = 'patternSummary';
+    summaryContainer.className = 'pattern-summary';
+    actionsCard.insertBefore(summaryContainer, actionsCard.firstChild);
+  }
+  
+  // Calculate patterns
+  if (winningActions.length === 0 && losingActions.length === 0) {
+    summaryContainer.innerHTML = '';
+    summaryContainer.style.display = 'none';
+    return;
+  }
+  
+  summaryContainer.style.display = 'block';
+  
+  // Find best category
+  const categoryTotals = {};
+  winningActions.forEach(action => {
+    const category = action.label || 'Unknown';
+    categoryTotals[category] = (categoryTotals[category] || 0) + action.delta;
+  });
+  
+  const bestCategory = Object.keys(categoryTotals).length > 0
+    ? Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+  
+  // Find worst category
+  const worstTotals = {};
+  losingActions.forEach(action => {
+    const category = action.label || 'Unknown';
+    worstTotals[category] = (worstTotals[category] || 0) + Math.abs(action.delta);
+  });
+  
+  const worstCategory = Object.keys(worstTotals).length > 0
+    ? Object.entries(worstTotals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+  
+  // Calculate averages
+  const avgWinning = winningActions.length > 0
+    ? Math.round(winningActions.reduce((sum, a) => sum + a.delta, 0) / winningActions.length)
+    : 0;
+  
+  const avgLosing = losingActions.length > 0
+    ? Math.round(Math.abs(losingActions.reduce((sum, a) => sum + a.delta, 0) / losingActions.length))
+    : 0;
+  
+  // Build summary HTML
+  let summaryHtml = '<div class="pattern-summary-title">📊 YOUR SPIKE PATTERNS</div>';
+  summaryHtml += '<div class="pattern-summary-content">';
+  
+  if (bestCategory) {
+    summaryHtml += `<div class="pattern-item best">🔥 Best Topic: <strong>${escapeHtml(bestCategory[0])}</strong> (+${avgWinning} avg)</div>`;
+  }
+  
+  if (worstCategory && losingActions.length > 0) {
+    summaryHtml += `<div class="pattern-item worst">⚠️ Avoid: <strong>${escapeHtml(worstCategory[0])}</strong> (-${avgLosing} avg)</div>`;
+  }
+  
+  // Total stats
+  const totalSpikes = winningActions.length;
+  const totalDrops = losingActions.length;
+  summaryHtml += `<div class="pattern-item stats">📈 Spikes: ${totalSpikes} | 📉 Drops: ${totalDrops}</div>`;
+  
+  summaryHtml += '</div>';
+  
+  summaryContainer.innerHTML = summaryHtml;
+}
+
 // Utility: Truncate text
 function truncate(text, maxLength) {
   if (text.length <= maxLength) return text;
