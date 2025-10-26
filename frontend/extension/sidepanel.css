@@ -813,6 +813,76 @@ body {
   font-size: 11px;
 }
 
+/* Pattern Summary Styles */
+.pattern-summary {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(0, 255, 127, 0.08), rgba(99, 102, 241, 0.08));
+  border: 1px solid rgba(0, 255, 127, 0.2);
+  border-radius: 8px;
+}
+
+.pattern-summary-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-green);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.pattern-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pattern-item {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pattern-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.pattern-item.best {
+  color: var(--accent-green);
+}
+
+.pattern-item.worst {
+  color: #ff9966;
+}
+
+.pattern-item.stats {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Rank Badge */
+.rank-badge {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+/* Expandable text cursor */
+.expandable-text {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expandable-text:hover {
+  color: var(--accent-green);
+}
+
 .action-item {
   padding: 10px;
   background: rgba(255, 255, 255, 0.03);
