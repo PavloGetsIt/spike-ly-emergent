@@ -627,14 +627,34 @@ class CorrelationEngine {
       // Reset 20-second countdown
       this.resetCountdown();
 
-      // Log as action
+      // Log as action with better labeling
+      // Extract keywords for better categorization
+      const actionKeywords = this.extractKeywords(segment.text);
+      
+      // Build better label: Keywords > Topic > Emotion (never "Neutral")
+      let actionLabel = 'Chat'; // Default fallback
+      
+      if (actionKeywords.length > 0) {
+        // Use first keyword, capitalize
+        actionLabel = actionKeywords[0].charAt(0).toUpperCase() + actionKeywords[0].slice(1);
+      } else if (segment.topic && segment.topic !== 'general' && segment.topic !== 'speech') {
+        // Use topic if not generic
+        actionLabel = segment.topic.charAt(0).toUpperCase() + segment.topic.slice(1);
+      } else if (tone?.emotion && tone.emotion.toLowerCase() !== 'neutral' && tone.emotion.toLowerCase() !== 'unknown') {
+        // Use emotion only if it's not "neutral" or "unknown"
+        actionLabel = tone.emotion.charAt(0).toUpperCase() + tone.emotion.slice(1) + ' talk';
+      }
+      
+      console.log('[Correlation] 📋 Action label:', actionLabel, '| Keywords:', actionKeywords, '| Emotion:', tone?.emotion);
+      
       chrome.runtime.sendMessage({
         type: 'ACTION',
-        label: tone.emotion || segment.topic || 'Speech',
+        label: actionLabel,
         delta: delta,
         text: segment.text,
         startTime: new Date(segment.startTime).toISOString(),
-        endTime: new Date(segment.endTime).toISOString()
+        endTime: new Date(segment.endTime).toISOString(),
+        keywords: actionKeywords // Include keywords for reference
       });
       
     } catch (error) {
