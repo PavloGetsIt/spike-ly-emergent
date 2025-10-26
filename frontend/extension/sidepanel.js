@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration
-// VERSION: 1.1.1-FREQUENCY-FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.1-FREQUENCY-FIX');
-console.log('⚡ Timeout: 2500ms | HIGH threshold: >=6 | Template fallback: MEDIUM+HIGH');
+// VERSION: 1.1.2-TOP-ACTIONS-ENHANCED
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.2-TOP-ACTIONS-ENHANCED');
+console.log('📊 Top 3 actions, pattern summary, better labels, expandable text');
 
 import { AudioProcessor } from './audioProcessor.js';
 
