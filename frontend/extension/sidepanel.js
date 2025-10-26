@@ -1040,40 +1040,78 @@ function addAction(action) {
   }
 }
 
-// Render actions
+// Render actions - ENHANCED VERSION with top 3, better labels, and pattern summary
 function renderActions(type) {
   const actions = type === 'winning' ? winningActions : losingActions;
   const container = type === 'winning' ? winningActionsContainer : losingActionsContainer;
   
   if (actions.length === 0) {
-    container.innerHTML = `<div class="actions-empty">No ${type} actions yet</div>`;
+    const emptyMessage = type === 'winning' ? 'No winning spikes yet' : 'No drops yet - keep it up!';
+    container.innerHTML = `<div class="actions-empty">${emptyMessage}</div>`;
     return;
   }
   
-  const html = actions.map(action => {
+  // Show top 3 only (not all 10)
+  const topActions = actions.slice(0, 3);
+  
+  const html = topActions.map((action, index) => {
     const isPositive = action.delta > 0;
     const arrowSvg = isPositive 
       ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
     
+    // Better label: Capitalize and add context
+    const betterLabel = action.label === 'Unknown' || action.label === 'Neutral' || action.label === 'Speech'
+      ? (action.snippet.length > 10 ? 'Chat interaction' : 'Action')
+      : action.label.charAt(0).toUpperCase() + action.label.slice(1);
+    
+    // Rank indicator
+    const rankBadge = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+    
     // Use timestamp to format relative time
     const timeText = action.timestamp ? formatTimeAgo(action.timestamp) : action.time;
     const fullTimestamp = action.timestamp ? new Date(action.timestamp).toLocaleString() : '';
     
+    // Full text for expandable tooltip
+    const fullText = action.text || action.snippet;
+    
     return `
-      <div class="action-item">
+      <div class="action-item" data-action-id="${action.id}">
         <div class="action-header">
+          <span class="rank-badge">${rankBadge}</span>
           <span class="action-arrow ${isPositive ? 'positive' : 'negative'}">${arrowSvg}</span>
-          <span class="action-label">${escapeHtml(action.label)}</span>
+          <span class="action-label">${escapeHtml(betterLabel)}</span>
           <span class="action-delta ${isPositive ? 'positive' : 'negative'}">${action.delta > 0 ? '+' : ''}${action.delta}</span>
         </div>
-        <div class="action-snippet" title="${escapeHtml(action.snippet)}">"${escapeHtml(action.snippet)}"</div>
-        <div class="action-time" data-timestamp="${action.timestamp || ''}" title="${fullTimestamp}">${timeText}</div>
+        <div class="action-snippet expandable-text" 
+             data-full-text="${escapeHtml(fullText)}"
+             title="${escapeHtml(fullText)}">"${escapeHtml(action.snippet)}"</div>
+        <div class="action-time" 
+             data-timestamp="${action.timestamp || ''}" 
+             title="${fullTimestamp}">${timeText}</div>
       </div>
     `;
   }).join('');
   
   container.innerHTML = html;
+  
+  // Add click-to-expand functionality
+  container.querySelectorAll('.expandable-text').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function() {
+      const fullText = this.getAttribute('data-full-text');
+      if (this.textContent === `"${this.getAttribute('data-full-text')}"`) {
+        // Currently expanded, collapse it
+        this.textContent = `"${truncate(fullText, 40)}"`;
+      } else {
+        // Currently collapsed, expand it
+        this.textContent = `"${fullText}"`;
+      }
+    });
+  });
+  
+  // Update pattern summary after rendering
+  updatePatternSummary();
 }
 
 // Format action time
