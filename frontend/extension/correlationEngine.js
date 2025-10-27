@@ -1150,23 +1150,49 @@ class CorrelationEngine {
       console.warn('⚠️ Transcript Score:', transcriptScore.tier, '| Allow Fallback:', allowTemplateFallback);
       console.warn('⚠️ ==========================================');
       
+      // 🔬 DIAGNOSTIC: Check exact values before template decision
+      console.log('🔬 DEBUG: Template Fallback Decision Point');
+      console.log('🔬 transcriptScore.tier:', transcriptScore.tier);
+      console.log('🔬 transcriptScore.tier type:', typeof transcriptScore.tier);
+      console.log('🔬 Exact comparison MEDIUM:', transcriptScore.tier === 'MEDIUM');
+      console.log('🔬 Exact comparison HIGH:', transcriptScore.tier === 'HIGH');
+      console.log('🔬 Keywords available:', keywords);
+      console.log('🔬 Keywords length:', keywords.length);
+      console.log('🔬 Delta value:', delta);
+      console.log('🔬 templateSelector exists:', !!this.templateSelector);
+      console.log('🔬 templateSelector.bank exists:', !!this.templateSelector?.bank);
+      
       // Use template fallback for MEDIUM or HIGH (better than skipping)
       // Only skip for LOW quality
-      if (transcriptScore.tier === 'MEDIUM' || transcriptScore.tier === 'HIGH') {
+      const shouldUseTemplate = transcriptScore.tier === 'MEDIUM' || transcriptScore.tier === 'HIGH';
+      console.log('🔬 Should use template?:', shouldUseTemplate);
+      
+      if (shouldUseTemplate) {
         console.log('[Routing] 🔄', transcriptScore.tier, 'quality + Claude failed → Using template fallback');
-        const templateInsight = this.selectTemplate(keywords, delta);
+        console.log('[Template] Attempting selectTemplate with keywords:', keywords, 'delta:', delta);
         
-        if (templateInsight) {
-          console.log('[Template] ✅ Using template:', templateInsight.templateId, '| Move:', templateInsight.nextMove);
-          emotionalLabel = templateInsight.emotionalLabel;
-          nextMove = templateInsight.nextMove;
-        } else {
-          console.warn('[Template] ❌ No template available - skipping insight');
+        try {
+          const templateInsight = this.selectTemplate(keywords, delta);
+          console.log('[Template] selectTemplate returned:', templateInsight ? 'SUCCESS' : 'NULL');
+          
+          if (templateInsight) {
+            console.log('[Template] ✅ Using template:', templateInsight.templateId, '| Move:', templateInsight.nextMove);
+            emotionalLabel = templateInsight.emotionalLabel;
+            nextMove = templateInsight.nextMove;
+          } else {
+            console.warn('[Template] ❌ selectTemplate returned null - skipping insight');
+            console.warn('[Template] ❌ Possible reasons: No templates in category or filter failed');
+            return null;
+          }
+        } catch (error) {
+          console.error('[Template] ❌ ERROR in selectTemplate:', error);
+          console.error('[Template] ❌ Error details:', error.message, error.stack?.substring(0, 200));
           return null;
         }
       } else {
         // LOW quality - skip insight (per "no insight" preference)
         console.warn('⚠️ LOW quality transcript and Claude failed - skipping (no template for low quality)');
+        console.warn('🔬 DEBUG: Tier was:', transcriptScore.tier, '(expected LOW)');
         return null;
       }
     }
