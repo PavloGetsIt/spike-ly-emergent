@@ -95,7 +95,15 @@ class CorrelationEngine {
   
   // Select template based on category and delta
   selectTemplate(keywords, delta) {
+    console.log('[Template] 🔬 selectTemplate called | Keywords:', keywords, '| Delta:', delta);
+    
     const templates = this.templateSelector.bank;
+    console.log('[Template] 🔬 Template bank exists:', !!templates);
+    
+    if (!templates) {
+      console.error('[Template] ❌ Template bank is null/undefined!');
+      return null;
+    }
     
     // Determine category
     let category = 'general';
@@ -105,27 +113,45 @@ class CorrelationEngine {
     else if (keywords.includes('fitness')) category = 'fitness';
     else if (keywords.includes('tech') || keywords.includes('product')) category = 'tech';
     
+    console.log('[Template] 🔬 Selected category:', category);
+    
     // Determine trigger type
     let triggerType;
     if (delta > 10) triggerType = 'spike';
     else if (delta < -10) triggerType = 'drop';
     else triggerType = 'flatline';
     
+    console.log('[Template] 🔬 Trigger type:', triggerType);
+    
     // Get templates for category
     const categoryTemplates = templates[category];
+    console.log('[Template] 🔬 Category templates found:', categoryTemplates?.length || 0);
+    
     if (!categoryTemplates || categoryTemplates.length === 0) {
+      console.warn('[Template] ⚠️ No templates for category:', category, '| Falling back to general');
       category = 'general';
     }
     
     // Filter by trigger type
     const filtered = templates[category].filter(t => t.triggerType.includes(triggerType));
+    console.log('[Template] 🔬 After trigger filter:', filtered.length, 'templates');
     
     // Exclude recently used
     const available = filtered.filter(t => !this.recentTemplates.includes(t.id));
+    console.log('[Template] 🔬 After recency filter:', available.length, 'templates');
+    console.log('[Template] 🔬 Recently used:', this.recentTemplates);
+    
     const pool = available.length > 0 ? available : filtered;
+    console.log('[Template] 🔬 Final pool size:', pool.length);
+    
+    if (pool.length === 0) {
+      console.error('[Template] ❌ No templates in pool! Category:', category, 'Trigger:', triggerType);
+      return null;
+    }
     
     // Select random
     const selected = pool[Math.floor(Math.random() * pool.length)];
+    console.log('[Template] 🔬 Selected template:', selected);
     
     // Track usage
     this.recentTemplates.push(selected.id);
@@ -133,7 +159,7 @@ class CorrelationEngine {
       this.recentTemplates.shift();
     }
     
-    console.log(`[Template] Selected ${selected.id} | Category: ${category} | Trigger: ${triggerType}`);
+    console.log(`[Template] ✅ Selected ${selected.id} | Category: ${category} | Trigger: ${triggerType}`);
     
     return {
       delta: delta,
