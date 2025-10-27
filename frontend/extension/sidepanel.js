@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.0.2-TEMPLATE-DEBUG
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0.2-TEMPLATE-DEBUG');
-console.log('🔬 Comprehensive template fallback logging enabled');
+// VERSION: 2.0.3-CLEAR-LOGGING
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0.3-CLEAR-LOGGING');
+console.log('🔍 Added: Claude Insight logs for easy filtering and debugging');
 
 import { AudioProcessor } from './audioProcessor.js';
 
