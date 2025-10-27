@@ -1082,6 +1082,10 @@ function addAction(action) {
 
 // Render actions - ENHANCED VERSION with top 3, better labels, and pattern summary
 function renderActions(type) {
+  // Clean legacy labels before rendering
+  winningActions = cleanLegacyLabels(winningActions);
+  losingActions = cleanLegacyLabels(losingActions);
+  
   const actions = type === 'winning' ? winningActions : losingActions;
   const container = type === 'winning' ? winningActionsContainer : losingActionsContainer;
   
