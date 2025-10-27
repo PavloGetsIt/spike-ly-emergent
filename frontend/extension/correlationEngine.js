@@ -445,6 +445,9 @@ class CorrelationEngine {
       nextMove: insight.nextMove
     });
     
+    // ADD CLEAR LOGGING FOR EASY FILTERING
+    console.log('✅ Claude Insight (Timer): ' + insight.nextMove.substring(0, 50));
+    
     // Send insight
     chrome.runtime.sendMessage({
       type: 'INSIGHT',
