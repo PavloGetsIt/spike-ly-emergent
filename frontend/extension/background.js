@@ -649,11 +649,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }, () => { void chrome.runtime.lastError; });
   } else if (message.type === 'INSIGHT') {
     // Forward insight to side panel
+    console.log('🔬 NUCLEAR: INSIGHT message received in background.js');
+    console.log('🔬 NUCLEAR: INSIGHT content:', {
+      emotionalLabel: message.emotionalLabel,
+      nextMove: message.nextMove?.substring(0, 50),
+      source: message.source,
+      isTimedInsight: message.isTimedInsight,
+      from: sender.tab?.id
+    });
     console.log('[Background] Insight generated:', message.nextMove);
+    
+    console.log('🔬 NUCLEAR: About to forward INSIGHT to sidepanel');
     chrome.runtime.sendMessage({
       type: 'INSIGHT',
       ...message
     }, () => { void chrome.runtime.lastError; });
+    console.log('🔬 NUCLEAR: INSIGHT forwarded to sidepanel');
     
     if (wsConnection?.readyState === WebSocket.OPEN) {
       wsConnection.send(JSON.stringify({
