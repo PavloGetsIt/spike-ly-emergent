@@ -1244,10 +1244,28 @@ function renderActions(type) {
     const fullTimestamp = action.timestamp ? new Date(action.timestamp).toLocaleString() : '';
     
     // Full text for expandable tooltip
-    const fullText = action.text || action.snippet;
+    const fullText = action.fullText || action.snippet;
+    
+    // Insight context
+    const insightHtml = action.insightGiven 
+      ? `<div class="action-insight">💡 Insight: "${escapeHtml(action.insightGiven)}"</div>`
+      : '';
+    
+    // Emotion + viewer count context
+    const contextHtml = `
+      <div class="action-context">
+        ${action.emotion ? `<span class="action-emotion">🎭 ${escapeHtml(action.emotion)}</span>` : ''}
+        ${action.viewerCount > 0 ? `<span class="action-viewers">👁️ ${action.viewerCount.toLocaleString()} viewers</span>` : ''}
+      </div>
+    `;
+    
+    // Try Again button (copies insight to clipboard)
+    const tryAgainBtn = action.insightGiven 
+      ? `<button class="try-again-btn" data-insight="${escapeHtml(action.insightGiven)}" title="Copy insight to clipboard">🔄 Try Again</button>`
+      : '';
     
     return `
-      <div class="action-item" data-action-id="${action.id}">
+      <div class="action-item enhanced" data-action-id="${action.id}">
         <div class="action-header">
           <span class="rank-badge">${rankBadge}</span>
           <span class="action-arrow ${isPositive ? 'positive' : 'negative'}">${arrowSvg}</span>
@@ -1257,9 +1275,14 @@ function renderActions(type) {
         <div class="action-snippet expandable-text" 
              data-full-text="${escapeHtml(fullText)}"
              title="${escapeHtml(fullText)}">"${escapeHtml(action.snippet)}"</div>
-        <div class="action-time" 
-             data-timestamp="${action.timestamp || ''}" 
-             title="${fullTimestamp}">${timeText}</div>
+        ${insightHtml}
+        ${contextHtml}
+        <div class="action-footer">
+          <span class="action-time" 
+               data-timestamp="${action.timestamp || ''}" 
+               title="${fullTimestamp}">${timeText}</span>
+          ${tryAgainBtn}
+        </div>
       </div>
     `;
   }).join('');
