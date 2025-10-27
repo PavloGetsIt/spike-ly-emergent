@@ -2,6 +2,9 @@
 // VERSION: 2025-10-23-022 - DYNAMIC INSIGHTS FULL IMPLEMENTATION
 // Features: Keyword detection, anti-repetition, 40s buffer, quality filtering, winning topics
 
+console.log('🔬 NUCLEAR: correlationEngine.js LOADING - v2.0.5');
+console.log('🔬 NUCLEAR: File timestamp:', new Date().toISOString());
+
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
 const DEBUG_HUME = true;
