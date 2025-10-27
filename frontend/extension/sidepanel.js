@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.0-COMPLETE-ACTIONS
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0-COMPLETE-ACTIONS');
-console.log('🎨 Enhanced: Insight display, Try Again buttons, Session stats, Replay recommendations');
+// VERSION: 2.0.1-STREAMLINED
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0.1-STREAMLINED');
+console.log('🧹 Removed: Pattern summary | Kept: Session stats, Recommendations, Rich cards');
 
 import { AudioProcessor } from './audioProcessor.js';
 
