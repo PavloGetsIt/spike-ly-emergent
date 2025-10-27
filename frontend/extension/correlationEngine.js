@@ -677,16 +677,20 @@ class CorrelationEngine {
       // Reset 20-second countdown
       this.resetCountdown();
 
-      // Log as action with better labeling
-      // Extract keywords for better categorization
+      // Log as action with SPECIFIC labeling
+      // Extract keywords AND specific nouns for better categorization
       const actionKeywords = this.extractKeywords(segment.text);
+      const specificNouns = this.extractSpecificNouns(segment.text);
       
-      // Build better label: Keywords > Topic > Emotion (never "Neutral")
+      // Build SPECIFIC label: Specific Nouns > Keywords > Topic (never generic)
       let actionLabel = 'Chat'; // Default fallback
       
-      if (actionKeywords.length > 0) {
-        // Use first keyword, capitalize
-        actionLabel = actionKeywords[0].charAt(0).toUpperCase() + actionKeywords[0].slice(1);
+      if (specificNouns.length > 0) {
+        // Use first specific phrase (most specific)
+        actionLabel = specificNouns[0].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      } else if (actionKeywords.length > 0) {
+        // Use keyword category
+        actionLabel = actionKeywords[0].charAt(0).toUpperCase() + actionKeywords[0].slice(1) + ' talk';
       } else if (segment.topic && segment.topic !== 'general' && segment.topic !== 'speech') {
         // Use topic if not generic
         actionLabel = segment.topic.charAt(0).toUpperCase() + segment.topic.slice(1);
@@ -695,7 +699,7 @@ class CorrelationEngine {
         actionLabel = tone.emotion.charAt(0).toUpperCase() + tone.emotion.slice(1) + ' talk';
       }
       
-      console.log('[Correlation] 📋 Action label:', actionLabel, '| Keywords:', actionKeywords, '| Emotion:', tone?.emotion);
+      console.log('[Correlation] 📋 Action label:', actionLabel, '| Specific nouns:', specificNouns, '| Keywords:', actionKeywords, '| Emotion:', tone?.emotion);
       
       chrome.runtime.sendMessage({
         type: 'ACTION',
@@ -704,7 +708,8 @@ class CorrelationEngine {
         text: segment.text,
         startTime: new Date(segment.startTime).toISOString(),
         endTime: new Date(segment.endTime).toISOString(),
-        keywords: actionKeywords // Include keywords for reference
+        keywords: actionKeywords, // Include keywords for reference
+        specificNouns: specificNouns // Include for debugging
       });
       
     } catch (error) {
