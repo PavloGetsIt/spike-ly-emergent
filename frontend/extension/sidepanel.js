@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 1.1.4-NEUTRAL-ELIMINATION
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.4-NEUTRAL-ELIMINATION');
-console.log('🧹 4-point fix: Source, Entry, Storage cleanup, Display transform');
+// VERSION: 1.1.5-SPECIFIC-NOUNS
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.5-SPECIFIC-NOUNS');
+console.log('🎯 Labels: Specific 2-word phrases (pasta carbonara, rtx 4090) not broad categories');
 
 import { AudioProcessor } from './audioProcessor.js';
 
