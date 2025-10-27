@@ -763,6 +763,15 @@ function handleMessage(message) {
       }
       break;
     case 'INSIGHT':
+      console.log('🔬 NUCLEAR: INSIGHT message received in sidepanel');
+      console.log('🔬 NUCLEAR: Message details:', {
+        emotionalLabel: message.emotionalLabel,
+        nextMove: message.nextMove?.substring(0, 50),
+        delta: message.delta,
+        source: message.source,
+        isTimedInsight: message.isTimedInsight,
+        isReminder: message.isReminder
+      });
       console.log('[SIDEPANEL] 🎯 INSIGHT received:', {
         emotionalLabel: message.emotionalLabel,
         nextMove: message.nextMove,
