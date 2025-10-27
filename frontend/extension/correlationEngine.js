@@ -697,6 +697,10 @@ class CorrelationEngine {
       
       // Send to background script
       console.log('[Correlation] 🔍 Step 5: Sending to background script...');
+      
+      // ADD CLEAR LOGGING FOR EASY FILTERING
+      console.log('✅ Claude Insight (Delta): ' + insight.nextMove.substring(0, 50));
+      
       chrome.runtime.sendMessage({
         type: 'INSIGHT',
         ...insight
