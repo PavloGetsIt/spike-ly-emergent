@@ -1304,8 +1304,37 @@ function renderActions(type) {
     });
   });
   
-  // Update pattern summary after rendering
+  // Add Try Again button click handlers
+  container.querySelectorAll('.try-again-btn').forEach(btn => {
+    btn.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const insight = this.getAttribute('data-insight');
+      
+      try {
+        // Copy to clipboard
+        await navigator.clipboard.writeText(insight);
+        
+        // Show feedback
+        const originalText = this.textContent;
+        this.textContent = '✅ Copied!';
+        this.style.background = 'rgba(0, 255, 127, 0.2)';
+        
+        setTimeout(() => {
+          this.textContent = originalText;
+          this.style.background = '';
+        }, 2000);
+        
+        console.log('[Action] Insight copied to clipboard:', insight);
+      } catch (err) {
+        console.error('[Action] Failed to copy:', err);
+        this.textContent = '❌ Failed';
+      }
+    });
+  });
+  
+  // Update pattern summary and recommendations after rendering
   updatePatternSummary();
+  updateReplayRecommendations();
 }
 
 // Format action time
