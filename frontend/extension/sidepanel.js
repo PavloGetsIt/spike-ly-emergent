@@ -1083,27 +1083,68 @@ function addAction(action) {
     betterLabel = betterLabel + ' talk';
   }
   
+  // Get current viewer count from UI
+  const currentViewerCount = parseInt(document.getElementById('viewerCount')?.textContent.replace(/,/g, '')) || 0;
+  
   const actionItem = {
     id: `${Date.now()}-${Math.random()}`,
     label: betterLabel,  // Use improved label
     delta: action.delta,
     snippet: truncate(action.text || '', 40),
+    fullText: action.text || '',
     time: formatActionTime(action.startTime, action.endTime),
     timestamp: Date.now(),
-    keywords: action.keywords || []
+    keywords: action.keywords || [],
+    // Enhanced data for rich cards
+    insightGiven: lastInsightGiven ? lastInsightGiven.nextMove : null,
+    emotion: lastInsightGiven ? lastInsightGiven.emotionalLabel : null,
+    viewerCount: currentViewerCount
   };
   
+  // Update session stats
   if (action.delta > 0) {
+    sessionStats.totalSpikes++;
+    if (action.delta > sessionStats.bestSpike.delta) {
+      sessionStats.bestSpike = {
+        delta: action.delta,
+        label: betterLabel,
+        timestamp: Date.now()
+      };
+    }
     winningActions.push(actionItem);
     winningActions.sort((a, b) => b.delta - a.delta);
     winningActions = winningActions.slice(0, 10);
     renderActions('winning');
   } else {
+    sessionStats.totalDrops++;
+    if (Math.abs(action.delta) > Math.abs(sessionStats.worstDrop.delta)) {
+      sessionStats.worstDrop = {
+        delta: action.delta,
+        label: betterLabel,
+        timestamp: Date.now()
+      };
+    }
     losingActions.push(actionItem);
     losingActions.sort((a, b) => a.delta - b.delta);
     losingActions = losingActions.slice(0, 10);
     renderActions('losing');
   }
+  
+  // Add to viewer history for trend graph
+  sessionStats.viewerHistory.push({
+    count: currentViewerCount,
+    delta: action.delta,
+    label: betterLabel,
+    timestamp: Date.now()
+  });
+  
+  // Keep last 50 points for trend graph
+  if (sessionStats.viewerHistory.length > 50) {
+    sessionStats.viewerHistory.shift();
+  }
+  
+  // Update session stats display
+  updateSessionStats();
 }
 
 // Render actions - ENHANCED VERSION with top 3, better labels, and pattern summary
