@@ -407,6 +407,7 @@ class CorrelationEngine {
   
   // Generate timed insight (called by 20s timer)
   async generateTimedInsight() {
+    console.log('🔬 TIMER DEBUG: generateTimedInsight() called');
     const now = Date.now();
     
     // Get most recent viewer data
