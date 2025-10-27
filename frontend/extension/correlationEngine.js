@@ -194,6 +194,56 @@ class CorrelationEngine {
     return Array.from(foundKeywords);
   }
   
+  // Extract specific 2-3 word noun phrases for better action labels
+  extractSpecificNouns(text) {
+    const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    const specificPhrases = [];
+    
+    // Generic phrases to skip
+    const skipPhrases = ['thank you', 'oh my', 'you guys', 'i mean', 'you know', 'right now', 
+                         'over here', 'like this', 'going to', 'want to', 'have to', 'need to',
+                         'i think', 'i feel', 'you see', 'let me', 'hold on'];
+    
+    // Filler words
+    const fillerWords = ['about', 'their', 'really', 'think', 'going', 'doing', 'saying', 
+                         'there', 'where', 'which', 'would', 'should', 'could', 'these', 
+                         'those', 'thank', 'thanks', 'please', 'just', 'very', 'much'];
+    
+    // Extract 2-word phrases that might be specific
+    for (let i = 0; i < words.length - 1; i++) {
+      const word1 = words[i];
+      const word2 = words[i + 1];
+      
+      // Both words should be substantial (>3 chars) and not filler
+      if (word1.length > 3 && word2.length > 3 && 
+          !fillerWords.includes(word1) && !fillerWords.includes(word2)) {
+        
+        const phrase = `${word1} ${word2}`;
+        
+        // Skip generic phrases
+        if (!skipPhrases.includes(phrase)) {
+          specificPhrases.push(phrase);
+        }
+      }
+    }
+    
+    // Also look for potential brand/product names (capitalized or with numbers)
+    const potentialNames = words.filter(w => {
+      // Look for words with numbers (rtx4090, iphone15, etc.)
+      if (/\d/.test(w)) return true;
+      // Look for longer unique words
+      if (w.length > 6 && !fillerWords.includes(w)) return true;
+      return false;
+    });
+    
+    // Combine and dedupe
+    const allNouns = [...specificPhrases, ...potentialNames].slice(0, 5);
+    
+    console.log('[Labels] Extracted specific nouns:', allNouns);
+    
+    return allNouns;
+  }
+  
   // Calculate transcript quality metrics
   analyzeTranscriptQuality(text) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
