@@ -410,12 +410,13 @@ class CorrelationEngine {
   
   // Generate timed insight (called by 20s timer)
   async generateTimedInsight() {
-    console.log('🔬 TIMER DEBUG: generateTimedInsight() called');
+    console.log('🔬 NUCLEAR: generateTimedInsight() ENTRY - Timer fired');
     const now = Date.now();
     
     // Get most recent viewer data
     const latestViewer = this.viewerBuffer[this.viewerBuffer.length - 1];
     if (!latestViewer) {
+      console.log('🔬 NUCLEAR: No viewer data, skipping timed insight');
       console.log('[Correlation] ⏰ No viewer data, skipping timed insight');
       return;
     }
@@ -425,41 +426,52 @@ class CorrelationEngine {
     
     // If no meaningful data, send reminder of winning actions
     if (!segment || segment.wordCount < 30) {
+      console.log('🔬 NUCLEAR: No transcript data, sending reminder');
       console.log('[Correlation] ⏰ No recent transcript or too short (<30 words) - sending reminder');
       this.sendReminderInsight(latestViewer.count, latestViewer.delta);
       this.resetCountdown();
       return;
     }
     
+    console.log('🔬 NUCLEAR: About to call generateInsight()');
+    
     // Generate normal insight with delta = 0 (timer-triggered)
     console.log('[Correlation] ⏰ Generating timed insight with data');
     const tone = await this.analyzeTone(segment.text);
     const insight = await this.generateInsight(0, latestViewer.count, segment, tone, true); // true = timed mode
     
+    console.log('🔬 NUCLEAR: generateInsight() returned:', !!insight);
+    
     // Handle case where Claude fails and returns null
     if (!insight) {
+      console.log('🔬 NUCLEAR: Insight was null, sending reminder');
       console.log('[Correlation] ⏰ Timed insight generation failed (Claude unavailable) - sending reminder');
       this.sendReminderInsight(latestViewer.count, latestViewer.delta);
       this.resetCountdown();
       return;
     }
     
+    console.log('🔬 NUCLEAR: About to log timed insight generated');
     console.log('[Correlation] 🎯 Timed insight generated:', {
       emotionalLabel: insight.emotionalLabel,
       nextMove: insight.nextMove
     });
     
     // ADD CLEAR LOGGING FOR EASY FILTERING
+    console.log('🔬 NUCLEAR: About to send INSIGHT message');
     console.log('✅ Claude Insight (Timer): ' + insight.nextMove.substring(0, 50));
     
     // Send insight
+    console.log('🔬 NUCLEAR: Calling chrome.runtime.sendMessage for INSIGHT');
     chrome.runtime.sendMessage({
       type: 'INSIGHT',
       ...insight,
       isTimedInsight: true
     });
+    console.log('🔬 NUCLEAR: INSIGHT message sent');
     
     this.resetCountdown();
+    console.log('🔬 NUCLEAR: generateTimedInsight() EXIT');
   }
   
   // Send reminder of winning actions
