@@ -991,6 +991,18 @@ function updateInsight(data) {
   
   const delta = data.delta || 0;
   
+  // Store last insight for linking to actions
+  lastInsightGiven = {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove,
+    delta: delta,
+    timestamp: Date.now()
+  };
+  
+  // Track session stats
+  sessionStats.insightsGenerated++;
+  sessionStats.insightsShown++;
+  
   // Apply UI-level sanitization safety net
   const emotionalLabel = sanitizeForDisplay(data.emotionalLabel, 3, '✅ Neutral');
   const nextMove = sanitizeForDisplay(data.nextMove, 8, 'Keep momentum');
