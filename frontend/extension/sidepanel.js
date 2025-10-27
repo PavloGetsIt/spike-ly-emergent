@@ -992,6 +992,15 @@ function updateViewerCount(count, delta) {
 
 // Update insight
 function updateInsight(data) {
+  console.log('🔬 NUCLEAR: updateInsight() called');
+  console.log('🔬 NUCLEAR: Insight data received:', {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove?.substring(0, 50),
+    delta: data.delta,
+    source: data.source,
+    timestamp: Date.now()
+  });
+  
   console.log('[Spikely Side Panel] 🎯 updateInsight called with:', {
     emotionalLabel: data.emotionalLabel,
     nextMove: data.nextMove,
