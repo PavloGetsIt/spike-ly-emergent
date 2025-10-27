@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 1.1.3-NO-NEUTRAL
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.3-NO-NEUTRAL');
-console.log('🏷️ Labels: Keywords→Topic→Emotion (never Neutral/Unknown)');
+// VERSION: 1.1.4-NEUTRAL-ELIMINATION
+console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.4-NEUTRAL-ELIMINATION');
+console.log('🧹 4-point fix: Source, Entry, Storage cleanup, Display transform');
 
 import { AudioProcessor } from './audioProcessor.js';
 
