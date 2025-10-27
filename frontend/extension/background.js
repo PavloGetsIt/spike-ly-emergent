@@ -1,6 +1,9 @@
 import { audioCaptureManager } from './audioCapture.js';
 import { correlationEngine } from './correlationEngine.js';
 
+console.log('🔬 NUCLEAR: background.js LOADING - v2.0.5');
+console.log('🔬 NUCLEAR: background.js timestamp:', new Date().toISOString());
+
 // ==================== DEBUG CONFIGURATION ====================
 // Set to true to enable verbose Hume AI logging
 const DEBUG_HUME = true;
