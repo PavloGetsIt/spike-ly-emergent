@@ -26,6 +26,20 @@ let audioProcessor = null;
 
 let isAudioRecording = false;
 
+// Session statistics tracking
+let sessionStats = {
+  totalSpikes: 0,
+  totalDrops: 0,
+  bestSpike: { delta: 0, label: '', timestamp: null },
+  worstDrop: { delta: 0, label: '', timestamp: null },
+  insightsGenerated: 0,
+  insightsShown: 0,
+  viewerHistory: [] // For trend graph: [{count: X, timestamp: Y, label: Z}]
+};
+
+// Track last insight for linking to actions
+let lastInsightGiven = null;
+
 // ==================== CLEANUP FUNCTION ====================
 // Clean any legacy "Neutral" labels from stored actions
 function cleanLegacyLabels(actions) {
