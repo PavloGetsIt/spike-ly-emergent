@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 1.1.5-SPECIFIC-NOUNS
-console.log('🎯 SIDEPANEL.JS LOADING - Version 1.1.5-SPECIFIC-NOUNS');
-console.log('🎯 Labels: Specific 2-word phrases (pasta carbonara, rtx 4090) not broad categories');
+// VERSION: 2.0-COMPLETE-ACTIONS
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0-COMPLETE-ACTIONS');
+console.log('🎨 Enhanced: Insight display, Try Again buttons, Session stats, Replay recommendations');
 
 import { AudioProcessor } from './audioProcessor.js';
 
