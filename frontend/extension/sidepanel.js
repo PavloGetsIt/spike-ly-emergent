@@ -1332,8 +1332,8 @@ function renderActions(type) {
     });
   });
   
-  // Update pattern summary and recommendations after rendering
-  updatePatternSummary();
+  // Update recommendations after rendering (pattern summary removed per user request)
+  // updatePatternSummary();  // DISABLED - user found not useful
   updateReplayRecommendations();
 }
 
