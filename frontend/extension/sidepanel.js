@@ -26,6 +26,20 @@ let audioProcessor = null;
 
 let isAudioRecording = false;
 
+// ==================== CLEANUP FUNCTION ====================
+// Clean any legacy "Neutral" labels from stored actions
+function cleanLegacyLabels(actions) {
+  return actions.map(action => {
+    if (action.label && 
+        (action.label.toLowerCase() === 'neutral' || 
+         action.label.toLowerCase() === 'unknown' ||
+         action.label.toLowerCase() === 'speech')) {
+      action.label = 'Chat interaction';
+    }
+    return action;
+  });
+}
+
 // ==================== UI UTILITY FUNCTIONS ====================
 
 /**
