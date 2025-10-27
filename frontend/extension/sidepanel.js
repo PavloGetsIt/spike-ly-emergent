@@ -689,8 +689,21 @@ function connectToWebSocket() {
     };
     
     wsConnection.onmessage = (event) => {
+      console.log('🔬 NUCLEAR: WebSocket message received');
+      console.log('🔬 NUCLEAR: Raw WebSocket data:', event.data.substring(0, 200));
+      
       try {
         const message = JSON.parse(event.data);
+        console.log('🔬 NUCLEAR: Parsed WebSocket message type:', message.type);
+        
+        if (message.type === 'INSIGHT') {
+          console.log('🔬 NUCLEAR: ⚠️ INSIGHT FROM WEBSOCKET! This is the mystery source!');
+          console.log('🔬 NUCLEAR: WebSocket INSIGHT:', {
+            emotionalLabel: message.emotionalLabel,
+            nextMove: message.nextMove?.substring(0, 50)
+          });
+        }
+        
         handleMessage(message);
       } catch (error) {
         console.error('[Spikely Side Panel] Error parsing message:', error);
