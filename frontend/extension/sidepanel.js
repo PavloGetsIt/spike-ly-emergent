@@ -1147,6 +1147,66 @@ function addAction(action) {
   updateSessionStats();
 }
 
+// Update session stats display
+function updateSessionStats() {
+  let statsContainer = document.getElementById('sessionStatsContainer');
+  
+  if (!statsContainer) {
+    // Create container if doesn't exist
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    statsContainer = document.createElement('div');
+    statsContainer.id = 'sessionStatsContainer';
+    statsContainer.className = 'session-stats';
+    
+    // Insert after pattern summary, before "Top Actions" title
+    const cardTitle = actionsCard.querySelector('.card-title-large');
+    if (cardTitle) {
+      cardTitle.parentNode.insertBefore(statsContainer, cardTitle.nextSibling);
+    }
+  }
+  
+  // Calculate average viewer gain
+  const totalDelta = [...winningActions, ...losingActions].reduce((sum, a) => sum + a.delta, 0);
+  const totalActions = winningActions.length + losingActions.length;
+  const avgGain = totalActions > 0 ? (totalDelta / totalActions).toFixed(1) : 0;
+  
+  const html = `
+    <div class="stats-title">📊 THIS SESSION</div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.totalSpikes}</div>
+        <div class="stat-label">Total Spikes</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.totalDrops}</div>
+        <div class="stat-label">Total Drops</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value positive">+${sessionStats.bestSpike.delta}</div>
+        <div class="stat-label">Best Spike</div>
+        <div class="stat-sublabel">${sessionStats.bestSpike.label || 'None yet'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value negative">${sessionStats.worstDrop.delta}</div>
+        <div class="stat-label">Worst Drop</div>
+        <div class="stat-sublabel">${sessionStats.worstDrop.label || 'None yet'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.insightsShown}/${sessionStats.insightsGenerated}</div>
+        <div class="stat-label">Insights</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value ${avgGain > 0 ? 'positive' : avgGain < 0 ? 'negative' : ''}">${avgGain > 0 ? '+' : ''}${avgGain}</div>
+        <div class="stat-label">Avg Impact</div>
+      </div>
+    </div>
+  `;
+  
+  statsContainer.innerHTML = html;
+}
+
 // Render actions - ENHANCED VERSION with top 3, better labels, and pattern summary
 function renderActions(type) {
   // Clean legacy labels before rendering
