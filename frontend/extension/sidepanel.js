@@ -1183,10 +1183,18 @@ function updatePatternSummary() {
   
   summaryContainer.style.display = 'block';
   
-  // Find best category
+  // Find best category (FILTER OUT "Neutral" and generic labels)
   const categoryTotals = {};
   winningActions.forEach(action => {
-    const category = action.label || 'Unknown';
+    let category = action.label || 'Chat';
+    
+    // Transform generic labels to "Chat interaction"
+    if (category.toLowerCase() === 'neutral' || 
+        category.toLowerCase() === 'unknown' || 
+        category.toLowerCase() === 'speech') {
+      category = 'Chat interaction';
+    }
+    
     categoryTotals[category] = (categoryTotals[category] || 0) + action.delta;
   });
   
@@ -1194,10 +1202,18 @@ function updatePatternSummary() {
     ? Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0]
     : null;
   
-  // Find worst category
+  // Find worst category (FILTER OUT "Neutral" and generic labels)
   const worstTotals = {};
   losingActions.forEach(action => {
-    const category = action.label || 'Unknown';
+    let category = action.label || 'Chat';
+    
+    // Transform generic labels to "Chat interaction"
+    if (category.toLowerCase() === 'neutral' || 
+        category.toLowerCase() === 'unknown' || 
+        category.toLowerCase() === 'speech') {
+      category = 'Chat interaction';
+    }
+    
     worstTotals[category] = (worstTotals[category] || 0) + Math.abs(action.delta);
   });
   
