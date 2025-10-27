@@ -1449,6 +1449,81 @@ function updatePatternSummary() {
   summaryContainer.innerHTML = summaryHtml;
 }
 
+// Update replay recommendations based on winning patterns
+function updateReplayRecommendations() {
+  let recsContainer = document.getElementById('replayRecommendations');
+  
+  if (!recsContainer) {
+    // Create container
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    recsContainer = document.createElement('div');
+    recsContainer.id = 'replayRecommendations';
+    recsContainer.className = 'replay-recommendations';
+    
+    // Insert before Top Actions grid
+    const actionsGrid = actionsCard.querySelector('.actions-grid');
+    if (actionsGrid) {
+      actionsGrid.parentNode.insertBefore(recsContainer, actionsGrid);
+    }
+  }
+  
+  // Only show if we have 3+ winning actions
+  if (winningActions.length < 3) {
+    recsContainer.style.display = 'none';
+    return;
+  }
+  
+  recsContainer.style.display = 'block';
+  
+  // Find recurring successful categories
+  const categoryFrequency = {};
+  winningActions.forEach(action => {
+    const baseLabel = action.label.replace(' talk', ''); // Remove "talk" suffix
+    categoryFrequency[baseLabel] = (categoryFrequency[baseLabel] || 0) + 1;
+  });
+  
+  // Find categories that spiked 2+ times
+  const recurring = Object.entries(categoryFrequency)
+    .filter(([cat, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2);
+  
+  if (recurring.length === 0) {
+    recsContainer.style.display = 'none';
+    return;
+  }
+  
+  let recsHtml = '<div class="recs-title">💡 RECOMMENDED ACTIONS (Based on your patterns)</div>';
+  recsHtml += '<div class="recs-list">';
+  
+  recurring.forEach(([category, count]) => {
+    // Calculate average spike for this category
+    const categoryActions = winningActions.filter(a => a.label.includes(category));
+    const avgDelta = categoryActions.length > 0
+      ? Math.round(categoryActions.reduce((sum, a) => sum + a.delta, 0) / categoryActions.length)
+      : 0;
+    
+    // Get an insight from one of these actions
+    const sampleAction = categoryActions[0];
+    const suggestedInsight = sampleAction.insightGiven || `Try more ${category} content`;
+    
+    recsHtml += `
+      <div class="rec-item">
+        <div class="rec-header">
+          <span class="rec-category">${escapeHtml(category)}</span>
+          <span class="rec-stats">worked ${count} times (+${avgDelta} avg)</span>
+        </div>
+        <div class="rec-suggestion">Try: "${escapeHtml(suggestedInsight)}"</div>
+      </div>
+    `;
+  });
+  
+  recsHtml += '</div>';
+  recsContainer.innerHTML = recsHtml;
+}
+
 // Utility: Truncate text
 function truncate(text, maxLength) {
   if (text.length <= maxLength) return text;
