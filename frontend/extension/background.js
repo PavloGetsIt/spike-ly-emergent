@@ -686,46 +686,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...message
       }));
     }
-  } else if (message.type === 'CHAT_METRICS') {
-    // PHASE 1: Handle chat metrics from content script
-    console.log('[Background] 📝 Chat metrics received:', message.metrics);
-    
-    // Add to correlation engine for enhanced routing decisions
-    correlationEngine.addChatMetrics(message.metrics, message.timestamp);
-    
-    // Forward to side panel for UI display
-    chrome.runtime.sendMessage({
-      type: 'CHAT_METRICS',
-      ...message
-    }, () => { void chrome.runtime.lastError; });
-    
-    // Forward to web app
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'CHAT_METRICS',
-        ...message
-      }));
-    }
-  } else if (message.type === 'ENGAGEMENT_METRICS') {
-    // PHASE 1: Handle engagement metrics from content script
-    console.log('[Background] 📈 Engagement metrics received:', message.metrics);
-    
-    // Add to correlation engine for enhanced routing decisions
-    correlationEngine.addEngagementMetrics(message.metrics, message.timestamp);
-    
-    // Forward to side panel for UI display
-    chrome.runtime.sendMessage({
-      type: 'ENGAGEMENT_METRICS',
-      ...message
-    }, () => { void chrome.runtime.lastError; });
-    
-    // Forward to web app
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'ENGAGEMENT_METRICS',
-        ...message
-      }));
-    }
   } else if (message.type === 'HUME_ANALYZE') {
     // Centralized Hume AI analysis with request gating
     (async () => {
