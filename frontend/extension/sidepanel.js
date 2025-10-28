@@ -1,8 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.0.6-WEBSOCKET-DEBUG
-console.log('🔬 NUCLEAR: sidepanel.js LOADING - v2.0.6');
-console.log('🔬 NUCLEAR: sidepanel.js timestamp:', new Date().toISOString());
-console.log('🕵️ WebSocket message debugging enabled - tracing external insight source');
+// VERSION: 2.1.0-PHASE-1
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.0-PHASE-1');
+console.log('📊 PHASE 1: Chat tracking, engagement metrics, enhanced routing enabled');
 
 import { AudioProcessor } from './audioProcessor.js';
 
