@@ -643,6 +643,25 @@ function startTracking() {
   console.debug('[VC:INIT] startTracking() invoked', { platform, isTracking: true });
   console.log('[Spikely] Starting viewer count tracking...');
   
+  // PHASE 1: Start enhanced signal collection
+  if (platform === 'tiktok') {
+    console.log('[Content] 📊 Starting TikTok enhanced tracking');
+    
+    // Start chat tracking
+    setTimeout(() => {
+      if (chatTracker) {
+        chatTracker.startTracking();
+      }
+    }, 1000); // Delay to ensure page is loaded
+    
+    // Start engagement tracking
+    setTimeout(() => {
+      if (engagementTracker) {
+        engagementTracker.startTracking();
+      }
+    }, 1500); // Delay for DOM stability
+  }
+  
   // TikTok: Use warm-up + observer with retry loop for node discovery
   if (platform === 'tiktok') {
     let retryCount = 0;
