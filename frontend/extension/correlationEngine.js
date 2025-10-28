@@ -1,9 +1,6 @@
 // Correlation engine for matching viewer changes with transcript + tone
-// VERSION: 2025-10-23-022 - DYNAMIC INSIGHTS FULL IMPLEMENTATION
-// Features: Keyword detection, anti-repetition, 40s buffer, quality filtering, winning topics
-
-console.log('🔬 NUCLEAR: correlationEngine.js LOADING - v2.0.5');
-console.log('🔬 NUCLEAR: File timestamp:', new Date().toISOString());
+// VERSION: 2.0.6-STABLE (ROLLBACK)
+// Restored stable functionality, removed experimental Phase 1 features
 
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
