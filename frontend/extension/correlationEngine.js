@@ -352,6 +352,75 @@ class CorrelationEngine {
     }
   }
   
+  // PHASE 1: Add chat metrics for enhanced routing decisions
+  addChatMetrics(metrics, timestamp) {
+    this.chatMetrics = {
+      ...metrics,
+      timestamp: timestamp
+    };
+    
+    console.log('[Correlation] 📝 Chat metrics added:', metrics);
+    
+    // If high chat activity, boost insight frequency
+    if (metrics.engagementLevel === 'HIGH') {
+      console.log('[Correlation] 📈 HIGH chat activity - potential insight trigger');
+      
+      // Trigger insight if high engagement (even without viewer delta)
+      const now = Date.now();
+      if (now - this.lastInsightTime > 10000) { // Minimum 10s between insights
+        console.log('[Correlation] 📝 High chat activity triggering insight generation');
+        this.handleHighEngagementEvent(metrics, timestamp);
+      }
+    }
+  }
+  
+  // PHASE 1: Add engagement metrics for enhanced routing decisions  
+  addEngagementMetrics(metrics, timestamp) {
+    this.engagementMetrics = {
+      ...metrics,
+      timestamp: timestamp
+    };
+    
+    console.log('[Correlation] 📈 Engagement metrics added:', metrics);
+    
+    // High engagement can also trigger insights
+    if (metrics.engagementScore > 50) { // Hearts + gifts + follows weighted score
+      console.log('[Correlation] 🎉 HIGH engagement score - potential insight trigger');
+    }
+  }
+  
+  // PHASE 1: Handle high engagement events (new insight trigger)
+  async handleHighEngagementEvent(chatMetrics, timestamp) {
+    console.log('[Correlation] 🎯 High engagement event - generating insight');
+    
+    const segment = this.getRecentSegment(timestamp, 40000);
+    if (!segment || segment.wordCount < 15) { // Lower threshold for engagement-driven
+      console.log('[Correlation] 💬 High engagement but insufficient transcript');
+      return;
+    }
+    
+    try {
+      const tone = await this.analyzeTone(segment.text);
+      const insight = await this.generateInsight(0, this.viewerBuffer[this.viewerBuffer.length - 1]?.count || 0, segment, tone, false, true); // Last param = engagement-triggered
+      
+      if (insight) {
+        console.log('[Correlation] 🎯 Engagement-triggered insight generated:', insight.nextMove);
+        
+        chrome.runtime.sendMessage({
+          type: 'INSIGHT',
+          ...insight,
+          isEngagementTriggered: true,
+          chatActivity: chatMetrics
+        });
+        
+        this.lastInsightTime = Date.now();
+        this.resetCountdown();
+      }
+    } catch (error) {
+      console.error('[Correlation] ❌ Error in engagement insight:', error);
+    }
+  }
+  
   // Start auto-insight timer (generates insights every 20s)
   startAutoInsightTimer() {
     this.stopAutoInsightTimer(); // Clear any existing timer
