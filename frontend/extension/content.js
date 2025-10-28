@@ -664,6 +664,10 @@ function startTracking() {
   
   // TikTok: Use warm-up + observer with retry loop for node discovery
   if (platform === 'tiktok') {
+    // PHASE 1: Initialize enhanced signal collection for TikTok
+    console.log('[Content] 🚀 Phase 1: Initializing enhanced TikTok tracking');
+    chatTracker = new TikTokChatTracker();
+    
     let retryCount = 0;
     const maxRetries = 10;
     
