@@ -309,27 +309,19 @@ class CorrelationEngine {
     const keywordBonus = keywords.length * 2; // Keywords worth 2 nouns each
     const score = nounCount + keywordBonus;
     
-    // PHASE 1: Enhanced scoring with chat activity
-    const chatBonus = this.chatMetrics?.engagementLevel === 'HIGH' ? 3 : 
-                      this.chatMetrics?.engagementLevel === 'MEDIUM' ? 1 : 0;
-    const engagementBonus = this.engagementMetrics?.engagementScore > 50 ? 2 : 
-                           this.engagementMetrics?.engagementScore > 20 ? 1 : 0;
-    
-    const totalScore = score + chatBonus + engagementBonus;
-    
-    // Determine quality tier (enhanced with chat/engagement)
+    // Determine quality tier (STABLE VERSION - no experimental chat features)
     let tier;
-    if (totalScore >= 8) {
-      tier = 'HIGH';    // Rich content + high engagement
-    } else if (totalScore >= 4) {
-      tier = 'MEDIUM';  // Some content or good engagement
+    if (score >= 6) {
+      tier = 'HIGH';    // Rich content with 6+ nouns/keywords
+    } else if (score >= 3) {
+      tier = 'MEDIUM';  // Some content with 3-5 nouns/keywords
     } else {
-      tier = 'LOW';     // Poor content and low engagement
+      tier = 'LOW';     // Pure filler with 0-2 nouns/keywords
     }
     
-    console.log(`[Routing] Enhanced Score: ${tier} | Nouns: ${nounCount} | Keywords: ${keywords.length} | Chat: +${chatBonus} | Engagement: +${engagementBonus} | Total: ${totalScore}`);
+    console.log(`[Routing] Transcript Score: ${tier} | Nouns: ${nounCount} | Keywords: ${keywords.length} | Total: ${score}`);
     
-    return { tier, score: totalScore, nounCount, keywordBonus, chatBonus, engagementBonus };
+    return { tier, score, nounCount, keywordBonus };
   }
   
   // Track insight for anti-repetition
