@@ -8,30 +8,6 @@
   } catch (_) {}
 
 // ============================================================================
-// PHASE 1: ENHANCED SIGNAL COLLECTION
-// ============================================================================
-
-// Import chat and engagement trackers
-let chatTracker = null;
-let engagementTracker = null;
-
-// Initialize enhanced tracking
-function initializeEnhancedTracking() {
-  console.log('[Content] 🚀 Initializing Phase 1: Enhanced Signal Collection');
-  
-  const platform = detectPlatform();
-  if (platform === 'tiktok') {
-    // Initialize chat tracking
-    chatTracker = new TikTokChatTracker();
-    
-    // Initialize engagement tracking
-    engagementTracker = new TikTokEngagementTracker();
-    
-    console.log('[Content] 📊 TikTok chat and engagement tracking ready');
-  }
-}
-
-// ============================================================================
 // TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
 // ============================================================================
 const TT_CONFIG = {
