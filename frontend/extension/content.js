@@ -681,16 +681,6 @@ function startTracking() {
     // Start discovery
     tryDiscoverNode();
     
-    // PHASE 1: Start enhanced signal collection for TikTok
-    console.log('[Content] 📊 Starting enhanced TikTok signal collection');
-    
-    // Initialize chat tracking after DOM is ready
-    setTimeout(() => {
-      if (chatTracker) {
-        chatTracker.startTracking();
-      }
-    }, 2000);
-    
     // SPA navigation detection
     if (detectionInterval) clearInterval(detectionInterval);
     detectionInterval = setInterval(detectNavigation, 1000);
