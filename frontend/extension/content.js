@@ -837,10 +837,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 025 (Instant Viewer Count)');
+console.log('[Spikely] Content script loaded - Version 2.0.6-ROLLBACK (Stable)');
 
 // Run parser validation tests
 validateParserFix();
+
+// STEP 1A: Safe chat detection (read-only, no processing)
+function detectTikTokChat() {
+  if (window.location.hostname.includes('tiktok.com')) {
+    console.log('[ChatDetection] 🔍 Checking for TikTok Live chat...');
+    
+    // Safe selectors for TikTok Live chat
+    const chatSelectors = [
+      '[data-e2e="comment-list"]',
+      '[class*="chat-list"]',
+      '[class*="comment-list"]',
+      '[class*="live-comment"]'
+    ];
+    
+    for (const selector of chatSelectors) {
+      const chatContainer = document.querySelector(selector);
+      if (chatContainer) {
+        console.log('[ChatDetection] ✅ TikTok Live chat container found via:', selector);
+        console.log('[ChatDetection] 📊 Container has', chatContainer.children.length, 'visible comments');
+        return true;
+      }
+    }
+    
+    console.log('[ChatDetection] ⚠️ No TikTok Live chat container found');
+    return false;
+  }
+  
+  return false;
+}
+
+// Run chat detection after page loads (safe, non-blocking)
+setTimeout(() => {
+  detectTikTokChat();
+}, 3000);
 
 // Stop timers cleanly on navigation to avoid context errors
 window.addEventListener('pagehide', () => { try { stopTracking(); } catch (_) {} });
