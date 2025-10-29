@@ -105,10 +105,21 @@ class CorrelationEngine {
     return { bank: TEMPLATE_BANK, recentTemplates: [] };
   }
   
-  // Select template based on category and delta
+  // Select template based on category and delta (ENHANCED with niche preferences)
   selectTemplate(keywords, delta) {
     console.log('[Template] 🔬 selectTemplate called | Keywords:', keywords, '| Delta:', delta);
+    console.log('[Template] 🎯 Current niche:', this.currentNiche, '| Goal:', this.currentGoal);
     
+    // Try niche-specific templates first
+    if (this.currentNiche && this.currentNiche !== 'general') {
+      const nicheInsight = this.selectNicheTemplate(delta);
+      if (nicheInsight) {
+        console.log('[Template] ✅ Using NICHE template:', nicheInsight.nextMove.substring(0, 50));
+        return nicheInsight;
+      }
+    }
+    
+    // Fallback to original template system
     const templates = this.templateSelector.bank;
     console.log('[Template] 🔬 Template bank exists:', !!templates);
     
@@ -117,7 +128,7 @@ class CorrelationEngine {
       return null;
     }
     
-    // Determine category
+    // Determine category (original logic)
     let category = 'general';
     if (keywords.includes('gaming')) category = 'gaming';
     else if (keywords.includes('makeup')) category = 'makeup';
@@ -181,6 +192,30 @@ class CorrelationEngine {
       source: 'template',
       templateId: selected.id
     };
+  }
+  
+  // Select niche-specific template
+  selectNicheTemplate(delta) {
+    // Use external niche template banks if available
+    if (typeof window !== 'undefined' && window.NICHE_TEMPLATE_BANKS) {
+      const nicheBank = window.NICHE_TEMPLATE_BANKS[this.currentNiche];
+      if (nicheBank && nicheBank[this.currentGoal]) {
+        const templates = nicheBank[this.currentGoal];
+        const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+        
+        return {
+          delta: delta,
+          emotionalLabel: this.currentNiche + ' ' + this.currentGoal,
+          nextMove: randomTemplate,
+          text: '',
+          source: 'niche-template',
+          niche: this.currentNiche,
+          goal: this.currentGoal
+        };
+      }
+    }
+    
+    return null;
   }
   
   // Initialize keyword library for topic detection
