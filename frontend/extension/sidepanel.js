@@ -395,6 +395,53 @@ const goalSelector = document.getElementById('goalSelector');
 
 // Niche template selector instance
 let nicheTemplateSelector = null;
+
+// Initialize niche template system
+function initializeNicheSystem() {
+  console.log('[Niche] Initializing niche template system');
+  
+  // Setup niche selector event listener
+  if (nicheSelector) {
+    nicheSelector.addEventListener('change', (e) => {
+      const selectedNiche = e.target.value;
+      const selectedGoal = goalSelector?.value || 'generalGrowth';
+      
+      console.log('[Niche] Niche changed to:', selectedNiche);
+      
+      // Send update to background for correlation engine
+      chrome.runtime.sendMessage({
+        type: 'NICHE_UPDATE',
+        niche: selectedNiche,
+        goal: selectedGoal
+      });
+    });
+  }
+  
+  // Setup goal selector event listener
+  if (goalSelector) {
+    goalSelector.addEventListener('change', (e) => {
+      const selectedGoal = e.target.value;
+      const selectedNiche = nicheSelector?.value || 'general';
+      
+      console.log('[Niche] Goal changed to:', selectedGoal);
+      
+      // Send update to background for correlation engine
+      chrome.runtime.sendMessage({
+        type: 'NICHE_UPDATE',
+        niche: selectedNiche,
+        goal: selectedGoal
+      });
+    });
+  }
+  
+  console.log('[Niche] Event listeners setup complete');
+}
+
+// Call initialization after DOM loads
+setTimeout(() => {
+  initializeNicheSystem();
+}, 1000);
+
 const connectionStatus = document.getElementById('connectionStatus');
 const panelContainer = document.getElementById('panelContainer');
 const collapsedTab = document.getElementById('collapsedTab');
