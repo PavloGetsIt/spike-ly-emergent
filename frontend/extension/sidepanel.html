@@ -72,6 +72,33 @@
 
     <!-- Viewer Tracking Card -->
     <div class="card viewer-card">
+  
+  <!-- Niche & Goal Selection -->
+  <div class="personalization-controls" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px; padding:10px; background:rgba(255,255,255,0.03); border-radius:6px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-size:11px; font-weight:500; color:#ffa500; min-width:50px;">Niche:</span>
+      <select id="nicheSelector" style="flex:1; font-size:11px; padding:4px 6px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#fff;">
+        <option value="general">General</option>
+        <option value="justChatting">Just Chatting</option>
+        <option value="gaming">Gaming</option>
+        <option value="makeup">Makeup/Beauty</option>
+        <option value="cooking">Cooking</option>
+        <option value="fitness">Fitness</option>
+        <option value="tech">Tech Reviews</option>
+      </select>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-size:11px; font-weight:500; color:#818cf8; min-width:50px;">Goal:</span>
+      <select id="goalSelector" style="flex:1; font-size:11px; padding:4px 6px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#fff;">
+        <option value="generalGrowth">General Growth</option>
+        <option value="usaGrowth">USA Viewer Growth</option>
+        <option value="engagement">Increase Engagement</option>
+        <option value="telegramFunnel">Funnel to Telegram</option>
+        <option value="monetization">Monetization Focus</option>
+      </select>
+    </div>
+  </div>
+  
   <div class="threshold-controls" style="display:flex; align-items:center; gap:12px; margin-bottom:12px; padding:8px; background:rgba(255,255,255,0.03); border-radius:6px;">
     <span style="font-size:12px; font-weight:500; color:rgba(255,255,255,0.7); min-width:100px;">Sensitivity:</span>
     <input type="range" id="thresholdSlider" min="1" max="200" value="10" style="flex:1;" aria-label="Viewer delta threshold" aria-valuemin="1" aria-valuemax="200" aria-valuenow="10" aria-valuetext="Plus or minus 10 viewers" />
