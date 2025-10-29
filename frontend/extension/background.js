@@ -1,6 +1,10 @@
+console.log('🚨 BACKGROUND TEST: background.js file executing BEFORE imports');
+console.log('🚨 TIMESTAMP:', new Date().toISOString());
+
 import { audioCaptureManager } from './audioCapture.js';
 import { correlationEngine } from './correlationEngine.js';
 
+console.log('🚨 BACKGROUND TEST: imports completed successfully');
 console.log('🔬 NUCLEAR: background.js LOADING - v2.0.5');
 console.log('🔬 NUCLEAR: background.js timestamp:', new Date().toISOString());
 
