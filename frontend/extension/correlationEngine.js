@@ -1107,10 +1107,20 @@ class CorrelationEngine {
     const words = segment.text.split(/\s+/);
     const truncatedTranscript = words.slice(-100).join(' ');
     
+    // MUSIC FILTERING (Fix A) - Clean transcript before processing
+    const cleanedTranscript = this.cleanMusicFromTranscript(segment.text);
+    const detectedActivity = this.detectCurrentActivity(cleanedTranscript);
+    
+    console.log('[Transcript] 🎭 Activity detected:', detectedActivity);
+    console.log('[Transcript] 🧹 Transcript cleaned:', cleanedTranscript !== segment.text ? 'FILTERED' : 'UNCHANGED');
+    
+    // Use cleaned transcript for processing
+    const processedText = cleanedTranscript.length > 20 ? cleanedTranscript : segment.text;
+    
     // ==================== ROUTING LOGIC: Calculate Transcript Score ====================
-    // Extract keywords first
-    const keywords = this.extractKeywords(segment.text);
-    const transcriptScore = this.calculateTranscriptScore(segment.text, keywords);
+    // Extract keywords from cleaned transcript
+    const keywords = this.extractKeywords(processedText);
+    const transcriptScore = this.calculateTranscriptScore(processedText, keywords);
     
     console.log(`[Routing] Decision Point | Score: ${transcriptScore.tier} (${transcriptScore.score}) | Delta: ${delta}`);
     
