@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.0.6-ROLLBACK
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2.0.6-ROLLBACK');
-console.log('🔄 Emergency rollback: Removed experimental Phase 1 features, restored stable functionality');
+// VERSION: 2.1.0-MUSIC-FIX
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.0-MUSIC-FIX');
+console.log('🎵 Music filtering, dancing templates, niche personalization enabled');
 
 import { AudioProcessor } from './audioProcessor.js';
 
