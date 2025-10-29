@@ -1162,6 +1162,9 @@ class CorrelationEngine {
     console.log('[Transcript] 🎭 Activity detected:', detectedActivity);
     console.log('[Transcript] 🧹 Transcript cleaned:', cleanedTranscript !== segment.text ? 'FILTERED' : 'UNCHANGED');
     
+    // Update activity for niche template selection
+    this.updateDetectedActivity(detectedActivity);
+    
     // Use cleaned transcript for processing
     const processedText = cleanedTranscript.length > 20 ? cleanedTranscript : segment.text;
     
