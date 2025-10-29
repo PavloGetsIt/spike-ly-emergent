@@ -40,6 +40,7 @@ class CorrelationEngine {
     // Niche personalization system
     this.currentNiche = 'general';
     this.currentGoal = 'generalGrowth';
+    this.lastDetectedActivity = 'general';
     
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
     console.log('[Correlation] 🎯 Dynamic insights mode enabled');
@@ -52,6 +53,12 @@ class CorrelationEngine {
     this.currentNiche = niche;
     this.currentGoal = goal;
     console.log('[Correlation] 🎯 Updated preferences:', niche, goal);
+  }
+  
+  // Update detected activity for niche template selection
+  updateDetectedActivity(activity) {
+    this.lastDetectedActivity = activity;
+    console.log('[Correlation] 🎭 Activity updated:', activity);
   }
   
   // Initialize template selector
