@@ -396,6 +396,96 @@ class CorrelationEngine {
     }
   }
   
+  // MUSIC CONTAMINATION DETECTION (Fix A)
+  detectMusicContamination(text) {
+    const musicIndicators = [
+      'by all night', 'don\'t fly honey', 'wonderful i see', 'no matter',
+      // Common song lyric patterns
+      'na na na', 'oh oh oh', 'yeah yeah yeah', 'baby baby',
+      'la la la', 'love love love', 'tonight tonight',
+      // Repetitive phrases common in music
+      'all night long', 'feel the beat', 'turn it up',
+      // Disconnected word chains (typical of mixed audio)
+      'wonderful i don\'t fly', 'coming honey see'
+    ];
+    
+    let musicWords = 0;
+    const totalWords = text.split(' ').filter(w => w.length > 0).length;
+    
+    musicIndicators.forEach(indicator => {
+      if (text.toLowerCase().includes(indicator.toLowerCase())) {
+        musicWords += indicator.split(' ').length;
+      }
+    });
+    
+    const musicRatio = musicWords / totalWords;
+    const isContaminated = musicRatio > 0.25; // > 25% music lyrics
+    
+    console.log('[Transcript] 🎵 Music check:', isContaminated ? 'CONTAMINATED' : 'CLEAN', `(${(musicRatio * 100).toFixed(1)}% music)`);
+    
+    return isContaminated;
+  }
+  
+  // Clean transcript of music lyrics (Fix A)
+  cleanMusicFromTranscript(text) {
+    if (this.detectMusicContamination(text)) {
+      console.log('[Transcript] 🧹 Filtering music contamination...');
+      
+      // Extract only spoken phrases (first person, questions, reactions, dance-related)
+      const sentences = text.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 0);
+      const spokenSentences = [];
+      
+      sentences.forEach(sentence => {
+        const lower = sentence.toLowerCase();
+        
+        // Keep if it contains personal pronouns or dance/stream context
+        if (lower.includes('i ') || lower.includes('you ') || 
+            lower.includes('give me') || lower.includes('out of breath') ||
+            lower.includes('dance') || lower.includes('song') ||
+            lower.includes('break') || lower.includes('tired') ||
+            lower.includes('kitchen') || lower.includes('cooking') ||
+            lower.includes('?') || sentence.length < 20) {
+          spokenSentences.push(sentence);
+        }
+      });
+      
+      const cleaned = spokenSentences.join('. ').trim();
+      console.log('[Transcript] 🧹 Cleaned:', cleaned.substring(0, 100) + '...');
+      
+      return cleaned.length > 10 ? cleaned : text; // Fallback if over-filtered
+    }
+    
+    return text;
+  }
+  
+  // Detect current activity from transcript (Fix A support)
+  detectCurrentActivity(text) {
+    const lower = text.toLowerCase();
+    
+    // Dancing indicators
+    if (lower.includes('dance') || lower.includes('breath') || 
+        lower.includes('tired') || lower.includes('moves') ||
+        lower.includes('song') || lower.includes('music')) {
+      return 'dancing';
+    }
+    
+    // Cooking indicators  
+    if (lower.includes('cook') || lower.includes('kitchen') ||
+        lower.includes('food') || lower.includes('eat') ||
+        lower.includes('recipe') || lower.includes('ingredients')) {
+      return 'cooking';
+    }
+    
+    // Chatting/Q&A indicators
+    if (lower.includes('question') || lower.includes('tell me') ||
+        lower.includes('what do you') || lower.includes('chat') ||
+        lower.includes('ask me') || lower.includes('answer')) {
+      return 'chatting';
+    }
+    
+    return 'general';
+  }
+  
   // Start auto-insight timer (generates insights every 20s)
   startAutoInsightTimer() {
     this.stopAutoInsightTimer(); // Clear any existing timer
