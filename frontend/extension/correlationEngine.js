@@ -2,6 +2,10 @@
 // VERSION: 2.0.6-STABLE (ROLLBACK)
 // Restored stable functionality, removed experimental Phase 1 features
 
+console.log('🚨 CRITICAL TEST: This log MUST appear if correlationEngine.js loads');
+console.log('🚨 TIMESTAMP:', new Date().toISOString());
+console.log('🚨 If you do not see this, the file is not loading my changes');
+
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
 const DEBUG_HUME = true;
