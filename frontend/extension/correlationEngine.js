@@ -194,27 +194,68 @@ class CorrelationEngine {
     };
   }
   
-  // Select niche-specific template
+  // Select niche-specific template (ENHANCED with activity detection)
   selectNicheTemplate(delta) {
+    console.log('[Template] 🎯 Selecting NICHE template | Niche:', this.currentNiche, '| Goal:', this.currentGoal);
+    
     // Use external niche template banks if available
     if (typeof window !== 'undefined' && window.NICHE_TEMPLATE_BANKS) {
       const nicheBank = window.NICHE_TEMPLATE_BANKS[this.currentNiche];
-      if (nicheBank && nicheBank[this.currentGoal]) {
-        const templates = nicheBank[this.currentGoal];
-        const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+      if (nicheBank) {
         
-        return {
-          delta: delta,
-          emotionalLabel: this.currentNiche + ' ' + this.currentGoal,
-          nextMove: randomTemplate,
-          text: '',
-          source: 'niche-template',
-          niche: this.currentNiche,
-          goal: this.currentGoal
-        };
+        // For Just Chatting, try activity-specific templates first
+        if (this.currentNiche === 'justChatting') {
+          // Try dancing templates if recent activity suggests dancing
+          if (nicheBank.dancing && this.lastDetectedActivity === 'dancing') {
+            const templates = nicheBank.dancing;
+            const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+            console.log('[Template] 🕺 Selected DANCING template:', randomTemplate.substring(0, 50));
+            
+            return {
+              delta: delta,
+              emotionalLabel: 'dancing activity',
+              nextMove: randomTemplate,
+              source: 'niche-dancing-template',
+              niche: this.currentNiche
+            };
+          }
+          
+          // Try kitchen templates if in kitchen context
+          if (nicheBank.kitchen && this.lastDetectedActivity === 'cooking') {
+            const templates = nicheBank.kitchen;
+            const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+            console.log('[Template] 🍳 Selected KITCHEN template:', randomTemplate.substring(0, 50));
+            
+            return {
+              delta: delta,
+              emotionalLabel: 'kitchen activity',
+              nextMove: randomTemplate,
+              source: 'niche-kitchen-template',
+              niche: this.currentNiche
+            };
+          }
+        }
+        
+        // Use goal-based templates
+        if (nicheBank[this.currentGoal]) {
+          const templates = nicheBank[this.currentGoal];
+          const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+          console.log('[Template] 🎯 Selected NICHE template for goal:', this.currentGoal);
+          
+          return {
+            delta: delta,
+            emotionalLabel: this.currentNiche + ' ' + this.currentGoal,
+            nextMove: randomTemplate,
+            text: '',
+            source: 'niche-template',
+            niche: this.currentNiche,
+            goal: this.currentGoal
+          };
+        }
       }
     }
     
+    console.log('[Template] ⚠️ No niche templates available, using fallback');
     return null;
   }
   
