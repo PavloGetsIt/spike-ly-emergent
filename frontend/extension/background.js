@@ -686,6 +686,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ...message
       }));
     }
+  } else if (message.type === 'NICHE_UPDATE') {
+    // Handle niche/goal selection updates
+    console.log('[Background] 🎯 Niche update:', message.niche, message.goal);
+    
+    // Update correlation engine with new niche preferences
+    if (correlationEngine && correlationEngine.updateNichePreferences) {
+      correlationEngine.updateNichePreferences(message.niche, message.goal);
+    }
+    
+    // Forward to web app
+    if (wsConnection?.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({
+        type: 'NICHE_UPDATE',
+        niche: message.niche,
+        goal: message.goal,
+        timestamp: Date.now()
+      }));
+    }
   } else if (message.type === 'HUME_ANALYZE') {
     // Centralized Hume AI analysis with request gating
     (async () => {
