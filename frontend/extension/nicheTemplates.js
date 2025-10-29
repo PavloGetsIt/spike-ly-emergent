@@ -146,7 +146,7 @@ class NicheTemplateSelector {
     this.recentTemplates = [];
   }
   
-  // Select template based on niche and goal
+  // Select niche-specific template with activity detection
   selectTemplate(keywords, delta, fallbackToGeneral = true) {
     console.log('[NicheSelector] Selecting template for:', this.selectedNiche, this.selectedGoal);
     
@@ -157,19 +157,45 @@ class NicheTemplateSelector {
       return fallbackToGeneral ? this.selectFromGeneral(delta) : null;
     }
     
-    const goalTemplates = nicheBank[this.selectedGoal];
+    // For Just Chatting, try to detect activity and use specific templates
+    let templateSource = this.selectedGoal;
+    
+    if (this.selectedNiche === 'justChatting') {
+      // Try activity-specific templates first if available
+      if (nicheBank.dancing && this.lastActivity === 'dancing') {
+        templateSource = 'dancing';
+        console.log('[NicheSelector] 🕺 Using DANCING templates');
+      } else if (nicheBank.kitchen && this.lastActivity === 'kitchen') {
+        templateSource = 'kitchen';
+        console.log('[NicheSelector] 🍳 Using KITCHEN templates');
+      }
+    }
+    
+    const goalTemplates = nicheBank[templateSource];
     if (!goalTemplates || goalTemplates.length === 0) {
+      // Fallback to selected goal if activity templates not found
+      const fallbackTemplates = nicheBank[this.selectedGoal];
+      if (fallbackTemplates && fallbackTemplates.length > 0) {
+        console.log('[NicheSelector] Using goal templates as fallback');
+        return this.selectFromPool(fallbackTemplates, delta);
+      }
+      
       console.warn('[NicheSelector] No templates for goal:', this.selectedGoal);
       return fallbackToGeneral ? this.selectFromGeneral(delta) : null;
     }
     
+    return this.selectFromPool(goalTemplates, delta);
+  }
+  
+  // Helper to select from template pool
+  selectFromPool(templates, delta) {
     // Filter out recently used templates
-    const availableTemplates = goalTemplates.filter(template => 
+    const availableTemplates = templates.filter(template => 
       !this.recentTemplates.includes(template)
     );
     
     // If all used, reset and use all
-    const pool = availableTemplates.length > 0 ? availableTemplates : goalTemplates;
+    const pool = availableTemplates.length > 0 ? availableTemplates : templates;
     
     // Select random template
     const selectedTemplate = pool[Math.floor(Math.random() * pool.length)];
@@ -180,18 +206,23 @@ class NicheTemplateSelector {
       this.recentTemplates.shift();
     }
     
-    console.log('[NicheSelector] ✅ Selected:', selectedTemplate);
+    console.log('[NicheSelector] ✅ Selected:', selectedTemplate.substring(0, 50));
     
-    // Build response format matching existing system
     return {
       delta: delta,
-      emotionalLabel: this.selectedNiche + ' engagement',
+      emotionalLabel: this.selectedNiche + ' activity',
       nextMove: selectedTemplate,
       text: '',
       source: 'niche-template',
       niche: this.selectedNiche,
       goal: this.selectedGoal
     };
+  }
+  
+  // Update detected activity
+  updateActivity(activity) {
+    this.lastActivity = activity;
+    console.log('[NicheSelector] 🎭 Activity detected:', activity);
   }
   
   // Fallback to general templates
