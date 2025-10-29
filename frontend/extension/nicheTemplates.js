@@ -8,16 +8,14 @@ const NICHE_TEMPLATE_BANKS = {
       "Call out USA cities in chat. React excited", 
       "Ask 'East Coast or West Coast?'. Count votes",
       "Shoutout USA viewers only. Wave at camera",
-      "Ask 'What time zone?'. Build USA map"
+      "Ask 'What time zone?'. Build USA connection"
     ],
     engagement: [
       "Ask 'Would you rather' question. React to answers",
       "Start 'This or That' game. Point at choices",
       "Ask viewers to rate your outfit. Count scores",
-      "Dance challenge: 'Copy my moves'. React big",
-      "Ask 'Describe me in 3 words'. Read best ones",
       "Poll chat: 'Yes or No?'. Count hands raised",
-      "Ask 'What should I do next?'. Take requests"
+      "Ask 'Describe me in 3 words'. Read funny ones"
     ],
     telegramFunnel: [
       "Share Telegram link. Say 'Private chat time'",
@@ -25,6 +23,25 @@ const NICHE_TEMPLATE_BANKS = {
       "Mention VIP Telegram group. Build FOMO",
       "Ask chat to DM for Telegram invite",
       "Tease: 'Special content in Telegram only'"
+    ],
+    // NEW: Activity-specific templates (Fix B)
+    dancing: [
+      "Take a dance break. Catch your breath",
+      "Ask 'Favorite dance song?'. Take requests", 
+      "Show your best dance move. Repeat it slow",
+      "Challenge: 'Rate my moves 1-10'. Read scores",
+      "Ask 'Dance battle?'. Copy viewer suggestions",
+      "Ask 'This song or next?'. Point at options",
+      "Hydration break: 'Water time?'. Drink up"
+    ],
+    kitchen: [
+      "Ask 'What should I cook next?'. Take requests",
+      "Show what's in your fridge. Get suggestions",
+      "Ask 'Sweet or savory mood?'. Poll the chat",
+      "Kitchen dance party: 'Turn up music?'. React",
+      "Ask 'Rate my kitchen vibes'. Count scores",
+      "Snack break: 'What are you eating?'. Share",
+      "Ask 'Cook with me or watch?'. Count votes"
     ],
     generalGrowth: [
       "Ask viewers to follow. Say why they should",
