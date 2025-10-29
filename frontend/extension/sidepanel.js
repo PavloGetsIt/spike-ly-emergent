@@ -388,6 +388,13 @@ const sessionTime = document.getElementById('sessionTime');
 const insightContent = document.getElementById('insightContent');
 const winningActionsContainer = document.getElementById('winningActions');
 const losingActionsContainer = document.getElementById('losingActions');
+
+// Niche/Goal selection elements
+const nicheSelector = document.getElementById('nicheSelector');
+const goalSelector = document.getElementById('goalSelector');
+
+// Niche template selector instance
+let nicheTemplateSelector = null;
 const connectionStatus = document.getElementById('connectionStatus');
 const panelContainer = document.getElementById('panelContainer');
 const collapsedTab = document.getElementById('collapsedTab');
