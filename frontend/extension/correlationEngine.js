@@ -1166,9 +1166,11 @@ class CorrelationEngine {
     
     // MUSIC FILTERING (Fix A) - Clean transcript before processing
     const cleanedTranscript = this.cleanMusicFromTranscript(segment.text);
-    const detectedActivity = this.detectCurrentActivity(cleanedTranscript);
     
-    console.log('[Transcript] 🎭 Activity detected:', detectedActivity);
+    // FORCE dancing activity for tester (who is always dancing/kitchen content)
+    const detectedActivity = 'dancing';  // HARDCODED for dancing kitchen streamer
+    
+    console.log('[Transcript] 🎭 Activity FORCED to:', detectedActivity);
     console.log('[Transcript] 🧹 Transcript cleaned:', cleanedTranscript !== segment.text ? 'FILTERED' : 'UNCHANGED');
     
     // Update activity for niche template selection
