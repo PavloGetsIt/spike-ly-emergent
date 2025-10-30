@@ -539,6 +539,57 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
             source="fallback" if not is_rate_limited else "fallback_rate_limited"
         )
 
+# ==================== HUME AI EMOTION ANALYSIS ====================
+
+class HumeAnalysisRequest(BaseModel):
+    text: str
+
+class HumeAnalysisResponse(BaseModel):
+    emotion: str
+    score: float
+    confidence: int
+
+@api_router.post("/analyze-emotion", response_model=HumeAnalysisResponse)
+async def analyze_emotion(request: HumeAnalysisRequest):
+    """
+    Analyze emotion in text using Hume AI (migrated from Supabase)
+    """
+    try:
+        logger.info(f"🎭 Analyzing emotion for text: {request.text[:50]}...")
+        
+        # Call Hume AI via original Supabase function (for now)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/hume-analyze-text",
+                headers={"Content-Type": "application/json"},
+                json={"text": request.text},
+                timeout=5.0  # 5 second timeout
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Hume AI request failed")
+            
+            data = response.json()
+            
+            result = HumeAnalysisResponse(
+                emotion=data.get("emotion", "Neutral"),
+                score=data.get("score", 0.5),
+                confidence=int(data.get("confidence", 50))
+            )
+            
+            logger.info(f"✅ Hume analysis complete: {result.emotion} ({result.confidence}%)")
+            return result
+            
+    except Exception as e:
+        logger.error(f"❌ Hume analysis error: {str(e)}")
+        
+        # Return neutral fallback
+        return HumeAnalysisResponse(
+            emotion="Neutral",
+            score=0.5,
+            confidence=0
+        )
+
 # ==================== END CORRELATION ENGINE ====================
 
 # Include the router in the main app
