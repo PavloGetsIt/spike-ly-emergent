@@ -13,6 +13,7 @@ from anthropic import Anthropic
 import json
 import re
 import time
+import httpx  # For Hume AI HTTP requests
 
 # Global correlation counter for unique IDs
 correlation_counter = 0
