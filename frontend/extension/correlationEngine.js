@@ -41,15 +41,15 @@ class CorrelationEngine {
     this.recentTemplates = []; // Track last 5 used template IDs
     this.templateSelector = this.initializeTemplateSelector();
     
-    // Niche personalization system
-    this.currentNiche = 'general';
-    this.currentGoal = 'generalGrowth';
+    // Niche personalization system (HARDCODED for tester)
+    this.currentNiche = 'justChatting';  // FORCED for dancing kitchen streamer
+    this.currentGoal = 'engagement';     // FORCED for interactive content
     this.lastDetectedActivity = 'general';
     
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
     console.log('[Correlation] 🎯 Dynamic insights mode enabled');
     console.log('[Correlation] 🎯 Template fallback system loaded: 30 templates');
-    console.log('[Correlation] 🎯 Niche personalization ready');
+    console.log('[Correlation] 🎯 FORCED NICHE: justChatting | GOAL: engagement');
   }
   
   // Update niche preferences from UI
