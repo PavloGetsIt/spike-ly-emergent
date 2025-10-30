@@ -993,7 +993,7 @@ class CorrelationEngine {
     };
   }
 
-  // Analyze tone with Hume AI
+  // Analyze tone with Hume AI (MIGRATED to FastAPI backend)
   async analyzeTone(text) {
     // Check cache
     const cacheKey = text.substring(0, 100);
@@ -1003,18 +1003,20 @@ class CorrelationEngine {
     }
 
     try {
-      console.log('[Correlation] Analyzing tone with Hume AI...');
+      console.log('[Correlation] Analyzing tone with Hume AI via FastAPI...');
       
-      const response = await fetch('https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/hume-analyze-text', {
+      // Call FastAPI backend instead of Supabase
+      const response = await fetch('https://project-continuity-5.preview.emergentagent.com/api/analyze-emotion', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text: text }),
+        signal: AbortSignal.timeout(5000) // 5 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Hume AI error: ${response.status}`);
+        throw new Error(`FastAPI Hume error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -1033,10 +1035,10 @@ class CorrelationEngine {
         this.analysisCache.delete(firstKey);
       }
 
-      console.log('[Correlation] Tone analysis:', result.emotion, result.confidence + '%');
+      console.log('[Correlation] Tone analysis (FastAPI):', result.emotion, result.confidence + '%');
       return result;
     } catch (error) {
-      console.error('[Correlation] Tone analysis failed:', error);
+      console.error('[Correlation] FastAPI tone analysis failed:', error);
       return { emotion: 'Unknown', score: 0.5, confidence: 0 };
     }
   }
