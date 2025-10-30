@@ -57,6 +57,11 @@ class CorrelationEngine {
     this.currentNiche = niche;
     this.currentGoal = goal;
     console.log('[Correlation] 🎯 Updated preferences:', niche, goal);
+    
+    // ALSO log to page console for easier debugging
+    if (typeof window !== 'undefined' && window.console) {
+      window.console.log('[Correlation] 🎯 NICHE UPDATED:', niche, goal);
+    }
   }
   
   // Update detected activity for niche template selection
