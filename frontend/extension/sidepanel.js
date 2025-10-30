@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.1.1-FORCED-JUST-CHATTING
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.1-FORCED-JUST-CHATTING');
-console.log('🎭 HARDCODED: justChatting niche + dancing activity for tester relevance');
+// VERSION: 2.1.2-UNIFIED-BACKEND
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.2-UNIFIED-BACKEND');
+console.log('🏗️ Unified: All AI calls (Claude + Hume) now use FastAPI backend only');
 
 import { AudioProcessor } from './audioProcessor.js';
 
