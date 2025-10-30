@@ -1,7 +1,7 @@
 // Spikely Side Panel - WebSocket Integration  
-// VERSION: 2.1.0-MUSIC-FIX
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.0-MUSIC-FIX');
-console.log('🎵 Music filtering, dancing templates, niche personalization enabled');
+// VERSION: 2.1.1-FORCED-JUST-CHATTING
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.1-FORCED-JUST-CHATTING');
+console.log('🎭 HARDCODED: justChatting niche + dancing activity for tester relevance');
 
 import { AudioProcessor } from './audioProcessor.js';
 
