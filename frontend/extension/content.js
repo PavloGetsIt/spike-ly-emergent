@@ -1616,9 +1616,12 @@ window.__SPIKELY_TEST_CHAT__ = function() {
 
 
 // Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 2.1.0-ENHANCED-DETECTION + CHAT-STREAM-v1.0');
+console.log('🎉🎉🎉 [SPIKELY] CONTENT SCRIPT FULLY LOADED! 🎉🎉🎉');
+console.log('[Spikely] Content script loaded - Version 2.2.0-CHAT-STREAM + ENHANCED-LOGGING');
 console.log('[Spikely] 🧪 Viewer detection test: window.__SPIKELY_TEST__()');
 console.log('[Spikely] 💬 Chat detection test: window.__SPIKELY_TEST_CHAT__()');
+console.log('[Spikely] Platform detected:', platform);
+console.log('[Spikely] Ready to receive START_TRACKING command from background');
 
 // Expose manual testing function
 window.__SPIKELY_TEST__ = function() {
