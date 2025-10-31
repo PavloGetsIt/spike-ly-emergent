@@ -35,43 +35,19 @@ function detectPlatform() {
   return 'unknown';
 }
 
-// Platform-specific selectors (ENHANCED for TikTok Live 2024)
+// Platform-specific selectors (SIMPLIFIED - back to working basics)
 const PLATFORM_SELECTORS = {
   tiktok: [
-    // Current TikTok Live selectors
-    '.P4-Regular.text-UIText3', // New TikTok digit container
-    'div:has(> span.inline-flex.justify-center)', // Container with digit spans
-    '[data-e2e="live-viewer-count"]',
-    '[data-e2e="room-stats-viewer-count"]',
-    '.live-viewer-count',
-    'svg[data-e2e="eye-icon"] + span',
+    // Target the "Viewers • 2.1K" format specifically
+    '*:has-text("Viewers")',
+    '[class*="viewer"]',
+    '[data-e2e*="viewer"]',
+    '.P4-Regular.text-UIText3', // Original working selector
+    'div:has(> span.inline-flex.justify-center)', // Original working selector
     
-    // ENHANCED: Additional TikTok Live selectors for 2024
-    '[data-e2e="viewer-count"]',
-    '[class*="viewer-count"]',
-    '[class*="ViewerCount"]',
-    '[class*="live-viewer"]',
-    '[aria-label*="viewer" i]',
-    '[aria-label*="watching" i]',
-    'span[class*="Text"]:has-text(/^\d+[KkMm]?$/)',
-    'div[class*="stats"] span',
-    '[data-testid="viewer-count"]',
-    '[data-testid="live-viewer-count"]',
-    
-    // Eye icon proximity selectors
-    'svg[data-e2e="eye-icon"] ~ span',
-    'svg[aria-label*="eye" i] + span',
-    'svg[aria-label*="eye" i] ~ span',
-    '[data-e2e="eye-icon"] ~ *',
-    
-    // Generic numeric patterns near viewer context
-    'span:has-text(/^\d{1,6}[KkMm]?$/) + [class*="viewer"]',
-    '[class*="viewer"] span:has-text(/^\d{1,6}[KkMm]?$/)',
-    
-    // Live stats container patterns
-    '[class*="live-room"] [class*="stat"] span',
-    '[class*="room-info"] [class*="count"] span',
-    '[class*="live-info"] span[class*="number"]'
+    // Generic fallbacks
+    'span:has-text(/^\d+\.?\d*[KM]?$/)',
+    'div:has-text(/^\d+\.?\d*[KM]?$/)'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
