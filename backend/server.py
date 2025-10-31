@@ -332,6 +332,8 @@ SIGNAL STRENGTH: {request.quality or 'medium'}
 
 {quality_indicator}
 
+{chat_context_str}
+
 ---
 🎯 CONTEXT FOR VARIETY:
 {recent_insights_str}
