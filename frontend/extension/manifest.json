@@ -23,6 +23,17 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [{
+    "matches": [
+      "https://*.tiktok.com/*",
+      "https://tiktok.com/*",
+      "https://*.twitch.tv/*",
+      "https://*.kick.com/*",
+      "https://*.youtube.com/*"
+    ],
+    "js": ["content.js"],
+    "run_at": "document_end"
+  }],
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
