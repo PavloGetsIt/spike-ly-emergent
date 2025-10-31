@@ -296,15 +296,15 @@ backend:
 
 metadata:
   created_by: "main_agent"
-  version: "2.1.0"
-  test_sequence: 1
+  version: "2.2.0-CHAT-STREAM"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "DOM Viewer Count Detection - Three-Tier Strategy"
-    - "Manual Testing Tool - window.__SPIKELY_TEST__()"
-    - "Enhanced Number Parsing with Decimal Support"
+    - "Chat Stream Detection - Multi-Tier Selector Strategy"
+    - "Chat Buffer Management & Keyword Extraction"
+    - "Chat Context Enhancement for Claude Prompts"
   stuck_tasks: []
   test_all: false
   test_priority: "critical_first"
@@ -312,54 +312,102 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      🚨 CRITICAL FIX COMPLETED: DOM Viewer Count Detection (v2.1.0)
+      ✅ PHASE 1 SIGNAL ENHANCEMENT: Chat Stream Detection (v1.0) COMPLETE
       
-      ✅ Implemented three-tier detection strategy to fix the broken viewer count (was showing 0 instead of 2.1K):
+      🎯 **Achievement:** Implemented the #1 priority engagement signal
       
-      **Strategy 1 - Label-Based Detection:**
-      - Search for "Viewers" text in DOM
-      - Check siblings/children/parent for numbers
-      - Handle formats like "Viewers • 2.1K"
-      - MOST RELIABLE: Text content is stable
+      This is THE MOST CRITICAL signal for accurate action→outcome correlation.
+      Chat provides direct audience feedback that correlates with viewer changes.
       
-      **Strategy 2 - Brute Force Number Search:**
-      - Scan ALL elements for number patterns (2.1K, 953, etc.)
-      - Score candidates by viewer context
-      - Sort by confidence
-      - Logs top 5 candidates for debugging
-      - ADAPTIVE: Works even if DOM structure changes
+      📊 **What Was Built:**
       
-      **Strategy 3 - Priority Selectors:**
-      - Updated with 2025 TikTok Live patterns
-      - 15+ selector variations (data-e2e, classes, aria-labels)
-      - Preserves original working selectors
-      - COMPREHENSIVE: Covers multiple naming conventions
+      **1. Real-Time Chat Detection (content.js)**
+      - MutationObserver watches for new comments in TikTok Live DOM
+      - 3-tier selector strategy (priority → heuristic → fallback)
+      - Parses username + text + timestamp from each comment
+      - 30-second rolling buffer (max 200 comments)
+      - Duplicate filtering via unique IDs
+      - Batched emission every 2 seconds
+      - Manual test command: window.__SPIKELY_TEST_CHAT__()
       
-      **Additional Improvements:**
-      - Fixed decimal parsing: 1.2K → 1200 (not 1000)
-      - 12 validation tests run on load
-      - Manual test command: window.__SPIKELY_TEST__()
-      - Extensive [VC:DEBUG] console logging
-      - Better element caching and revalidation
+      **2. Chat Buffer & Analytics (correlationEngine.js)**
+      - addChatStream() - Maintains 30s rolling buffer
+      - getChatContext() - Provides chat data for insights
+      - extractChatKeywords() - NLP-style keyword extraction
+      - Stop word filtering + frequency analysis
+      - Returns: commentCount, chatRate, topKeywords, recentComments
       
-      **Files Modified:**
-      - /app/frontend/extension/content.js (lines 39-310, enhanced parsing, manual test tool)
+      **3. Message Routing (background.js)**
+      - CHAT_STREAM_UPDATE handler
+      - Forwards to correlation engine
+      - Logs sample comments for debugging
       
-      **Documentation:**
-      - /app/VIEWER_DETECTION_FIX_V2.md (comprehensive guide)
+      **4. Claude Prompt Enhancement (server.py)**
+      - New ChatData model (commentCount, chatRate, topKeywords, recentComments)
+      - Enhanced prompt with chat context section
+      - Claude can now reference viewer questions and comments
       
-      **Testing Instructions:**
-      1. Load extension and go to TikTok Live page
-      2. Open DevTools console
-      3. Run: window.__SPIKELY_TEST__()
-      4. OR click "Start Audio" and watch console for [VC:DEBUG] logs
-      5. Verify viewer count shows correctly in side panel (not 0)
+      🎁 **Value Delivered:**
+      
+      **Before:** Claude only saw transcript + viewer count
+      ```json
+      {"emotionalLabel": "topic exhausted", 
+       "nextMove": "Pivot to Q&A. Build excitement"}  // Generic
+      ```
+      
+      **After:** Claude sees what viewers are asking
+      ```json
+      {"emotionalLabel": "song request spike",
+       "nextMove": "Answer 'what song is this'. Name it now"}  // Specific
+      ```
+      
+      📦 **Files Modified:**
+      - /app/frontend/extension/content.js (+600 lines)
+        • Chat config, selectors, detection, parsing
+        • window.__SPIKELY_TEST_CHAT__() test tool
+      
+      - /app/frontend/extension/correlationEngine.js (+150 lines)
+        • addChatStream(), getChatContext(), extractChatKeywords()
+        • Enhanced insight payload with chatData
+      
+      - /app/frontend/extension/background.js (+35 lines)
+        • CHAT_STREAM_UPDATE message handler
+      
+      - /app/backend/server.py (+30 lines)
+        • ChatData model, chatData field, prompt enhancement
+      
+      📚 **Documentation:**
+      - /app/CHAT_STREAM_DETECTION_v1.md (comprehensive technical guide)
+      
+      🧪 **Testing Instructions:**
+      
+      **Quick Test (30 seconds):**
+      1. Go to TikTok Live page
+      2. Open DevTools console (F12)
+      3. Run: window.__SPIKELY_TEST_CHAT__()
+      4. Check if chat container found + comments parsed ✅
+      
+      **Full Test (5 minutes):**
+      1. Load extension → Go to active TikTok Live
+      2. Click "Start Audio" (starts chat tracking)
+      3. Watch console for:
+         [CHAT] 💬 username: comment text
+         [CHAT] 📤 Emitted batch: X comments, rate: Y/min
+         [CHAT:BG:RX] CHAT_STREAM_UPDATE
+         [Correlation] Chat stream updated
+      4. Wait for insight → Check if Claude references chat
+      
+      📊 **Phase 1 Progress:**
+      ✅ Chat Stream Detection (Priority 1) - COMPLETE
+      ❌ Hearts/Gifts Detection (Priority 2) - Not started
+      ❌ Follow Events (Priority 2) - Not started  
+      ❌ Platform Delay Measurement (Priority 3) - Not started
+      ❌ Data Quality Monitoring (Priority 4) - Not started
+      
+      🚀 **Status:** ✅ Ready for manual testing on live TikTok streams
       
       **Next Steps:**
-      - Manual testing on real TikTok Live streams required
-      - User should test with multiple streamers (different viewer counts)
-      - If detection still fails, run test command and share output
-      - This fix unblocks the correlation engine functionality
-      
-      Status: ✅ Ready for manual testing
-      Priority: 🔴 CRITICAL - Core functionality restored
+      - Test chat detection on multiple TikTok streams
+      - Verify insights reference viewer comments
+      - Refine selectors if DOM structure changed
+      - Then move to Priority 2: Hearts/Gifts detection
