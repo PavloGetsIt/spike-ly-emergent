@@ -238,10 +238,7 @@ function queryViewerNode() {
       return element;
     }
   }
-
-  return null;
-}
-
+  
   // Non-TikTok platforms: simple selector sweep
   const selectors = PLATFORM_SELECTORS[platform] || [];
   for (const selector of selectors) {
