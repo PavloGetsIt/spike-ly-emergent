@@ -23,19 +23,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "content_scripts": [{
-    "matches": [
-      "*://*.tiktok.com/*",
-      "*://tiktok.com/*",
-      "*://*.twitch.tv/*",
-      "*://*.kick.com/*",
-      "*://*.youtube.com/*"
-    ],
-    "js": ["content.js"],
-    "run_at": "document_start",
-    "all_frames": true,
-    "match_about_blank": true
-  }],
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
