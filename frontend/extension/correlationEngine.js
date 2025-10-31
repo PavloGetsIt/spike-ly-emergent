@@ -836,6 +836,89 @@ class CorrelationEngine {
     }
   }
 
+  // Add chat stream data to buffer
+  addChatStream(comments, chatRate, timestamp) {
+    // Initialize chat buffer if not exists
+    if (!this.chatBuffer) {
+      this.chatBuffer = [];
+    }
+
+    const now = Date.now();
+
+    // Add comments to buffer
+    comments.forEach(comment => {
+      this.chatBuffer.push({
+        username: comment.username,
+        text: comment.text,
+        timestamp: comment.timestamp
+      });
+    });
+
+    // Keep only last 30 seconds
+    this.chatBuffer = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    // Store chat rate
+    this.lastChatRate = chatRate;
+    this.lastChatUpdate = now;
+
+    console.log(`[Correlation] Chat stream updated: ${comments.length} new comments, rate: ${chatRate}/min, buffer: ${this.chatBuffer.length}`);
+  }
+
+  // Get recent chat context for insights
+  getChatContext() {
+    if (!this.chatBuffer || this.chatBuffer.length === 0) {
+      return {
+        hasChat: false,
+        commentCount: 0,
+        chatRate: 0,
+        recentComments: []
+      };
+    }
+
+    const now = Date.now();
+    const recentComments = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    return {
+      hasChat: true,
+      commentCount: recentComments.length,
+      chatRate: this.lastChatRate || 0,
+      recentComments: recentComments.slice(-10).map(c => ({
+        username: c.username,
+        text: c.text
+      })),
+      topKeywords: this.extractChatKeywords(recentComments)
+    };
+  }
+
+  // Extract common keywords from chat
+  extractChatKeywords(comments) {
+    if (!comments || comments.length === 0) return [];
+
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being']);
+    const wordCounts = {};
+
+    comments.forEach(c => {
+      const words = c.text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w));
+
+      words.forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+    });
+
+    // Sort by frequency and return top 5
+    return Object.entries(wordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word, count]) => ({ word, count }));
+  }
+
   // Handle significant viewer change
   async handleSignificantChange(count, delta, timestamp) {
     const now = Date.now();
