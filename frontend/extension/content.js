@@ -122,29 +122,63 @@ function queryViewerNode() {
   // Reuse if still in DOM
   if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
 
-  // ENHANCED DEBUGGING: Log all potential viewer count elements found
-  console.log('[VC:DEBUG] 🔍 Searching for TikTok viewer count element...');
+  console.log('[VC:DEBUG] 🔍 Starting TikTok viewer count search...');
+  console.log('[VC:DEBUG] 🌐 Current URL:', window.location.href);
   
-  // Find ALL elements that might contain viewer counts
-  const allNumericElements = Array.from(document.querySelectorAll('span, div, p, strong')).filter(el => {
-    const text = el.textContent?.trim() || '';
-    return /^\d{1,6}[KkMm]?$/.test(text) || /^\d{1,3}(,\d{3})*$/.test(text);
-  });
-  
-  console.log('[VC:DEBUG] 📊 Found', allNumericElements.length, 'numeric elements on page');
-  
-  // Log each element with context
-  allNumericElements.forEach((el, index) => {
-    const text = el.textContent?.trim();
-    const parsed = normalizeAndParse(el);
-    const context = el.parentElement?.textContent?.toLowerCase() || '';
-    const hasViewerContext = context.includes('viewer') || context.includes('watching') || context.includes('eye');
-    
-    console.log(`[VC:DEBUG] Element ${index + 1}: "${text}" → ${parsed} | Context: ${hasViewerContext ? 'HAS viewer context' : 'NO context'} | "${context.substring(0, 50)}"`);
-  });
-
-  // TikTok-specific 3-tier selector strategy
   if (platform === 'tiktok') {
+    
+    // EMERGENCY FIX: Direct search for "Viewers • X.XK" pattern
+    console.log('[VC:DEBUG] 🎯 Emergency: Searching for "Viewers • X.XK" pattern...');
+    
+    const allElements = Array.from(document.querySelectorAll('*'));
+    for (const element of allElements) {
+      const text = element.textContent?.trim() || '';
+      
+      // Look for "Viewers • 2.1K" or similar patterns
+      if (text.includes('Viewers') && text.includes('•')) {
+        console.log('[VC:DEBUG] 🎯 Found "Viewers •" element:', text);
+        
+        // Extract the number part after the bullet
+        const match = text.match(/Viewers\s*•\s*([\d\.]+[KkMm]?)/i);
+        if (match) {
+          const countText = match[1];
+          const parsed = normalizeAndParse(countText);
+          
+          console.log('[VC:DEBUG] ✅ EMERGENCY SUCCESS: Found viewer count via "Viewers •":', countText, '→', parsed);
+          
+          if (parsed > 0) {
+            // Create a virtual element to return
+            const virtualElement = { 
+              textContent: countText,
+              innerHTML: countText,
+              classList: { contains: () => false }
+            };
+            
+            cachedViewerEl = virtualElement;
+            return virtualElement;
+          }
+        }
+      }
+      
+      // Also check for standalone "2.1K" numbers with viewer context
+      if (/^\d+\.?\d*[KkMm]?$/.test(text) && text.length <= 6) {
+        const parentText = element.parentElement?.textContent?.toLowerCase() || '';
+        if (parentText.includes('viewer') || parentText.includes('watching') || 
+            element.previousElementSibling?.textContent?.toLowerCase().includes('viewer')) {
+          
+          const parsed = normalizeAndParse(text);
+          console.log('[VC:DEBUG] 📊 Found potential viewer count:', text, '→', parsed, '| Context:', parentText.substring(0, 50));
+          
+          if (parsed > 1000) { // Prioritize high counts
+            console.log('[VC:DEBUG] ✅ EMERGENCY SUCCESS: High count with viewer context');
+            cachedViewerEl = element;
+            return element;
+          }
+        }
+      }
+    }
+    
+    console.log('[VC:DEBUG] ❌ Emergency search failed, trying original method...');
     // Tier 1: Label-driven lookup (find "Viewers" text)
     const labels = Array.from(document.querySelectorAll('div,span,strong,p')).filter(
       el => el.textContent && el.textContent.trim().toLowerCase() === 'viewers'
