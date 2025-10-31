@@ -146,12 +146,36 @@ function queryViewerNode() {
   // Reuse if still in DOM
   if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
 
+  // ENHANCED DEBUGGING: Log all potential viewer count elements found
+  console.log('[VC:DEBUG] 🔍 Searching for TikTok viewer count element...');
+  
+  // Find ALL elements that might contain viewer counts
+  const allNumericElements = Array.from(document.querySelectorAll('span, div, p, strong')).filter(el => {
+    const text = el.textContent?.trim() || '';
+    return /^\d{1,6}[KkMm]?$/.test(text) || /^\d{1,3}(,\d{3})*$/.test(text);
+  });
+  
+  console.log('[VC:DEBUG] 📊 Found', allNumericElements.length, 'numeric elements on page');
+  
+  // Log each element with context
+  allNumericElements.forEach((el, index) => {
+    const text = el.textContent?.trim();
+    const parsed = normalizeAndParse(el);
+    const context = el.parentElement?.textContent?.toLowerCase() || '';
+    const hasViewerContext = context.includes('viewer') || context.includes('watching') || context.includes('eye');
+    
+    console.log(`[VC:DEBUG] Element ${index + 1}: "${text}" → ${parsed} | Context: ${hasViewerContext ? 'HAS viewer context' : 'NO context'} | "${context.substring(0, 50)}"`);
+  });
+
   // TikTok-specific 3-tier selector strategy
   if (platform === 'tiktok') {
     // Tier 1: Label-driven lookup (find "Viewers" text)
     const labels = Array.from(document.querySelectorAll('div,span,strong,p')).filter(
       el => el.textContent && el.textContent.trim().toLowerCase() === 'viewers'
     );
+    
+    console.log('[VC:DEBUG] 🏷️ Found', labels.length, '"Viewers" labels');
+    
     for (const label of labels) {
       const parent = label.parentElement || label.closest('div,section,li');
       const digitContainer = parent?.querySelector('div:has(> span.inline-flex.justify-center)')
@@ -160,6 +184,7 @@ function queryViewerNode() {
       if (digitContainer) {
         const parsed = normalizeAndParse(digitContainer);
         if (parsed !== null && parsed > 0) {
+          console.log('[VC:DEBUG] ✅ TIER 1 SUCCESS: Found via label, count =', parsed);
           console.debug('[TT:SEL] ✓ Tier 1: Label-driven match');
           cachedViewerEl = digitContainer;
           cachedContainer = digitContainer.closest('div,section,header') || document.body;
