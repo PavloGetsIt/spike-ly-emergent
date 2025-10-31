@@ -6,10 +6,19 @@
   console.log('[SPIKELY] User agent:', navigator.userAgent.substring(0, 100));
   
   try {
-    if (window.__SPIKELY_CONTENT_ACTIVE__) {
-      console.warn('[Spikely] ⚠️ Content script already initialized - skipping reinjection');
+    // Check if already fully initialized (has both flag AND functions)
+    const hasFlag = !!window.__SPIKELY_CONTENT_ACTIVE__;
+    const hasFunctions = typeof window.__SPIKELY_TEST__ === 'function';
+    
+    if (hasFlag && hasFunctions) {
+      console.warn('[Spikely] ⚠️ Content script already fully initialized - skipping reinjection');
       return;
     }
+    
+    if (hasFlag && !hasFunctions) {
+      console.warn('[Spikely] ⚠️ Flag set but functions missing - forcing re-initialization');
+    }
+    
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
     console.log('[Spikely] ✅ Marking script as active');
   } catch (e) {
