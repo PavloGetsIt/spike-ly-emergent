@@ -1,11 +1,19 @@
 (function(){
+  // CRITICAL: Log immediately to verify script is loading
+  console.log('🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀');
+  console.log('[SPIKELY] URL:', window.location.href);
+  console.log('[SPIKELY] Timestamp:', new Date().toISOString());
+  
   try {
     if (window.__SPIKELY_CONTENT_ACTIVE__) {
-      console.log('[Spikely] Content script already initialized - skipping reinjection');
+      console.warn('[Spikely] ⚠️ Content script already initialized - skipping reinjection');
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
-  } catch (_) {}
+    console.log('[Spikely] ✅ Marking script as active');
+  } catch (e) {
+    console.error('[Spikely] ❌ Error in initialization:', e);
+  }
 
 // ============================================================================
 // TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
