@@ -1058,7 +1058,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 2.0.6-ROLLBACK (Stable)');
+console.log('[Spikely] Content script loaded - Version 2.1.0-ENHANCED-DETECTION');
+console.log('[Spikely] 🧪 To manually test viewer detection, run: window.__SPIKELY_TEST__()');
+
+// Expose manual testing function
+window.__SPIKELY_TEST__ = function() {
+  console.log('='.repeat(60));
+  console.log('🧪 SPIKELY MANUAL VIEWER DETECTION TEST');
+  console.log('='.repeat(60));
+  
+  const node = queryViewerNode();
+  
+  if (node) {
+    const parsed = normalizeAndParse(node);
+    console.log('✅ SUCCESS! Found viewer count element');
+    console.log('   Text content:', node.textContent?.substring(0, 100));
+    console.log('   Parsed value:', parsed);
+    console.log('   Element classes:', node.className || '(none)');
+    console.log('   Parent classes:', node.parentElement?.className || '(none)');
+    console.log('   Cached:', cachedViewerEl === node);
+    
+    // Try to trigger an update
+    if (parsed !== null) {
+      console.log('\n📤 Sending test message to background script...');
+      safeSendMessage({
+        type: 'VIEWER_COUNT_UPDATE',
+        platform,
+        count: parsed,
+        delta: 0,
+        timestamp: Date.now(),
+        source: 'manual_test'
+      });
+      console.log('   Message sent!');
+    }
+  } else {
+    console.log('❌ FAILED - No viewer count element found');
+    console.log('\n🔍 Debugging info:');
+    console.log('   Platform:', platform);
+    console.log('   URL:', window.location.href);
+    console.log('   Is tracking:', isTracking);
+    
+    console.log('\n💡 Suggestions:');
+    console.log('   1. Make sure you\'re on a TikTok Live page');
+    console.log('   2. Open DevTools and inspect the viewer count element');
+    console.log('   3. Look for a number like "2.1K" near the text "Viewers"');
+    console.log('   4. Check the console logs above for detailed search results');
+  }
+  
+  console.log('='.repeat(60));
+  return node;
+};
 
 // Run parser validation tests
 validateParserFix();
