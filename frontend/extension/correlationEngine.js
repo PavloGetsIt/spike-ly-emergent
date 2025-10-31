@@ -1006,7 +1006,7 @@ class CorrelationEngine {
       console.log('[Correlation] Analyzing tone with Hume AI via FastAPI...');
       
       // Call FastAPI backend instead of Supabase
-      const response = await fetch('https://project-continuity-5.preview.emergentagent.com/api/analyze-emotion', {
+      const response = await fetch('https://live-assistant-2.preview.emergentagent.com/api/analyze-emotion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1279,7 +1279,7 @@ class CorrelationEngine {
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
-          url: 'https://project-continuity-5.preview.emergentagent.com/api/generate-insight',
+          url: 'https://live-assistant-2.preview.emergentagent.com/api/generate-insight',
           payloadSize: JSON.stringify(payload).length,
           transcriptPreview: sanitizedTranscript,
           delta: payload.viewerDelta,
@@ -1295,7 +1295,7 @@ class CorrelationEngine {
         }, AI_MAX_LATENCY_MS);
 
         const aiStartTime = performance.now();
-        const backendUrl = 'https://project-continuity-5.preview.emergentagent.com/api/generate-insight';
+        const backendUrl = 'https://live-assistant-2.preview.emergentagent.com/api/generate-insight';
         const response = await fetch(backendUrl, {
           method: 'POST',
           headers: {

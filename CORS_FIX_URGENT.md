@@ -6,7 +6,7 @@
 
 User reported zero insights appearing in UI with CORS errors in console:
 ```
-Access to fetch at 'https://project-continuity-5.preview.emergentagent.com/api/generate-insight' 
+Access to fetch at 'https://live-assistant-2.preview.emergentagent.com/api/generate-insight' 
 from origin 'chrome-extension://...' has been blocked by CORS policy: 
 Response to preflight request doesn't pass access control check: 
 No 'Access-Control-Allow-Origin' header is present on the requested resource.
@@ -166,7 +166,7 @@ INFO:     10.64.130.103:57372 - "POST /api/generate-insight HTTP/1.1" 200 OK
 If issues persist:
 1. Check backend status: `sudo supervisorctl status backend`
 2. Check backend logs: `tail -n 100 /var/log/supervisor/backend.err.log`
-3. Verify CORS: `curl -v https://project-continuity-5.preview.emergentagent.com/api/generate-insight`
+3. Verify CORS: `curl -v https://live-assistant-2.preview.emergentagent.com/api/generate-insight`
 
 ## Status
 
