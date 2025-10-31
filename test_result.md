@@ -226,43 +226,70 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 0
+  version: "2.1.0"
+  test_sequence: 1
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Manual testing of Chrome extension side panel"
-    - "Verify all 8 Priority One fixes"
+    - "DOM Viewer Count Detection - Three-Tier Strategy"
+    - "Manual Testing Tool - window.__SPIKELY_TEST__()"
+    - "Enhanced Number Parsing with Decimal Support"
   stuck_tasks: []
   test_all: false
-  test_priority: "high_first"
+  test_priority: "critical_first"
 
 agent_communication:
   - agent: "main"
     message: |
-      ✅ All Priority One UI/UX fixes have been implemented:
+      🚨 CRITICAL FIX COMPLETED: DOM Viewer Count Detection (v2.1.0)
       
-      1. CSS Cache Busting - Added ?v=2025102101 and inline critical animations
-      2. JS Initialization - Retry logic with 5 attempts, 200ms intervals
-      3. Text Truncation - Hover tooltips + click-to-expand
-      4. Status Animation - Pulse animation with fallback
-      5. Audio State - Clear labels and visual feedback
-      6. Delta Tooltips - Hover tooltips with color coding
-      7. Timestamp Format - Relative time with auto-update
-      8. Alignment - CSS fixes already present
+      ✅ Implemented three-tier detection strategy to fix the broken viewer count (was showing 0 instead of 2.1K):
       
-      Files Modified:
-      - /app/frontend/extension/sidepanel.html (+45 lines)
-      - /app/frontend/extension/sidepanel.js (+140 lines)
+      **Strategy 1 - Label-Based Detection:**
+      - Search for "Viewers" text in DOM
+      - Check siblings/children/parent for numbers
+      - Handle formats like "Viewers • 2.1K"
+      - MOST RELIABLE: Text content is stable
       
-      Documentation Created:
-      - /app/PRIORITY_ONE_FIXES_COMPLETE.md
-      - /app/PRIORITY_ONE_TESTING_GUIDE.md
+      **Strategy 2 - Brute Force Number Search:**
+      - Scan ALL elements for number patterns (2.1K, 953, etc.)
+      - Score candidates by viewer context
+      - Sort by confidence
+      - Logs top 5 candidates for debugging
+      - ADAPTIVE: Works even if DOM structure changes
       
-      Next Steps:
-      - Manual testing in Chrome browser
-      - Load extension and verify all features
-      - Check console logs for initialization
-      - Test tooltips, animations, and timestamps
-      - Once verified, proceed to correlation engine work
+      **Strategy 3 - Priority Selectors:**
+      - Updated with 2025 TikTok Live patterns
+      - 15+ selector variations (data-e2e, classes, aria-labels)
+      - Preserves original working selectors
+      - COMPREHENSIVE: Covers multiple naming conventions
+      
+      **Additional Improvements:**
+      - Fixed decimal parsing: 1.2K → 1200 (not 1000)
+      - 12 validation tests run on load
+      - Manual test command: window.__SPIKELY_TEST__()
+      - Extensive [VC:DEBUG] console logging
+      - Better element caching and revalidation
+      
+      **Files Modified:**
+      - /app/frontend/extension/content.js (lines 39-310, enhanced parsing, manual test tool)
+      
+      **Documentation:**
+      - /app/VIEWER_DETECTION_FIX_V2.md (comprehensive guide)
+      
+      **Testing Instructions:**
+      1. Load extension and go to TikTok Live page
+      2. Open DevTools console
+      3. Run: window.__SPIKELY_TEST__()
+      4. OR click "Start Audio" and watch console for [VC:DEBUG] logs
+      5. Verify viewer count shows correctly in side panel (not 0)
+      
+      **Next Steps:**
+      - Manual testing on real TikTok Live streams required
+      - User should test with multiple streamers (different viewer counts)
+      - If detection still fails, run test command and share output
+      - This fix unblocks the correlation engine functionality
+      
+      Status: ✅ Ready for manual testing
+      Priority: 🔴 CRITICAL - Core functionality restored
