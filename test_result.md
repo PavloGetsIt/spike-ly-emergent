@@ -103,28 +103,41 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Spikely Chrome Extension - DOM Viewer Count Detection Fix
+  Spikely Chrome Extension - Phase 1 Signal Enhancement: Chat Stream Detection
   
-  CRITICAL ISSUE: The viewer count detection was broken, showing 0 instead of actual counts (e.g., 2.1K).
-  This is the highest priority issue as it blocks the core correlation engine functionality.
+  GOAL: Implement the most critical engagement signal (chat comments) to enable accurate 
+  action→outcome correlation. This is Priority 1 of the Signal Enhancement roadmap.
   
-  ROOT CAUSE: TikTok frequently changes its DOM structure and CSS classes. Previous detection methods
-  were too rigid and relied on specific selectors that became outdated.
+  FEATURE IMPLEMENTED: Real-time TikTok Live chat stream detection and analysis
   
-  SOLUTION IMPLEMENTED: Three-tier robust detection strategy
-  1. Label-based detection (search for "Viewers" text and find associated numbers)
-  2. Brute force number search (scan all elements, prioritize by context)
-  3. Priority selectors (updated with 2025 patterns + legacy support)
+  CORE FUNCTIONALITY:
+  - MutationObserver-based chat tracking (watches for new comments in DOM)
+  - 30-second rolling buffer of comments (username, text, timestamp)
+  - Duplicate filtering and efficient batching (2s intervals)
+  - Chat rate calculation (comments per minute)
+  - Keyword extraction from chat content
+  - Integration with correlation engine and Claude AI
   
-  ENHANCEMENTS:
-  - Extensive console debugging with [VC:DEBUG] prefix
-  - Manual test command: window.__SPIKELY_TEST__()
-  - Improved decimal parsing (1.2K → 1200 not 2000)
-  - Validation tests on load (12 test cases)
-  - Better element caching and revalidation
+  DATA CAPTURED:
+  - Comment text (full message)
+  - Username (who posted)
+  - Timestamp (millisecond precision)
+  - Chat rate (comments/min)
+  - Top keywords (frequency analysis)
   
-  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS
-  Priority: CRITICAL - Without this, correlation engine cannot work
+  INTEGRATION POINTS:
+  1. content.js - DOM observation and parsing
+  2. background.js - Message routing
+  3. correlationEngine.js - Buffer management and context extraction
+  4. server.py - Claude prompt enhancement with chat data
+  
+  VALUE: Claude can now reference specific viewer questions and comments in insights:
+  - "Answer 'what song is this'. Name it now"
+  - "Shoutout user789 for fire comment"
+  - "Read top chat question. Respond big"
+  
+  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, FastAPI backend
+  Priority: CRITICAL - Most important single engagement signal
 
 frontend:
   - task: "DOM Viewer Count Detection - Three-Tier Strategy"
