@@ -193,20 +193,32 @@ function queryViewerNode() {
       }
     }
 
-    // Tier 2: Priority selector sweep
+    // Tier 2: Priority selector sweep (ENHANCED with debugging)
     const selectors = PLATFORM_SELECTORS[platform] || [];
+    console.log('[VC:DEBUG] 🎯 Trying', selectors.length, 'priority selectors...');
+    
     for (let i = 0; i < selectors.length; i++) {
-      const element = document.querySelector(selectors[i]);
+      const selector = selectors[i];
+      const element = document.querySelector(selector);
+      
       if (element && element.textContent?.trim()) {
+        const text = element.textContent.trim();
         const parsed = normalizeAndParse(element);
+        console.log(`[VC:DEBUG] Selector ${i + 1}/${selectors.length}: "${selector}" → Element: "${text}" → Parsed: ${parsed}`);
+        
         if (parsed !== null && parsed > 0) {
+          console.log('[VC:DEBUG] ✅ TIER 2 SUCCESS: Found via selector', i + 1, 'count =', parsed);
           console.debug(`[TT:SEL] ✓ Tier 2: Selector[${i}] matched`);
           cachedViewerEl = element;
           cachedContainer = element.closest('div,section,header') || document.body;
           return element;
         }
+      } else {
+        console.log(`[VC:DEBUG] Selector ${i + 1}/${selectors.length}: "${selector}" → NOT FOUND`);
       }
     }
+    
+    console.log('[VC:DEBUG] ❌ All priority selectors failed, trying heuristics...');
 
     // Tier 3: Heuristic fallback (numeric node near eye icon)
     const candidates = document.querySelectorAll('span, div, p, strong');
