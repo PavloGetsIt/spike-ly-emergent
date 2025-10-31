@@ -1,5 +1,91 @@
-console.log('🚨 BACKGROUND TEST: background.js file executing BEFORE imports');
-console.log('🚨 TIMESTAMP:', new Date().toISOString());
+// ==================== PROGRAMMATIC CONTENT SCRIPT INJECTION ====================
+// Since manifest content_scripts are being blocked, inject programmatically
+
+async function injectContentScript(tabId) {
+  try {
+    console.log('[BG] 🚀 Injecting content script into tab:', tabId);
+    
+    // Inject the content script programmatically
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: function() {
+        // INLINE CONTENT SCRIPT - Minimal viewer detection
+        console.log('%c🚀🚀🚀 [SPIKELY] PROGRAMMATIC INJECTION SUCCESS! 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 16px');
+        console.log('[SPIKELY] URL:', window.location.href);
+        console.log('[SPIKELY] Timestamp:', new Date().toISOString());
+        
+        // Set flag
+        window.__SPIKELY_CONTENT_ACTIVE__ = true;
+        
+        // Platform detection
+        const platform = window.location.hostname.includes('tiktok') ? 'tiktok' : 'unknown';
+        console.log('[SPIKELY] Platform detected:', platform);
+        
+        // Simple test functions
+        window.__SPIKELY_TEST__ = function() {
+          console.log('🧪 PROGRAMMATIC TEST EXECUTED!');
+          return 'SUCCESS_PROGRAMMATIC';
+        };
+        
+        window.__SPIKELY_TEST_CHAT__ = function() {
+          console.log('💬 PROGRAMMATIC CHAT TEST EXECUTED!');
+          return 'CHAT_SUCCESS_PROGRAMMATIC';
+        };
+        
+        // Simple viewer detection function
+        window.__SPIKELY_FIND_VIEWERS__ = function() {
+          const allElements = Array.from(document.querySelectorAll('*'));
+          for (const element of allElements) {
+            const text = element.textContent?.trim() || '';
+            if (text.includes('Viewers') && /\d+[\.\d]*[KkMm]?/.test(text)) {
+              console.log('📊 Found viewer element:', text);
+              return text;
+            }
+          }
+          console.log('❌ No viewer element found');
+          return null;
+        };
+        
+        console.log('✅ [SPIKELY] Programmatic injection complete!');
+        console.log('🧪 Test with: window.__SPIKELY_TEST__()');
+        console.log('💬 Test chat: window.__SPIKELY_TEST_CHAT__()'); 
+        console.log('📊 Find viewers: window.__SPIKELY_FIND_VIEWERS__()');
+      }
+    });
+    
+    console.log('[BG] ✅ Content script injected successfully');
+    return true;
+  } catch (error) {
+    console.error('[BG] ❌ Failed to inject content script:', error);
+    return false;
+  }
+}
+
+// Inject content script when side panel opens
+chrome.sidePanel.onChanged.addListener(async (details) => {
+  if (details.opened) {
+    console.log('[BG] 📂 Side panel opened, injecting content script...');
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.url.includes('tiktok.com')) {
+      await injectContentScript(tab.id);
+    }
+  }
+});
+
+// Also inject when tracking starts
+async function injectAndStartTracking() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab && tab.url.includes('tiktok.com')) {
+    const success = await injectContentScript(tab.id);
+    if (success) {
+      console.log('[BG] ✅ Content script ready, starting tracking...');
+      // Add small delay to ensure script is fully loaded
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tab.id, { type: 'START_TRACKING' });
+      }, 500);
+    }
+  }
+}
 
 import { audioCaptureManager } from './audioCapture.js';
 import { correlationEngine } from './correlationEngine.js';
