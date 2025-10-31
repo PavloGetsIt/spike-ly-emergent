@@ -91,6 +91,12 @@ class HistoryItem(BaseModel):
     delta: int
     emotion: Optional[str] = None
 
+class ChatData(BaseModel):
+    commentCount: int
+    chatRate: int
+    topKeywords: Optional[List[str]] = None
+    recentComments: Optional[List[str]] = None
+
 class InsightRequest(BaseModel):
     transcript: str
     viewerDelta: int
@@ -108,6 +114,8 @@ class InsightRequest(BaseModel):
     winningTopics: Optional[List[str]] = None
     transcriptQuality: Optional[str] = None
     uniqueWordRatio: Optional[float] = None
+    # Chat stream data
+    chatData: Optional[ChatData] = None
 
 class InsightResponse(BaseModel):
     emotionalLabel: str
