@@ -495,6 +495,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         console.debug('[AUDIO:BG:START]', { tabId, url: url.substring(0, 50) });
         
+        // STEP 0: Inject content script first (since manifest injection fails)
+        console.log('[AUDIO:BG] 💉 Injecting content script before audio capture...');
+        await injectContentScript(tabId);
+        
         // Step 2: Validate supported platform
         const isSupported = /^(https?:)/.test(url) && /(tiktok\.com|twitch\.tv|kick\.com|youtube\.com)/.test(url);
         
