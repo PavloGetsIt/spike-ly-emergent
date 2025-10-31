@@ -293,6 +293,22 @@ Return ONLY valid JSON. No markdown, no explanations."""
             if request.uniqueWordRatio:
                 quality_indicator += f" (word variety: {request.uniqueWordRatio:.0%})"
         
+        # Chat context
+        chat_context_str = ""
+        if request.chatData:
+            chat_context_str = f"\n💬 LIVE CHAT CONTEXT:\n"
+            chat_context_str += f"- Comments: {request.chatData.commentCount} in last 30s\n"
+            chat_context_str += f"- Chat rate: {request.chatData.chatRate}/min\n"
+            
+            if request.chatData.topKeywords and len(request.chatData.topKeywords) > 0:
+                chat_context_str += f"- Top chat keywords: {', '.join(request.chatData.topKeywords)}\n"
+            
+            if request.chatData.recentComments and len(request.chatData.recentComments) > 0:
+                chat_context_str += f"- Recent comments:\n"
+                for comment in request.chatData.recentComments[-3:]:  # Show last 3
+                    chat_context_str += f"  • {comment}\n"
+                chat_context_str += "\n💡 Use chat context: Reference specific viewer questions, respond to comments, or acknowledge engagement"
+        
         # Create user prompt with enriched context
         user_prompt = f"""LIVE STREAM DATA:
 
