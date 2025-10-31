@@ -1039,17 +1039,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       resetTracking();
     } else {
       startTracking();
+      // Also start chat tracking
+      startChatTracking();
     }
-    console.debug('[VC:CT:ACK] STARTED', { platform, isTracking: true });
-    sendResponse({ type: 'ACK_START', platform, isTracking: true });
+    console.debug('[VC:CT:ACK] STARTED', { platform, isTracking: true, isChatTracking: true });
+    sendResponse({ type: 'ACK_START', platform, isTracking: true, isChatTracking: true });
   } else if (message.type === 'STOP_TRACKING') {
     stopTracking();
+    stopChatTracking();
     sendResponse({ success: true });
   } else if (message.type === 'RESET_TRACKING') {
     resetTracking();
+    stopChatTracking();
     sendResponse({ success: true, platform });
   } else if (message.type === 'GET_STATUS') {
-    sendResponse({ isTracking, platform, currentCount: currentViewerCount });
+    sendResponse({ 
+      isTracking, 
+      isChatTracking,
+      platform, 
+      currentCount: currentViewerCount,
+      chatBufferSize: chatBuffer.length
+    });
   } else if (message.type === 'PING') {
     console.debug('[VC:CT:ACK] PONG', { platform });
     sendResponse({ type: 'PONG', platform, isReady: true });
