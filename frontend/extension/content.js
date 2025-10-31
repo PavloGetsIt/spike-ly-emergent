@@ -35,19 +35,35 @@ function detectPlatform() {
   return 'unknown';
 }
 
-// Platform-specific selectors (SIMPLIFIED - back to working basics)
+// Platform-specific selectors (COMPREHENSIVE 2025 UPDATE)
 const PLATFORM_SELECTORS = {
   tiktok: [
-    // Target the "Viewers • 2.1K" format specifically
-    '*:has-text("Viewers")',
-    '[class*="viewer"]',
+    // 2025 TikTok Live selectors (most common patterns)
+    '[data-e2e="live-viewer-count"]',
     '[data-e2e*="viewer"]',
-    '.P4-Regular.text-UIText3', // Original working selector
-    'div:has(> span.inline-flex.justify-center)', // Original working selector
+    '[class*="LiveViewerCount"]',
+    '[class*="ViewerCount"]',
+    '[class*="live-viewer"]',
+    '[class*="viewer-count"]',
+    
+    // Original working selectors
+    '.P4-Regular.text-UIText3',
+    'div:has(> span.inline-flex.justify-center)',
+    
+    // Generic class-based patterns
+    '[class*="viewer"]',
+    '[class*="Viewer"]',
+    
+    // Aria labels for accessibility
+    '[aria-label*="viewer"]',
+    '[aria-label*="Viewer"]',
+    
+    // Role-based selectors
+    '[role="status"]:has-text(/\d+[KkMm]?/)',
     
     // Generic fallbacks
-    'span:has-text(/^\d+\.?\d*[KM]?$/)',
-    'div:has-text(/^\d+\.?\d*[KM]?$/)'
+    'span:has-text(/^\d+\.?\d*[KkMm]?$/)',
+    'div:has-text(/^\d+\.?\d*[KkMm]?$/)'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
