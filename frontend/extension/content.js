@@ -1,8 +1,9 @@
 (function(){
-  // CRITICAL: Log immediately to verify script is loading
-  console.log('🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀');
+  // IMMEDIATE LOAD CHECK - This should appear in console immediately
+  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 14px');
   console.log('[SPIKELY] URL:', window.location.href);
   console.log('[SPIKELY] Timestamp:', new Date().toISOString());
+  console.log('[SPIKELY] User agent:', navigator.userAgent.substring(0, 100));
   
   try {
     if (window.__SPIKELY_CONTENT_ACTIVE__) {
