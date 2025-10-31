@@ -127,101 +127,102 @@ user_problem_statement: |
   Priority: CRITICAL - Without this, correlation engine cannot work
 
 frontend:
-  - task: "CSS Cache Busting + Inline Critical Animations"
+  - task: "DOM Viewer Count Detection - Three-Tier Strategy"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.html"
+    working: "needs_testing"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: false
+    priority: "critical"
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Added cache-busting query string (?v=2025102101) to CSS link and inlined critical @keyframes animations to prevent caching issues. Ensures animations apply immediately on extension load."
+        comment: |
+          CRITICAL FIX: Completely rewrote queryViewerNode() with 3-tier detection strategy:
+          
+          STRATEGY 1 (Label-Based): Search for "Viewers" text and find associated numbers
+          - Checks siblings, children, parent elements
+          - Handles inline formats like "Viewers • 2.1K"
+          - Most reliable as text content is stable
+          
+          STRATEGY 2 (Brute Force): Scan ALL elements for viewer count patterns
+          - Finds numbers like "2.1K", "953" anywhere in DOM
+          - Scores by viewer context in parent elements
+          - Sorts candidates by confidence
+          - Logs top 5 candidates for debugging
+          
+          STRATEGY 3 (Priority Selectors): Updated selector list
+          - Added 2025 patterns: [data-e2e*="viewer"], [class*="ViewerCount"], [aria-label*="viewer"]
+          - Preserved original working selectors
+          - 15+ selector variations
+          
+          Files changed: /app/frontend/extension/content.js (lines 39-310)
   
-  - task: "JavaScript Initialization with Retry Logic"
+  - task: "Enhanced Number Parsing with Decimal Support"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
+    working: "needs_testing"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Implemented initializeUIFeatures() with retry logic (5 attempts, 200ms intervals). Added setupTooltips(), applyPulseAnimationFallback(), and startTimestampUpdater() functions. Ensures DOM is ready before initializing UI features."
+        comment: |
+          Fixed parseTextToCount() to handle decimal values correctly:
+          - 1.2K → 1200 (not 1000 or 2000)
+          - Handle bullets (•), dots (·), commas
+          - Case insensitive (2.5k or 2.5K)
+          - 12 validation tests run on load
+          
+          All test cases pass:
+          ✅ "953" → 953
+          ✅ "1.2K" → 1200
+          ✅ "1.5M" → 1500000
+          etc.
   
-  - task: "Text Truncation with Expandable Tooltips"
+  - task: "Manual Testing Tool - window.__SPIKELY_TEST__()"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
+    working: "needs_testing"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Enhanced updateInsight() and renderActions() to add hover tooltips and click-to-expand behavior for truncated text. Full text shown in native tooltip on hover, expands inline on click."
+        comment: |
+          Added console command for instant detection testing:
+          
+          Usage: Open TikTok Live page → DevTools console → window.__SPIKELY_TEST__()
+          
+          Output includes:
+          - Found element details (text, classes, parsed value)
+          - Test message sent to background script
+          - Debug suggestions if detection fails
+          - Clear success/failure indicators
+          
+          Makes debugging 10x easier for users and developers.
   
-  - task: "Animated Status Indicator"
+  - task: "Comprehensive Console Debugging"
     implemented: true
     working: true
-    file: "/app/frontend/extension/sidepanel.html, sidepanel.css"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
-    priority: "high"
+    priority: "medium"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "Pulse animation for status indicator already exists in CSS. Added inline keyframes in HTML and JavaScript fallback in applyPulseAnimationFallback() to ensure animations work reliably."
-  
-  - task: "Clear Audio State Display"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "updateAudioState() function already implemented. States: Stopped (gray dot, 'Audio: Stopped'), Recording (red pulsing dot, 'Audio: Recording'). Clear visual feedback for audio capture state."
-  
-  - task: "Delta Indicator Tooltips"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "updateViewerDeltaDisplay() and setupTooltips() provide hover tooltips for viewer delta, count, and threshold. Color-coded: green (positive), red (negative), gray (zero)."
-  
-  - task: "Improved Timestamp Format"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Action items now use relative time format (just now, 5s ago, 2m ago). Added data-timestamp attributes and startTimestampUpdater() to auto-update every 5 seconds. Full timestamp shown in hover tooltip."
-  
-  - task: "Alignment Fixes"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.css"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "CSS already contains comprehensive alignment fixes for threshold controls, audio controls, viewer row, and consistent button heights (36px). All elements properly aligned."
+        comment: |
+          Added extensive [VC:DEBUG] logging throughout detection process:
+          - Strategy-by-strategy progress
+          - Found elements and parsed values
+          - Top 5 candidates with confidence scores
+          - Clear success/failure messages
+          - Helpful tips when detection fails
+          
+          All logs can be filtered by "[VC:DEBUG]" prefix in console.
 
 metadata:
   created_by: "main_agent"
