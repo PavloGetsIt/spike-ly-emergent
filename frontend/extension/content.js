@@ -424,64 +424,6 @@ function parseViewerCount(textOrElement) {
   const result = normalizeAndParse(textOrElement);
   return result !== null ? result : 0;
 }
-        }
-      }
-    }
-
-    // Tier 2: Priority selector sweep
-    const selectors = PLATFORM_SELECTORS[platform] || [];
-    console.log('[VC:DEBUG] 🎯 Trying', selectors.length, 'priority selectors...');
-    
-    for (let i = 0; i < selectors.length; i++) {
-      const selector = selectors[i];
-      const element = document.querySelector(selector);
-      
-      if (element && element.textContent?.trim()) {
-        const text = element.textContent.trim();
-        const parsed = normalizeAndParse(element);
-        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → "${text}" → ${parsed}`);
-        
-        if (parsed !== null && parsed > 0) {
-          console.log('[VC:DEBUG] ✅ TIER 2 SUCCESS: Found via selector', i + 1, 'count =', parsed);
-          cachedViewerEl = element;
-          return element;
-        }
-      } else {
-        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → NOT FOUND`);
-      }
-    }
-
-    console.log('[VC:DEBUG] ❌ All methods failed - no viewer count found');
-    return null;
-  }
-
-  // Non-TikTok platforms: simple selector sweep
-  const selectors = PLATFORM_SELECTORS[platform] || [];
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element && element.textContent?.trim()) {
-      cachedViewerEl = element;
-      return element;
-    }
-  }
-  
-  // Non-TikTok platforms: simple selector sweep
-  const platformSelectors = PLATFORM_SELECTORS[platform] || [];
-  for (const selector of platformSelectors) {
-    const element = document.querySelector(selector);
-    if (element && element.textContent?.trim()) {
-      cachedViewerEl = element;
-      return element;
-    }
-  }
-
-  return null;
-}
-
-// Legacy alias for non-TikTok platforms
-function findViewerElement() {
-  return queryViewerNode();
-}
 
 
 // ============================================================================
