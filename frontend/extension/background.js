@@ -499,7 +499,75 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log('[AUDIO:BG] 💉 Injecting content script before audio capture...');
         await injectContentScript(tabId);
         
-        // Step 2: Validate supported platform
+        // STEP 0: Ensure content script is injected (with fallback)
+        console.log('[AUDIO:BG] 💉 Ensuring content script is injected...');
+        
+        // First, try to ping existing content script
+        let contentScriptReady = false;
+        try {
+          const pingResponse = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(response);
+              }
+            });
+            // Timeout after 1 second
+            setTimeout(() => reject(new Error('Ping timeout')), 1000);
+          });
+          
+          if (pingResponse?.type === 'PONG') {
+            console.log('[AUDIO:BG] ✅ Content script already active');
+            contentScriptReady = true;
+          }
+        } catch (pingError) {
+          console.log('[AUDIO:BG] ⚠️ Content script not responding, injecting...', pingError.message);
+        }
+        
+        // If content script not ready, inject it programmatically
+        if (!contentScriptReady) {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['content.js']
+            });
+            console.log('[AUDIO:BG] ✅ Content script injected successfully');
+            
+            // Wait for content script to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Verify injection worked by pinging again
+            try {
+              const verifyResponse = await new Promise((resolve, reject) => {
+                chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
+                  if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                  } else {
+                    resolve(response);
+                  }
+                });
+                setTimeout(() => reject(new Error('Verify timeout')), 1000);
+              });
+              
+              if (verifyResponse?.type === 'PONG') {
+                console.log('[AUDIO:BG] ✅ Content script injection verified');
+                contentScriptReady = true;
+              }
+            } catch (verifyError) {
+              console.warn('[AUDIO:BG] ⚠️ Content script injection could not be verified:', verifyError.message);
+            }
+          } catch (injectError) {
+            console.error('[AUDIO:BG] ❌ Failed to inject content script:', injectError);
+            sendResponse({ 
+              success: false, 
+              error: 'Failed to initialize page tracking: ' + injectError.message
+            });
+            return;
+          }
+        }
+        
+        // Step 1: Validate supported platform
         const isSupported = /^(https?:)/.test(url) && /(tiktok\.com|twitch\.tv|kick\.com|youtube\.com)/.test(url);
         
         if (!isSupported) {
