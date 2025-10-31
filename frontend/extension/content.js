@@ -240,8 +240,8 @@ function queryViewerNode() {
   }
   
   // Non-TikTok platforms: simple selector sweep
-  const selectors = PLATFORM_SELECTORS[platform] || [];
-  for (const selector of selectors) {
+  const platformSelectors = PLATFORM_SELECTORS[platform] || [];
+  for (const selector of platformSelectors) {
     const element = document.querySelector(selector);
     if (element && element.textContent?.trim()) {
       cachedViewerEl = element;
