@@ -179,6 +179,7 @@ function queryViewerNode() {
     }
     
     console.log('[VC:DEBUG] ❌ Emergency search failed, trying original method...');
+    
     // Tier 1: Label-driven lookup (find "Viewers" text)
     const labels = Array.from(document.querySelectorAll('div,span,strong,p')).filter(
       el => el.textContent && el.textContent.trim().toLowerCase() === 'viewers'
@@ -195,15 +196,13 @@ function queryViewerNode() {
         const parsed = normalizeAndParse(digitContainer);
         if (parsed !== null && parsed > 0) {
           console.log('[VC:DEBUG] ✅ TIER 1 SUCCESS: Found via label, count =', parsed);
-          console.debug('[TT:SEL] ✓ Tier 1: Label-driven match');
           cachedViewerEl = digitContainer;
-          cachedContainer = digitContainer.closest('div,section,header') || document.body;
           return digitContainer;
         }
       }
     }
 
-    // Tier 2: Priority selector sweep (ENHANCED with debugging)
+    // Tier 2: Priority selector sweep
     const selectors = PLATFORM_SELECTORS[platform] || [];
     console.log('[VC:DEBUG] 🎯 Trying', selectors.length, 'priority selectors...');
     
@@ -214,88 +213,34 @@ function queryViewerNode() {
       if (element && element.textContent?.trim()) {
         const text = element.textContent.trim();
         const parsed = normalizeAndParse(element);
-        console.log(`[VC:DEBUG] Selector ${i + 1}/${selectors.length}: "${selector}" → Element: "${text}" → Parsed: ${parsed}`);
+        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → "${text}" → ${parsed}`);
         
         if (parsed !== null && parsed > 0) {
           console.log('[VC:DEBUG] ✅ TIER 2 SUCCESS: Found via selector', i + 1, 'count =', parsed);
-          console.debug(`[TT:SEL] ✓ Tier 2: Selector[${i}] matched`);
           cachedViewerEl = element;
-          cachedContainer = element.closest('div,section,header') || document.body;
           return element;
         }
       } else {
-        console.log(`[VC:DEBUG] Selector ${i + 1}/${selectors.length}: "${selector}" → NOT FOUND`);
+        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → NOT FOUND`);
       }
     }
-    
-    console.log('[VC:DEBUG] ❌ All priority selectors failed, trying heuristics...');
 
-    // Tier 3: Enhanced heuristic fallback with better context detection
-    console.log('[VC:DEBUG] 🧠 Starting heuristic search for viewer count...');
-    
-    const candidates = document.querySelectorAll('span, div, p, strong');
-    let bestCandidate = null;
-    let bestScore = 0;
-    
-    for (const node of candidates) {
-      const text = node.textContent?.trim() || '';
-      if (!/^[\d,\.]+[kKmM]?$/.test(text)) continue;
-      
-      const parsed = normalizeAndParse(text);
-      if (!parsed || parsed <= 0) continue;
-      
-      // Score this candidate based on context
-      let score = 0;
-      
-      // Check parent context for viewer-related terms
-      let ctxNode = node.parentElement;
-      let depth = 0;
-      
-      while (ctxNode && depth < 5) {  // Increased depth search
-        const ctxText = ctxNode.textContent?.toLowerCase() || '';
-        const classes = ctxNode.className?.toLowerCase() || '';
-        
-        // Strong indicators
-        if (ctxText.includes('viewer') || ctxText.includes('watching')) score += 10;
-        if (classes.includes('viewer') || classes.includes('live')) score += 8;
-        
-        // Eye icon proximity
-        if (ctxNode.querySelector('svg[data-e2e="eye-icon"], [data-icon="eye"], svg[aria-label*="eye" i]')) score += 15;
-        
-        // Live streaming context
-        if (ctxText.includes('live') || classes.includes('live')) score += 5;
-        if (ctxText.includes('room') || classes.includes('room')) score += 3;
-        
-        // Numeric value reasonableness (2.9K is high viewer count)
-        if (parsed >= 2000) score += 5;  // High counts are more likely to be main viewer count
-        if (parsed >= 1000 && parsed < 5000) score += 3;  // Reasonable live viewer range
-        
-        ctxNode = ctxNode.parentElement;
-        depth++;
-      }
-      
-      console.log(`[VC:DEBUG] Candidate: "${text}" → ${parsed} | Score: ${score} | Context depth: ${depth}`);
-      
-      if (score > bestScore && score >= 3) {  // Minimum score threshold
-        bestScore = score;
-        bestCandidate = node;
-        console.log(`[VC:DEBUG] 🏆 New best candidate: ${parsed} (score: ${score})`);
-      }
-    }
-    
-    if (bestCandidate) {
-      const parsed = normalizeAndParse(bestCandidate);
-      console.log('[VC:DEBUG] ✅ TIER 3 SUCCESS: Best heuristic match, count =', parsed, '| Score:', bestScore);
-      console.debug('[TT:SEL] ✓ Tier 3: Heuristic match');
-      cachedViewerEl = bestCandidate;
-      cachedContainer = bestCandidate.closest('div,section,header') || document.body;
-      return bestCandidate;
-    }
-    
-    console.log('[VC:DEBUG] ❌ No viable candidates found');
-    console.debug('[TT:SEL] ✗ No match found');
+    console.log('[VC:DEBUG] ❌ All methods failed - no viewer count found');
     return null;
   }
+
+  // Non-TikTok platforms: simple selector sweep
+  const selectors = PLATFORM_SELECTORS[platform] || [];
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element && element.textContent?.trim()) {
+      cachedViewerEl = element;
+      return element;
+    }
+  }
+
+  return null;
+}
 
   // Non-TikTok platforms: simple selector sweep
   const selectors = PLATFORM_SELECTORS[platform] || [];
