@@ -103,20 +103,28 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Spikely Chrome Extension - Priority One UI/UX Fixes
+  Spikely Chrome Extension - DOM Viewer Count Detection Fix
   
-  The user requested completion of all Priority One UI/UX fixes for the Spikely Chrome extension side panel.
-  These fixes address critical visual and clarity issues identified in the UI verification report:
+  CRITICAL ISSUE: The viewer count detection was broken, showing 0 instead of actual counts (e.g., 2.1K).
+  This is the highest priority issue as it blocks the core correlation engine functionality.
   
-  1. Text Truncation - Quotes cut off with ellipses, need expandable tooltips
-  2. Unclear Status Indicator - "Watching for changes..." too subtle, needs animation
-  3. Audio Label Confusion - Need clear Play/Pause state labels
-  4. Unclear Delta Indicators - "±3" and "-1" lack immediate clarity
-  5. Minor Alignment Issues - Vertical misalignments in control panel
-  6. Top Actions Timestamps - "(0s)" format unusual, need relative time
+  ROOT CAUSE: TikTok frequently changes its DOM structure and CSS classes. Previous detection methods
+  were too rigid and relied on specific selectors that became outdated.
   
-  Priority: HIGH - Complete UI/UX fixes before correlation engine work
-  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, CSS
+  SOLUTION IMPLEMENTED: Three-tier robust detection strategy
+  1. Label-based detection (search for "Viewers" text and find associated numbers)
+  2. Brute force number search (scan all elements, prioritize by context)
+  3. Priority selectors (updated with 2025 patterns + legacy support)
+  
+  ENHANCEMENTS:
+  - Extensive console debugging with [VC:DEBUG] prefix
+  - Manual test command: window.__SPIKELY_TEST__()
+  - Improved decimal parsing (1.2K → 1200 not 2000)
+  - Validation tests on load (12 test cases)
+  - Better element caching and revalidation
+  
+  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS
+  Priority: CRITICAL - Without this, correlation engine cannot work
 
 frontend:
   - task: "CSS Cache Busting + Inline Critical Animations"
