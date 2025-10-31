@@ -1677,4 +1677,5 @@ validateParserFix();
 // Stop timers cleanly on navigation to avoid context errors
 window.addEventListener('pagehide', () => { try { stopTracking(); } catch (_) {} });
 window.addEventListener('beforeunload', () => { try { stopTracking(); } catch (_) {} });
-})();
+
+})(); // END OF IIFE - CRITICAL: This closes the (function(){ at the top
