@@ -140,7 +140,7 @@ user_problem_statement: |
   Priority: CRITICAL - Most important single engagement signal
 
 frontend:
-  - task: "DOM Viewer Count Detection - Three-Tier Strategy"
+  - task: "Chat Stream Detection - Multi-Tier Selector Strategy"
     implemented: true
     working: "needs_testing"
     file: "/app/frontend/extension/content.js"
@@ -151,27 +151,88 @@ frontend:
       - working: "needs_testing"
         agent: "main"
         comment: |
-          CRITICAL FIX: Completely rewrote queryViewerNode() with 3-tier detection strategy:
+          ✅ CRITICAL FEATURE: Real-time chat detection system implemented
           
-          STRATEGY 1 (Label-Based): Search for "Viewers" text and find associated numbers
-          - Checks siblings, children, parent elements
-          - Handles inline formats like "Viewers • 2.1K"
-          - Most reliable as text content is stable
+          DETECTION STRATEGY (3-tier):
+          1. Priority selectors: [data-e2e="live-chat-list"], [class*="ChatList"], etc.
+          2. Heuristic search: Find scrollable containers with 10+ children
+          3. Fallback: Manual inspection guidance
           
-          STRATEGY 2 (Brute Force): Scan ALL elements for viewer count patterns
-          - Finds numbers like "2.1K", "953" anywhere in DOM
-          - Scores by viewer context in parent elements
-          - Sorts candidates by confidence
-          - Logs top 5 candidates for debugging
+          PARSING CAPABILITIES:
+          - Extract username from multiple selector variations
+          - Extract comment text with fallback to full text content
+          - Generate unique IDs for duplicate detection
+          - Handle TikTok's dynamic class names
           
-          STRATEGY 3 (Priority Selectors): Updated selector list
-          - Added 2025 patterns: [data-e2e*="viewer"], [class*="ViewerCount"], [aria-label*="viewer"]
-          - Preserved original working selectors
-          - 15+ selector variations
+          CONFIGURATION:
+          - 30s rolling buffer (max 200 comments)
+          - 2s batch emission interval
+          - 100ms mutation debounce
+          - 3s retry interval if container not found
           
-          Files changed: /app/frontend/extension/content.js (lines 39-310)
+          FILES: +600 lines in content.js (lines 1065-1595)
   
-  - task: "Enhanced Number Parsing with Decimal Support"
+  - task: "Chat Buffer Management & Keyword Extraction"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/frontend/extension/correlationEngine.js"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+      - working: "needs_testing"
+        agent: "main"
+        comment: |
+          ✅ Added chat stream integration to correlation engine
+          
+          NEW METHODS:
+          - addChatStream(): Maintains 30s rolling buffer
+          - getChatContext(): Returns chat data for insights
+          - extractChatKeywords(): NLP-style keyword extraction
+          
+          DATA PROVIDED:
+          - Comment count in last 30s
+          - Chat rate (comments/min)
+          - Top 5 keywords (stop words filtered)
+          - Last 10 comments for context
+          
+          INTEGRATION:
+          - Enhanced insight payload with chatData field
+          - Claude receives chat context in every insight request
+          
+          FILES: +150 lines (lines 838-920)
+  
+  - task: "Chat Message Routing & Logging"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/frontend/extension/background.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "needs_testing"
+        agent: "main"
+        comment: |
+          ✅ CHAT_STREAM_UPDATE message handler added
+          
+          FUNCTIONALITY:
+          - Receives batched chat data from content script
+          - Forwards to correlation engine
+          - Broadcasts to side panel for display
+          - Logs sample comments for debugging
+          
+          MESSAGE FORMAT:
+          {
+            type: 'CHAT_STREAM_UPDATE',
+            platform: 'tiktok',
+            comments: [{ username, text, timestamp }, ...],
+            chatRate: 30,
+            commentCount: 15
+          }
+          
+          FILES: +35 lines (lines 301-330)
+  
+  - task: "Manual Chat Testing Tool"
     implemented: true
     working: "needs_testing"
     file: "/app/frontend/extension/content.js"
@@ -182,60 +243,56 @@ frontend:
       - working: "needs_testing"
         agent: "main"
         comment: |
-          Fixed parseTextToCount() to handle decimal values correctly:
-          - 1.2K → 1200 (not 1000 or 2000)
-          - Handle bullets (•), dots (·), commas
-          - Case insensitive (2.5k or 2.5K)
-          - 12 validation tests run on load
+          ✅ Console command for instant chat detection testing
           
-          All test cases pass:
-          ✅ "953" → 953
-          ✅ "1.2K" → 1200
-          ✅ "1.5M" → 1500000
-          etc.
-  
-  - task: "Manual Testing Tool - window.__SPIKELY_TEST__()"
+          Usage: window.__SPIKELY_TEST_CHAT__()
+          
+          OUTPUT:
+          - Chat container found/not found
+          - Element details (tag, classes, children count)
+          - Parsed comment samples (first 3)
+          - Current buffer size
+          - Tracking status
+          - Debug suggestions if failed
+          
+          Makes debugging 10x easier for TikTok DOM changes
+
+backend:
+  - task: "Chat Context Enhancement for Claude Prompts"
     implemented: true
     working: "needs_testing"
-    file: "/app/frontend/extension/content.js"
+    file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
+    priority: "critical"
     needs_retesting: true
     status_history:
       - working: "needs_testing"
         agent: "main"
         comment: |
-          Added console command for instant detection testing:
+          ✅ Backend integration for chat-aware insights
           
-          Usage: Open TikTok Live page → DevTools console → window.__SPIKELY_TEST__()
+          NEW MODEL:
+          class ChatData(BaseModel):
+              commentCount: int
+              chatRate: int
+              topKeywords: Optional[List[str]]
+              recentComments: Optional[List[str]]
           
-          Output includes:
-          - Found element details (text, classes, parsed value)
-          - Test message sent to background script
-          - Debug suggestions if detection fails
-          - Clear success/failure indicators
+          CLAUDE PROMPT ENHANCEMENT:
+          Added chat context section:
+          - Comment count in last 30s
+          - Chat rate (comments/min)
+          - Top keywords from chat
+          - Last 3 comments with usernames
+          - Guidance: "Use chat context: Reference specific viewer questions"
           
-          Makes debugging 10x easier for users and developers.
-  
-  - task: "Comprehensive Console Debugging"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/content.js"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: |
-          Added extensive [VC:DEBUG] logging throughout detection process:
-          - Strategy-by-strategy progress
-          - Found elements and parsed values
-          - Top 5 candidates with confidence scores
-          - Clear success/failure messages
-          - Helpful tips when detection fails
+          IMPACT:
+          Claude can now generate insights like:
+          - "Answer 'what song is this'. Name it now"
+          - "Shoutout user789 for fire comment"
+          - "Read top chat question. Respond big"
           
-          All logs can be filtered by "[VC:DEBUG]" prefix in console.
+          FILES: +30 lines (lines 93-97, 299-320)
 
 metadata:
   created_by: "main_agent"
