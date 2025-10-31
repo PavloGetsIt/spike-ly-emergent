@@ -297,6 +297,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       timestamp: message.timestamp
     }, () => { void chrome.runtime.lastError; });
 
+  } else if (message.type === 'CHAT_STREAM_UPDATE') {
+    console.log('[CHAT:BG:RX] CHAT_STREAM_UPDATE', { 
+      commentCount: message.commentCount, 
+      chatRate: message.chatRate,
+      platform: message.platform 
+    });
+
+    // Add to correlation engine
+    if (correlationEngine && typeof correlationEngine.addChatStream === 'function') {
+      correlationEngine.addChatStream(message.comments, message.chatRate, message.timestamp);
+    } else {
+      console.warn('[CHAT:BG] Correlation engine not ready for chat stream');
+    }
+
+    // Broadcast to side panel for display
+    chrome.runtime.sendMessage({
+      type: 'CHAT_STREAM',
+      platform: message.platform,
+      comments: message.comments,
+      chatRate: message.chatRate,
+      commentCount: message.commentCount,
+      timestamp: message.timestamp
+    }, () => { void chrome.runtime.lastError; });
+
+    // Log sample comments for debugging
+    if (message.comments.length > 0) {
+      const sample = message.comments.slice(0, 3).map(c => 
+        `${c.username}: ${c.text.substring(0, 30)}`
+      ).join(' | ');
+      console.log('[CHAT:BG] Sample:', sample);
+    }
+
   } else if (message.type === 'START_TRACKING_ACTIVE_TAB' || message.type === 'STOP_TRACKING_ACTIVE_TAB' || message.type === 'RESET_TRACKING_ACTIVE_TAB') {
     (async () => {
       try {
