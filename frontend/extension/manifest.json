@@ -31,7 +31,7 @@
       "*://*.kick.com/*",
       "*://*.youtube.com/*"
     ],
-    "js": ["content.js"],
+    "js": ["content_simple.js"],
     "run_at": "document_idle",
     "all_frames": false
   }],
