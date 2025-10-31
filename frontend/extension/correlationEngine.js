@@ -1329,6 +1329,9 @@ class CorrelationEngine {
         const keywords = this.extractKeywords(segment.text);
         const transcriptAnalysis = this.analyzeTranscriptQuality(segment.text);
         
+        // Get chat context
+        const chatContext = this.getChatContext();
+        
         // Prepare payload for AI insight generation with ENHANCED CONTEXT
         const payload = {
           transcript: truncatedTranscript,
@@ -1355,10 +1358,19 @@ class CorrelationEngine {
         recentInsights: this.recentInsights,
         winningTopics: this.winningTopics,
         transcriptQuality: transcriptAnalysis.quality,
-        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio
+        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio,
+        // CHAT CONTEXT
+        chatData: chatContext.hasChat ? {
+          commentCount: chatContext.commentCount,
+          chatRate: chatContext.chatRate,
+          topKeywords: chatContext.topKeywords.map(k => k.word),
+          recentComments: chatContext.recentComments.map(c => 
+            `${c.username}: ${c.text.substring(0, 50)}`
+          ).slice(-5) // Last 5 comments
+        } : undefined
       };
 
-        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none');
+        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none', '| Chat:', chatContext.hasChat ? `${chatContext.commentCount} comments` : 'no chat');
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
