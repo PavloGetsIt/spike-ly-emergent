@@ -1819,6 +1819,32 @@ if (startAudioBtn) {
           throw new Error('No active tab found');
         }
         
+        // Check for chrome:// URLs which can't be captured
+        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
+          throw new Error('Chrome pages cannot be captured. Please switch to a TikTok Live tab.');
+        }
+        
+        // Request activeTab permission for current tab
+        console.log('[AUDIO:SP] 🔐 Requesting activeTab permission...');
+        const hasPermission = await chrome.permissions.request({
+          permissions: ['activeTab'],
+          origins: [activeTab.url]
+        });
+        
+        if (!hasPermission) {
+          throw new Error('Permission denied for tab access');
+        }
+        
+        // Inject content script via chrome.scripting.executeScript (user gesture preserved)
+        console.log('[AUDIO:SP] 💉 Injecting content script via scripting API...');
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['content.js']
+        });
+        
+        // Wait for content script to initialize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // Call tabCapture DIRECTLY in button click (preserves user gesture)
         const stream = await new Promise((resolve, reject) => {
           chrome.tabCapture.capture({
