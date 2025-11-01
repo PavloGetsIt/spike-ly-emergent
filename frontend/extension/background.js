@@ -91,8 +91,27 @@ import { audioCaptureManager } from './audioCapture.js';
 import { correlationEngine } from './correlationEngine.js';
 
 console.log('🚨 BACKGROUND TEST: imports completed successfully');
-console.log('🔬 NUCLEAR: background.js LOADING - v2.0.5');
+console.log('🔬 NUCLEAR: background.js LOADING - v2.7.0');
 console.log('🔬 NUCLEAR: background.js timestamp:', new Date().toISOString());
+
+// ==================== MV3 KEEP-ALIVE HEARTBEAT ====================
+// Prevent service worker from sleeping during audio capture
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepAlive') {
+    console.log('[BG] 💓 Keep-alive heartbeat');
+  }
+});
+
+function startKeepAlive() {
+  chrome.alarms.create('keepAlive', { periodInMinutes: 0.5 }); // Every 30 seconds
+  console.log('[BG] ❤️ Keep-alive started');
+}
+
+function stopKeepAlive() {
+  chrome.alarms.clear('keepAlive');
+  console.log('[BG] 💔 Keep-alive stopped');
+}
+// =================================================================
 
 // ==================== DEBUG CONFIGURATION ====================
 // Set to true to enable verbose Hume AI logging
