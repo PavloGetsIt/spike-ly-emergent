@@ -514,6 +514,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
+    // Forward click acknowledgement to sidepanel
+    console.log('[BG] 🔴 Click acknowledgement received, forwarding to sidepanel');
+    
+    chrome.runtime.sendMessage({
+      type: 'CAPTURE_CLICK_ACKNOWLEDGED',
+      timestamp: message.timestamp
+    });
+    
   } else if (message.type === 'BEGIN_AUDIO_CAPTURE') {
     // ONLY valid context for tabCapture under MV3
     console.log('[BG] 🔴 STATE: IDLE → CAPTURING');
