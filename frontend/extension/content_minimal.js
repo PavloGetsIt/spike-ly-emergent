@@ -48,52 +48,91 @@
     console.error('[SPIKELY] ❌ Handshake error:', e);
   }
   
-  // Simple viewer detection for TikTok
+  // Enhanced viewer detection with shadow DOM support
   function findViewerCount() {
     if (platform !== 'tiktok') return null;
     
-    console.log('[SPIKELY] 🔍 Searching for viewer count...');
+    console.log('[SPIKELY] 🔍 Enhanced viewer search (including shadow DOM)...');
     
-    // Strategy 1: Look for "Viewers • X" pattern
-    const allElements = Array.from(document.querySelectorAll('*'));
+    // Get ALL elements including shadow DOM
+    function getAllElementsWithShadow(root = document) {
+      const elements = Array.from(root.querySelectorAll('*'));
+      const allElements = [...elements];
+      
+      // Check for shadow roots
+      for (const el of elements) {
+        if (el.shadowRoot) {
+          allElements.push(...getAllElementsWithShadow(el.shadowRoot));
+        }
+      }
+      return allElements;
+    }
     
+    const allElements = getAllElementsWithShadow();
+    console.log('[SPIKELY] Scanning', allElements.length, 'elements (including shadow DOM)');
+    
+    // Strategy 1: "Viewers • X" pattern
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
-      // Match "Viewers • 127" or similar
       if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
         const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (match) {
           const countText = match[1];
           const numericValue = parseViewerNumber(countText);
           if (numericValue > 0) {
-            console.log('[SPIKELY] ✅ Found viewer count via "Viewers •":', countText, '→', numericValue);
+            console.log('[SPIKELY] ✅ Found via "Viewers •":', countText, '→', numericValue);
             return { element: el, count: numericValue, text: countText };
           }
         }
       }
     }
     
-    // Strategy 2: Look for standalone numbers with viewer context
+    // Strategy 2: TikTok 2025 specific selectors
+    const tiktokSelectors = [
+      '[data-e2e="live-viewer-count"]',
+      '[data-e2e*="viewer"]',
+      '[data-testid*="viewer"]',
+      'div[class*="viewer"] span',
+      'div[class*="live"] span[class*="count"]',
+      'span[class*="viewer-count"]',
+      'div:has(> span:contains("Viewers"))'
+    ];
+    
+    for (const selector of tiktokSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent?.trim() || '';
+          const numericValue = parseViewerNumber(text);
+          if (numericValue > 0) {
+            console.log('[SPIKELY] ✅ Found via selector:', selector, '→', numericValue);
+            return { element: el, count: numericValue, text: text };
+          }
+        }
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    }
+    
+    // Strategy 3: Context-based number search
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
-      // Match standalone numbers (like "127", "2.1K")
       if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
         const parentText = el.parentElement?.textContent?.toLowerCase() || '';
         
-        // Check if parent mentions viewers
-        if (parentText.includes('viewer') || parentText.includes('watching')) {
+        if (parentText.includes('viewer') || parentText.includes('watching') || parentText.includes('live')) {
           const numericValue = parseViewerNumber(text);
-          if (numericValue > 0) {
-            console.log('[SPIKELY] ✅ Found viewer count via context:', text, '→', numericValue);
+          if (numericValue > 50) { // Filter out small numbers
+            console.log('[SPIKELY] ✅ Found via context:', text, '→', numericValue);
             return { element: el, count: numericValue, text: text };
           }
         }
       }
     }
     
-    console.log('[SPIKELY] ❌ No viewer count found');
+    console.log('[SPIKELY] ❌ No viewer count found after enhanced search');
     return null;
   }
   
