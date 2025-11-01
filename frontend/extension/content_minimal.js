@@ -231,7 +231,25 @@
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[SPIKELY] 📨 Received:', message.type);
     
-    if (message.type === 'START_TRACKING') {
+    if (message.type === 'USER_CLICKED_RED_BUTTON') {
+      console.log('[SPIKELY] 🔴 User clicked red button, forwarding to background...');
+      
+      // Forward to background for tabCapture (only valid context)
+      chrome.runtime.sendMessage({
+        type: 'BEGIN_AUDIO_CAPTURE',
+        timestamp: Date.now(),
+        url: window.location.href
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[SPIKELY] ⚠️ Audio capture request failed:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[SPIKELY] ✅ Audio capture request sent to background');
+        }
+      });
+      
+      sendResponse({ success: true });
+      
+    } else if (message.type === 'START_TRACKING') {
       startTracking();
       sendResponse({ success: true, platform: platform });
     } else if (message.type === 'STOP_TRACKING') {
