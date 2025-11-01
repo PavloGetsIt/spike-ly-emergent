@@ -1809,42 +1809,73 @@ if (startAudioBtn) {
       // Start viewer tracking
       sendToActive('START_VIEWER_TRACKING');
       
-      // Start audio capture
-      chrome.runtime.sendMessage({ type: 'START_AUDIO_CAPTURE' }, async (response) => {
-        console.debug('[AUDIO:SP:RX]', response);
+      // Start audio capture - MUST call tabCapture in user gesture context (side panel)
+      try {
+        console.log('[AUDIO:SP] 📞 Starting tab audio capture (user gesture context)...');
         
-        if (response?.success) {
-      audioIsCapturing = true;
-      updateAudioState(true);  // Use centralized state update
-      startAudioBtn.disabled = false;
-      console.log('[Spikely Side Panel] ✅ System started');
-      
-      // Show test button when system starts
-      if (testInsightBtn) {
-        testInsightBtn.style.display = 'inline-block';
-      }
-    } else {
-          const errMsg = response?.error || 'Unknown error';
-          console.warn('[AUDIO:SP:RX] Failed:', errMsg);
+        // Get active tab info
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!activeTab?.id) {
+          throw new Error('No active tab found');
+        }
+        
+        // Call tabCapture DIRECTLY in button click (preserves user gesture)
+        const stream = await chrome.tabCapture.capture({
+          audio: true,
+          video: false
+        });
+        
+        if (!stream || stream.getAudioTracks().length === 0) {
+          throw new Error('No audio tracks captured from tab');
+        }
+        
+        console.log('[AUDIO:SP] ✅ Tab audio captured successfully');
+        
+        // Send stream to background for processing
+        chrome.runtime.sendMessage({ 
+          type: 'PROCESS_CAPTURED_STREAM',
+          tabId: activeTab.id,
+          streamActive: true
+        }, (response) => {
+          console.debug('[AUDIO:SP:RX]', response);
           
-          // Check if fallback is appropriate
-          if (response?.requiresFallback) {
-            console.log('[AUDIO:SP:UI] Auto-falling back to screen share');
-            try {
-              await startAudioViaScreenShare();
-            } catch (fallbackErr) {
-              // Error already handled in helper
+          if (response?.success) {
+            audioIsCapturing = true;
+            updateAudioState(true);
+            startAudioBtn.disabled = false;
+            console.log('[Spikely Side Panel] ✅ System started');
+            
+            // Show test button when system starts
+            if (testInsightBtn) {
+              testInsightBtn.style.display = 'inline-block';
             }
           } else {
-            // Show friendly inline error (unrecoverable)
-            console.debug('[AUDIO:SP:UI] Showing inline error:', errMsg);
-            alert('⚠️ Audio Capture Not Available\n\n' + errMsg);
-            updateAudioState(false);  // Use centralized state update
+            throw new Error(response?.error || 'Stream processing failed');
+          }
+        });
+        
+      } catch (error) {
+        console.error('[AUDIO:SP] ❌ Audio capture failed:', error);
+        
+        // Check if fallback is appropriate
+        if (error.message.includes('not supported') || error.message.includes('permission')) {
+          console.log('[AUDIO:SP:UI] Auto-falling back to screen share');
+          try {
+            await startAudioViaScreenShare();
+          } catch (fallbackErr) {
+            // Error already handled in helper
+            updateAudioState(false);
             startAudioBtn.disabled = false;
             isSystemStarted = false;
           }
+        } else {
+          // Show friendly inline error
+          alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nTry refreshing the page or reloading the extension.');
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          isSystemStarted = false;
         }
-      });
+      }
     } else {
       // Stop entire system
       console.debug('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
