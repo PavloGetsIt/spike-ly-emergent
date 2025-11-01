@@ -543,52 +543,92 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   } else if (message.type === 'START_AUDIO') {
     // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
-    const requestId = message.requestId;
+    const requestId = message.requestId || ('bg-' + Date.now());
     console.log('[AUDIO:BG] ▶ START requestId=' + requestId);
-    
+
+    let responded = false;
+    let watchdogTimer = null;
+
+    const respond = (payload) => {
+      if (responded) {
+        console.debug('[AUDIO:BG] 🔁 duplicate respond suppressed for requestId=' + requestId);
+        return;
+      }
+
+      responded = true;
+
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
+
+      const responsePayload = { requestId, ...payload };
+
+      try {
+        sendResponse(responsePayload);
+      } catch (responseError) {
+        console.warn('[AUDIO:BG] ⚠️ sendResponse after channel closed:', responseError);
+      }
+
+      chrome.runtime.sendMessage({
+        type: 'AUDIO_CAPTURE_RESULT',
+        requestId,
+        ...payload
+      }, () => { void chrome.runtime.lastError; });
+    };
+
+    watchdogTimer = setTimeout(() => {
+      console.warn('[AUDIO:BG] ⏰ Background watchdog fired requestId=' + requestId);
+      respond({
+        ok: false,
+        code: 'AUDIO_ERR_TIMEOUT',
+        message: 'Background watchdog expired before capture completed.'
+      });
+    }, 6000);
+
     (async () => {
       const startTime = Date.now();
-      
+
       try {
         // STEP 1: Locate target TikTok Live tab
         const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         if (!activeTab?.id || !activeTab.url) {
-          sendResponse({ 
-            ok: false, 
+          respond({
+            ok: false,
             code: 'AUDIO_ERR_NOT_ELIGIBLE',
             message: 'No active tab found'
           });
           return;
         }
-        
+
         const tabId = activeTab.id;
         const url = activeTab.url;
         
         // STEP 2: Validate eligibility
         if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) {
           console.log('[AUDIO:BG] ❌ tabCapture FAIL code=CHROME_PAGE_BLOCKED');
-          sendResponse({ 
-            ok: false, 
+          respond({
+            ok: false,
             code: 'AUDIO_ERR_CHROME_PAGE_BLOCKED',
             message: 'Chrome pages cannot be captured'
           });
           return;
         }
-        
+
         const isTikTok = /tiktok\.com.*\/live/i.test(url);
         const isEligible = isTikTok || /twitch\.tv|kick\.com|youtube\.com/i.test(url);
         
         console.log('[AUDIO:BG] 🔎 targetTab url=' + url.substring(0, 50) + ' focused=' + activeTab.active + ' eligible=' + isEligible);
-        
+
         if (!isEligible) {
-          sendResponse({ 
-            ok: false, 
+          respond({
+            ok: false,
             code: 'AUDIO_ERR_NOT_ELIGIBLE',
             message: 'Please open a supported live stream (TikTok, Twitch, Kick, YouTube)'
           });
           return;
         }
-        
+
         // STEP 3: Stop existing capture cleanly
         if (audioCaptureState.has(tabId)) {
           console.log('[AUDIO:BG] ⏹ STOP reason=clean_restart');
@@ -669,40 +709,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             stopKeepAlive();
           };
         }
-        
+
         correlationEngine.startAutoInsightTimer();
-        
-        sendResponse({ 
-          ok: true, 
+
+        respond({
+          ok: true,
           streamId: stream.id,
           tabId: tabId,
           diagnostics: { url, focused: true, activationOk: true }
         });
-        
+
         console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
-        
+
       } catch (error) {
         const totalTime = Date.now() - startTime;
         const isTimeout = error.message.includes('TIMEOUT');
         const isPermission = error.message.includes('permission') || error.message.includes('invoked');
-        
+
         const errorCode = isTimeout ? 'AUDIO_ERR_TIMEOUT'
-                         : isPermission ? 'AUDIO_ERR_NOT_INVOKED' 
+                         : isPermission ? 'AUDIO_ERR_NOT_INVOKED'
                          : 'AUDIO_ERR_GENERAL';
-        
+
         console.log('[AUDIO:BG] ❌ tabCapture FAIL code=' + errorCode + ' time=' + totalTime + 'ms');
-        
-        sendResponse({ 
-          ok: false, 
+
+        respond({
+          ok: false,
           code: errorCode,
           message: error.message,
           diagnostics: { totalTime }
         });
       }
     })();
-    
+
     return true; // Keep message channel open
-    
+
   } else if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
     // Forward click acknowledgement to sidepanel
     console.log('[BG] 🔴 Click acknowledgement received, forwarding to sidepanel');

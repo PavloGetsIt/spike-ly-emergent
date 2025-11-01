@@ -26,6 +26,12 @@ let audioProcessor = null;
 
 let isAudioRecording = false;
 
+// Track pending audio capture attempts so the UI can recover even if the
+// original message response is lost (e.g. service worker restart).
+let pendingAudioRequestId = null;
+let lastHandledAudioRequestId = null;
+let audioStartWatchdog = null;
+
 // Session statistics tracking
 let sessionStats = {
   totalSpikes: 0,
@@ -106,7 +112,7 @@ function formatTimeAgo(timestamp) {
  */
 function updateAudioState(recording) {
   isAudioRecording = recording;
-  
+
   const audioBtn = startAudioBtn;
   const statusDot = document.getElementById('audioStatusDot');
   const statusLabel = document.getElementById('audioStatusLabel');
@@ -134,6 +140,83 @@ function updateAudioState(recording) {
     if (btnText) btnText.textContent = 'Start Audio';
     audioBtn.setAttribute('aria-label', 'Start audio recording');
   }
+}
+
+function showAudioCaptureError(code, rawMessage = '') {
+  let userMessage = '';
+
+  if (code === 'AUDIO_ERR_NOT_ELIGIBLE') {
+    userMessage = 'Open a TikTok, Twitch, Kick, or YouTube Live tab and try again.';
+  } else if (code === 'AUDIO_ERR_NOT_INVOKED') {
+    userMessage = 'Click the livestream tab once, then press Start within 2 seconds.';
+  } else if (code === 'AUDIO_ERR_TIMEOUT') {
+    userMessage = 'Chrome did not grant capture in time. Make sure the tab stays focused.';
+  } else if (code === 'AUDIO_ERR_CHROME_PAGE_BLOCKED') {
+    userMessage = 'Chrome internal pages cannot be captured. Switch back to the livestream.';
+  }
+
+  const finalMessage = userMessage || rawMessage || 'Unknown error';
+
+  alert('⚠️ Audio Capture Failed\n\n' + finalMessage + '\n\nCode: ' + code);
+}
+
+function handleAudioCaptureResult(result, source = 'callback') {
+  const resultId = result?.requestId || pendingAudioRequestId;
+
+  if (resultId && lastHandledAudioRequestId === resultId) {
+    console.debug(`[AUDIO:SP] 🔁 Duplicate result ignored (${source}) requestId=${resultId}`);
+    return;
+  }
+
+  if (pendingAudioRequestId && resultId && resultId !== pendingAudioRequestId) {
+    console.debug(`[AUDIO:SP] ⏭️ Stale result skipped (${source}) requestId=${resultId} pending=${pendingAudioRequestId}`);
+    return;
+  }
+
+  if (audioStartWatchdog) {
+    clearTimeout(audioStartWatchdog);
+    audioStartWatchdog = null;
+  }
+
+  if (resultId) {
+    lastHandledAudioRequestId = resultId;
+    pendingAudioRequestId = null;
+  }
+
+  const ok = result?.ok === true || result?.success === true;
+  const code = result?.code || result?.errorCode || (ok ? 'AUDIO_OK' : 'AUDIO_ERR_GENERAL');
+  const rawMessage = result?.message || result?.error || '';
+
+  if (ok) {
+    console.log(`[AUDIO:SP] ✅ STARTED (source=${source}) streamId=${result?.streamId || 'unknown'}`);
+    isSystemStarted = true;
+    audioIsCapturing = true;
+    updateAudioState(true);
+
+    if (startAudioBtn) {
+      startAudioBtn.disabled = false;
+      startAudioBtn.textContent = 'Stop Audio';
+    }
+
+    if (testInsightBtn) {
+      testInsightBtn.style.display = 'inline-block';
+    }
+
+    return;
+  }
+
+  console.error(`[AUDIO:SP] ❌ FAILED (source=${source}) code=${code} msg=${rawMessage}`);
+
+  updateAudioState(false);
+
+  if (startAudioBtn) {
+    startAudioBtn.disabled = false;
+    startAudioBtn.textContent = code === 'AUDIO_ERR_NOT_ELIGIBLE' ? 'Open Stream' : 'Focus & Retry';
+  }
+
+  isSystemStarted = false;
+
+  showAudioCaptureError(code, rawMessage);
 }
 
 /**
@@ -688,7 +771,7 @@ function startCooldownTimer(seconds) {
 
 // Listen to messages from background script (viewer updates, transcripts, etc.)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE'];
+  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE', 'AUDIO_CAPTURE_RESULT'];
   
   if (!message || !message.type || !allowedTypes.includes(message.type)) {
     return;
@@ -701,6 +784,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Always process FULL_RESET regardless of system state
   if (message.type === 'FULL_RESET') {
     handleMessage(message);
+    return;
+  }
+
+  if (message.type === 'AUDIO_CAPTURE_RESULT') {
+    handleAudioCaptureResult(message, 'event');
     return;
   }
   
@@ -1799,24 +1887,29 @@ if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
       console.log('[AUDIO:SP] ▶ START click');
-      
+
       const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
       console.log('[AUDIO:SP] ⏳ waiting response requestId=' + requestId);
-      
+
       startAudioBtn.disabled = true;
       startAudioBtn.textContent = 'Processing...';
-      
-      // 6s client-side watchdog
-      const watchdog = setTimeout(() => {
+      pendingAudioRequestId = requestId;
+      lastHandledAudioRequestId = null;
+
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+      }
+
+      audioStartWatchdog = setTimeout(() => {
         console.error('[AUDIO:SP] ❌ Client watchdog fired - cancelling processing state');
-        updateAudioState(false);
-        startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Try Again';
-        isSystemStarted = false;
-        
-        alert('⚠️ Audio Capture Timed Out\n\nTook longer than 6 seconds. Please:\n1. Make sure TikTok tab is focused\n2. Try "Try Again" button');
+        handleAudioCaptureResult({
+          ok: false,
+          code: 'AUDIO_ERR_TIMEOUT',
+          message: 'Client watchdog expired before background replied.',
+          requestId
+        }, 'client-watchdog');
       }, 6000);
-      
+
       // Send START_AUDIO directly to background
       chrome.runtime.sendMessage({
         type: 'START_AUDIO',
@@ -1824,71 +1917,43 @@ if (startAudioBtn) {
         gesture: true,
         timestamp: Date.now()
       }, (response) => {
-        clearTimeout(watchdog);
-        
         if (chrome.runtime.lastError) {
-          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
-          updateAudioState(false);
-          startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Try Again';
-          isSystemStarted = false;
-          
-          alert('⚠️ Extension Error\n\n' + chrome.runtime.lastError.message);
+          handleAudioCaptureResult({
+            ok: false,
+            code: 'AUDIO_ERR_RUNTIME',
+            message: chrome.runtime.lastError.message,
+            requestId
+          }, 'callback-runtime');
           return;
         }
-        
-        if (response?.ok) {
-          console.log('[AUDIO:SP] ✅ STARTED streamId=' + response.streamId);
-          
-          isSystemStarted = true;
-          audioIsCapturing = true;
-          updateAudioState(true);
-          startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Stop Audio';
-          
-          if (testInsightBtn) {
-            testInsightBtn.style.display = 'inline-block';
-          }
-          
-        } else {
-          const errorCode = response?.code || 'UNKNOWN';
-          const errorMsg = response?.message || 'Unknown error';
-          
-          console.error('[AUDIO:SP] ❌ FAILED code=' + errorCode + ' msg=' + errorMsg);
-          
-          updateAudioState(false);
-          startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Focus & Retry';
-          isSystemStarted = false;
-          
-          // Map error codes to user messages
-          let userMessage = '';
-          if (errorCode === 'AUDIO_ERR_NOT_ELIGIBLE') {
-            userMessage = 'Open a TikTok Live tab and try again.';
-          } else if (errorCode === 'AUDIO_ERR_NOT_INVOKED') {
-            userMessage = 'Click the TikTok tab once, then press Start.';
-          } else if (errorCode === 'AUDIO_ERR_TIMEOUT') {
-            userMessage = 'Chrome didn\'t grant capture in time.';
-          } else if (errorCode === 'AUDIO_ERR_CHROME_PAGE_BLOCKED') {
-            userMessage = 'Chrome pages can\'t be captured.';
-          } else {
-            userMessage = errorMsg;
-          }
-          
-          alert('⚠️ Audio Capture Failed\n\n' + userMessage + '\n\nCode: ' + errorCode);
+
+        if (!response) {
+          handleAudioCaptureResult({
+            ok: false,
+            code: 'AUDIO_ERR_GENERAL',
+            message: 'No response from background service worker.',
+            requestId
+          }, 'callback-empty');
+          return;
         }
+
+        handleAudioCaptureResult({ ...response, requestId }, 'callback');
       });
-      
-      // Enable system for UI state
-      isSystemStarted = true;
     } else {
       // Stop entire system
       console.debug('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
       isSystemStarted = false;
-      
+
+      pendingAudioRequestId = null;
+      lastHandledAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
+
       // Stop viewer tracking
       sendToActive('STOP_VIEWER_TRACKING');
-      
+
       // Stop audio capture
       if (audioProcessor) {
         // Stop fallback audio processor
