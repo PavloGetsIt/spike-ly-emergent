@@ -60,6 +60,166 @@ class CorrelationEngine {
     console.log('[Correlation] 🎯 FORCED NICHE: justChatting | GOAL: engagement');
   }
   
+  // ==================== ROBUST VIEWER DOM DETECTION ====================
+  
+  // Start self-healing viewer detection with MutationObserver
+  startViewerDetection() {
+    if (this.viewerDetectionState.isScanning) {
+      console.log('[Correlation] 👁️ Viewer detection already running');
+      return;
+    }
+    
+    console.log('[Correlation] 👁️ Starting robust viewer detection...');
+    this.viewerDetectionState.isScanning = true;
+    
+    // Try to find viewer element immediately
+    this.findViewerElement();
+    
+    // Start self-healing scan every 2 seconds
+    this.viewerDetectionState.scanInterval = setInterval(() => {
+      this.findViewerElement();
+    }, 2000);
+  }
+  
+  // Stop viewer detection
+  stopViewerDetection() {
+    console.log('[Correlation] 👁️ Stopping viewer detection');
+    this.viewerDetectionState.isScanning = false;
+    
+    if (this.viewerDetectionState.scanInterval) {
+      clearInterval(this.viewerDetectionState.scanInterval);
+      this.viewerDetectionState.scanInterval = null;
+    }
+  }
+  
+  // Multi-strategy viewer element detection
+  findViewerElement() {
+    console.log('[Correlation] 🔍 Scanning for viewer count...');
+    
+    // Check if cached element still valid
+    if (this.viewerDetectionState.lastFoundElement && 
+        document.contains(this.viewerDetectionState.lastFoundElement)) {
+      const text = this.viewerDetectionState.lastFoundElement.textContent?.trim();
+      const parsed = this.parseViewerText(text);
+      if (parsed > 0) {
+        console.log('[Correlation] ✅ Using cached element:', parsed);
+        return { element: this.viewerDetectionState.lastFoundElement, count: parsed };
+      }
+    }
+    
+    // Strategy 1: Primary selector - Look for "Viewers • X" pattern
+    const allElements = Array.from(document.querySelectorAll('*'));
+    
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+        const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
+        if (match) {
+          const parsed = this.parseViewerText(match[1]);
+          if (parsed > 0) {
+            console.log('[Correlation] ✅ Strategy 1 success:', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: Secondary selector - TikTok-specific attributes
+    const tiktokSelectors = [
+      '[data-e2e*="viewer"]',
+      '[data-testid*="viewer"]', 
+      'div[class*="viewer"] span',
+      'span[class*="count"]'
+    ];
+    
+    for (const selector of tiktokSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const parsed = this.parseViewerText(el.textContent);
+          if (parsed > 50) { // Filter small numbers
+            console.log('[Correlation] ✅ Strategy 2 success:', selector, parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    }
+    
+    // Strategy 3: Text-node proximity search
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
+        const parentText = el.parentElement?.textContent?.toLowerCase() || '';
+        
+        if (parentText.includes('viewer') || parentText.includes('live') || parentText.includes('watching')) {
+          const parsed = this.parseViewerText(text);
+          if (parsed > 50) {
+            console.log('[Correlation] ✅ Strategy 3 success (proximity):', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    console.log('[Correlation] ❌ No viewer element found, retry', ++this.viewerDetectionState.retryCount);
+    return null;
+  }
+  
+  // Parse viewer count text (handles K/M/B suffixes)
+  parseViewerText(text) {
+    if (!text) return 0;
+    
+    const cleaned = text.toLowerCase().replace(/[,\s]/g, '');
+    const match = cleaned.match(/^([\d.]+)([kmb])?$/);
+    if (!match) return 0;
+    
+    let num = parseFloat(match[1]);
+    const suffix = match[2];
+    
+    if (suffix === 'k') num *= 1000;
+    else if (suffix === 'm') num *= 1000000;
+    else if (suffix === 'b') num *= 1000000000;
+    
+    return Math.round(num);
+  }
+  
+  // Setup MutationObserver on found element
+  setupMutationObserver(element) {
+    // Remove existing observer
+    if (this.viewerObserver) {
+      this.viewerObserver.disconnect();
+    }
+    
+    const container = element.parentElement || element;
+    
+    this.viewerObserver = new MutationObserver((mutations) => {
+      console.log('[Correlation] 👁️ DOM mutation detected, rescanning...');
+      
+      // Re-scan after DOM changes
+      setTimeout(() => {
+        this.findViewerElement();
+      }, 100);
+    });
+    
+    this.viewerObserver.observe(container, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    
+    console.log('[Correlation] 👁️ MutationObserver setup on viewer container');
+  }
+  
   // Update niche preferences from UI
   updateNichePreferences(niche, goal) {
     this.currentNiche = niche;
