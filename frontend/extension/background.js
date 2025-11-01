@@ -111,6 +111,33 @@ function stopKeepAlive() {
   chrome.alarms.clear('keepAlive');
   console.log('[BG] 💔 Keep-alive stopped');
 }
+
+// ==================== OFFSCREEN DOCUMENT HELPER ====================
+async function ensureOffscreen() {
+  try {
+    const existingContexts = await chrome.runtime.getContexts({});
+    const offscreenExists = existingContexts.some(c => c.contextType === 'OFFSCREEN_DOCUMENT');
+    
+    if (!offscreenExists) {
+      await chrome.offscreen.createDocument({
+        url: chrome.runtime.getURL('offscreen.html'),
+        reasons: ['USER_MEDIA'],
+        justification: 'Audio capture for transcription'
+      });
+      console.log('[BG] ✅ Offscreen document created');
+      // Wait for initialization
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } else {
+      console.log('[BG] ✅ Offscreen document already exists');
+    }
+  } catch (error) {
+    if (error.message.includes('Only a single offscreen')) {
+      console.log('[BG] ✅ Offscreen document already exists (caught exception)');
+    } else {
+      throw error;
+    }
+  }
+}
 // =================================================================
 
 // ==================== DEBUG CONFIGURATION ====================
@@ -514,182 +541,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
-  } else if (message.type === 'START_AUDIO') {
-    // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
-    console.log('[AUDIO:BG] START_AUDIO received from sidepanel');
-    
-    (async () => {
-      try {
-        // STEP 1: Validate current active tab
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!activeTab?.id || !activeTab.url) {
-          sendResponse({ success: false, errorCode: 'NO_TAB', error: 'No active tab found' });
-          return;
-        }
-        
-        const tabId = activeTab.id;
-        const url = activeTab.url;
-        
-        // STEP 2: Guardrails - block unsupported domains
-        if (url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-          console.log('[AUDIO:BG] ❌ tabCapture error: CHROME_PAGE_BLOCKED');
-          sendResponse({ 
-            success: false, 
-            errorCode: 'AUDIO_ERR_CHROME_PAGE_BLOCKED',
-            error: 'Chrome pages cannot be captured'
-          });
-          return;
-        }
-        
-        const isTikTok = /tiktok\.com/i.test(url);
-        const isSupported = isTikTok || /twitch\.tv|kick\.com|youtube\.com/i.test(url);
-        
-        if (!isSupported) {
-          console.log('[AUDIO:BG] ❌ tabCapture error: NOT_ON_TIKTOK');
-          sendResponse({ 
-            success: false, 
-            errorCode: 'AUDIO_ERR_NOT_ON_TIKTOK',
-            error: 'Please open a TikTok Live, Twitch, Kick, or YouTube Live stream'
-          });
-          return;
-        }
-        
-        console.log('[AUDIO:BG] 🔎 Active tab url=' + url.substring(0, 50) + ' eligible=' + (isTikTok ? 'tiktok' : 'other'));
-        
-        // STEP 3: Check for existing capture - stop cleanly first
-        if (audioCaptureState.has(tabId) && audioCaptureState.get(tabId).isCapturing) {
-          console.log('[AUDIO:BG] Stopping existing capture for clean restart');
-          const existing = audioCaptureState.get(tabId);
-          if (existing.stream) {
-            existing.stream.getTracks().forEach(track => track.stop());
-          }
-          audioCaptureState.delete(tabId);
-        }
-        
-        // STEP 4: Ensure offscreen document + focus tab
-        await ensureOffscreen();
-        await chrome.tabs.update(tabId, { active: true });
-        console.log("[PRECAP] Tab active:", tabId);
-        console.log("[PRECAP] Offscreen ready");
-        console.log("[PRECAP] Calling tabCapture.capture");
-        
-        // STEP 5: Start capture with 8s timeout
-        const capturePromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            console.log('[AUDIO:BG] ❌ tabCapture error: TIMEOUT');
-            reject(new Error('AUDIO_ERR_TIMEOUT'));
-          }, 8000);
-          
-          console.log('[AUDIO:BG] 🎤 Calling tabCapture.capture...');
-          
-          chrome.tabCapture.capture(
-            { audio: true, video: false },
-            (stream) => {
-              clearTimeout(timeout);
-              
-              if (chrome.runtime.lastError) {
-                console.log('[AUDIO:BG] ❌ tabCapture error:', chrome.runtime.lastError.message);
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-              }
-              
-              console.log('[AUDIO:BG] 🟢 tabCapture.capture() → stream acquired');
-              resolve(stream);
-            }
-          );
-        });
-        
-        // Wait for capture with auto-retry
-        let stream;
-        try {
-          stream = await capturePromise;
-        } catch (captureError) {
-          // Auto-retry once within gesture window
-          console.log('[AUDIO:BG] Retrying capture once...');
-          
-          try {
-            stream = await new Promise((resolve, reject) => {
-              const retryTimeout = setTimeout(() => reject(new Error('AUDIO_ERR_TIMEOUT')), 4000);
-              
-              chrome.tabCapture.capture(
-                { audio: true, video: false },
-                (retryStream) => {
-                  clearTimeout(retryTimeout);
-                  
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                  } else {
-                    console.log('[AUDIO:BG] ✅ Retry succeeded');
-                    resolve(retryStream);
-                  }
-                }
-              );
-            });
-          } catch (retryError) {
-            const errorCode = retryError.message.includes('permission') ? 'PERMISSION_DENIED'
-                             : retryError.message.includes('signature') ? 'SIGNATURE'
-                             : retryError.message.includes('TIMEOUT') ? 'TIMEOUT'
-                             : 'UNKNOWN';
-            
-            sendResponse({ 
-              success: false, 
-              errorCode: 'AUDIO_ERR_' + errorCode,
-              error: retryError.message 
-            });
-            return;
-          }
-        }
-        
-        // Validate stream
-        if (!stream || !stream.getAudioTracks || stream.getAudioTracks().length === 0) {
-          console.log('[AUDIO:BG] ❌ Stream validation failed');
-          sendResponse({ 
-            success: false, 
-            errorCode: 'AUDIO_ERR_NO_TRACKS',
-            error: 'No audio tracks - tab may be muted' 
-          });
-          return;
-        }
-        
-        console.log('[AUDIO:BG] audio tracks:', stream.getAudioTracks().length);
-        
-        // Store stream and start keep-alive
-        audioCaptureState.set(tabId, {
-          isCapturing: true,
-          stream: stream,
-          startTime: Date.now()
-        });
-        
-        startKeepAlive();
-        
-        // Setup track end detection
-        const audioTrack = stream.getAudioTracks()[0];
-        if (audioTrack) {
-          audioTrack.onended = () => {
-            console.log('[AUDIO:PROC] ⏹ stream stopped');
-            stopKeepAlive();
-            audioCaptureState.delete(tabId);
-          };
-        }
-        
-        // Start correlation engine and notify audioProcessor
-        correlationEngine.startAutoInsightTimer();
-        
-        console.log('[AUDIO:PROC] 🎧 stream attached → frames flowing');
-        sendResponse({ success: true, streamId: stream.id });
-        
-      } catch (error) {
-        console.error('[AUDIO:BG] Setup error:', error);
-        sendResponse({ 
-          success: false, 
-          errorCode: 'AUDIO_ERR_SETUP',
-          error: error.message 
-        });
-      }
-    })();
-    
-    return true; // Keep message channel open
-    
   } else if (message.type === 'START_AUDIO') {
     // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
     const requestId = message.requestId;
