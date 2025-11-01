@@ -106,6 +106,9 @@ let isChatTracking = false;
 let viewerDetectionRetries = 0;
 const MAX_VIEWER_RETRIES = 60; // 60 * 500ms = 30 seconds max
 let viewerRetryInterval = null;
+// ============================================================================
+// TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
+// ============================================================================
 const TT_CONFIG = {
   WARMUP_MS: 500,                     // Warm-up duration (REDUCED from 1500ms for instant display)
   WARMUP_MIN_TICKS: 1,                // Minimum mutation ticks (REDUCED from 3 for speed)
