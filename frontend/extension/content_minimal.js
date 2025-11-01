@@ -6,6 +6,36 @@
   console.log('[SPIKELY] URL:', window.location.href);
   console.log('[SPIKELY] Timestamp:', new Date().toISOString());
   
+  // ==================== POSTMESSAGE BRIDGE (BEFORE EARLY RETURN) ====================
+  console.log('[SPIKELY] 🌉 Initializing postMessage bridge...');
+  
+  window.addEventListener('message', function(event) {
+    if (event.source !== window || event.data?.source !== 'spikely-page-script') {
+      return;
+    }
+    
+    console.log('[SPIKELY] 📨 Bridge received postMessage:', event.data.type);
+    
+    if (event.data.type === 'SPIKELY_USER_CLICKED_RED_BUTTON') {
+      console.log('[SPIKELY] 🔴 Forwarding user click to background...');
+      
+      chrome.runtime.sendMessage({
+        type: 'BEGIN_AUDIO_CAPTURE',
+        timestamp: event.data.timestamp,
+        url: event.data.url
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[SPIKELY] ⚠️ Bridge forward failed:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[SPIKELY] ✅ Audio request forwarded to background');
+        }
+      });
+    }
+  });
+  
+  console.log('[SPIKELY] ✅ postMessage bridge active');
+  // ==========================================================================
+  
   // Prevent double initialization
   if (window.__SPIKELY_CONTENT_ACTIVE__) {
     console.warn('[Spikely] ⚠️ Content script already active - skipping');
