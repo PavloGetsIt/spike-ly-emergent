@@ -1897,8 +1897,8 @@ if (startAudioBtn) {
         startAudioBtn.style.background = '';
         isSystemStarted = false;
         
-        if (error.message.includes('click the red audio button')) {
-          alert('⚠️ Audio Capture Requires Your Click\n\nPlease:\n1. Look for the RED audio button on the TikTok page\n2. Click it to grant audio permission\n3. If no button appears, try reloading the extension');
+        if (error.message.includes('click the RED audio button')) {
+          alert('⚠️ Audio Capture Requires Your Click\n\nPlease:\n1. Look for the RED "🎤 Start Spikely Audio" button on the TikTok page (top-right)\n2. Click it to start audio capture\n3. Grant permission when Chrome asks');
         } else {
           alert('⚠️ Audio Setup Failed\n\n' + error.message);
         }
