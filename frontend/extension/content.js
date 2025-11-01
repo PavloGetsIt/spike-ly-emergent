@@ -155,11 +155,6 @@ function sendContentScriptReady() {
   }
 }
 
-// RETRY LOGIC - Keep trying to find viewer element until found
-let viewerDetectionRetries = 0;
-const MAX_VIEWER_RETRIES = 60; // 60 * 500ms = 30 seconds max
-let viewerRetryInterval = null;
-
 function startViewerDetectionWithRetry() {
   console.log('[SPIKELY] 🔍 Starting viewer detection with retry logic...');
   
