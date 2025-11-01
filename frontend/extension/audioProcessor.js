@@ -389,11 +389,36 @@ export class AudioProcessor {
     }
   }
 
+  // WebSocket heartbeat to prevent connection closure
+  startHeartbeat() {
+    this.stopHeartbeat(); // Clear any existing
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        console.log('🎙️ [ASSEMBLYAI] 💓 Sending heartbeat ping...');
+        this.ws.send(JSON.stringify({ message_type: 'KeepAlive' }));
+      }
+    }, 30000); // Every 30 seconds
+    
+    console.log('🎙️ [ASSEMBLYAI] ❤️ Heartbeat started (30s interval)');
+  }
+  
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log('🎙️ [ASSEMBLYAI] 💔 Heartbeat stopped');
+    }
+  }
+
   // Stop processing and cleanup
   stop() {
     this.log('Stopping audio processor...');
     
     this.isProcessing = false;
+    
+    // Stop heartbeat
+    this.stopHeartbeat();
     
     // Reset Hume buffers
     this.humeAudioBuffer = [];
