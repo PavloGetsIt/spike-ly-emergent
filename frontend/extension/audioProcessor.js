@@ -128,6 +128,9 @@ export class AudioProcessor {
         
         // V3 with token query param - no auth message needed
         
+        // Start heartbeat to prevent connection closure
+        this.startHeartbeat();
+        
         this.debug?.('ws_open', 'v3:ready');
         this.log('✅ WebSocket connected (v3 Universal Streaming)');
         resolve();
