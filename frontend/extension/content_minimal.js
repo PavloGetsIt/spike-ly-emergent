@@ -16,7 +16,15 @@
     
     console.log('[SPIKELY] 📨 Bridge received postMessage:', event.data.type);
     
-    if (event.data.type === 'BEGIN_CAPTURE') {
+    if (event.data.type === 'capture_click_acknowledged') {
+      console.log('[SPIKELY] 🔴 Click acknowledgement received, forwarding to background...');
+      
+      chrome.runtime.sendMessage({
+        type: 'CAPTURE_CLICK_ACKNOWLEDGED',
+        timestamp: event.data.timestamp
+      });
+      
+    } else if (event.data.type === 'BEGIN_CAPTURE') {
       console.log('[SPIKELY] 🔴 BEGIN_CAPTURE - Forwarding to background with gesture timing...');
       
       chrome.runtime.sendMessage({
