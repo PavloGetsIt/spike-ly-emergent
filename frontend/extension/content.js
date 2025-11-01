@@ -1,9 +1,8 @@
 (function(){
-  // IMMEDIATE LOAD CHECK - This should appear in console immediately
-  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 14px');
+  // PAGE CONSOLE LOGGING - User must see these logs
+  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 16px');
   console.log('[SPIKELY] URL:', window.location.href);
-  console.log('[SPIKELY] Timestamp:', new Date().toISOString());
-  console.log('[SPIKELY] User agent:', navigator.userAgent.substring(0, 100));
+  console.log('[SPIKELY] DOM ready state:', document.readyState);
   
   try {
     // Check if already fully initialized (has both flag AND functions)
@@ -21,8 +20,28 @@
     
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
     console.log('[Spikely] ✅ Marking script as active');
+    
+    // DOM READINESS CHECK - Wait for DOM before viewer detection
+    if (document.readyState === 'loading') {
+      console.log('[SPIKELY] 📄 DOM still loading, waiting for DOMContentLoaded...');
+      document.addEventListener('DOMContentLoaded', initializeAfterDOM);
+    } else {
+      console.log('[SPIKELY] 📄 DOM already ready, initializing immediately');
+      initializeAfterDOM();
+    }
+    
   } catch (e) {
     console.error('[Spikely] ❌ Error in initialization:', e);
+  }
+  
+  function initializeAfterDOM() {
+    console.log('[SPIKELY] 🏁 DOM ready, starting initialization...');
+    
+    // Send handshake to background script
+    sendContentScriptReady();
+    
+    // Start viewer detection with retry logic
+    startViewerDetectionWithRetry();
   }
 
 // ============================================================================
