@@ -286,29 +286,15 @@
       stopTracking();
       sendResponse({ success: true });
     } else if (message.type === 'UPDATE_BUTTON_STATE') {
-      console.log('[SPIKELY] 🔘 Updating button state:', message.state);
+      console.log('[SPIKELY] 🔘 Updating button state via postMessage:', message.state);
       
-      // Update page script button
-      try {
-        const btn = document.getElementById('__SPIKELY_CAPTURE_BTN__');
-        if (btn) {
-          if (message.state === 'success') {
-            btn.textContent = '✅ Success!';
-            btn.style.background = 'linear-gradient(135deg, #44ff44, #66ff66)';
-            setTimeout(() => btn.style.display = 'none', 3000);
-          } else if (message.state === 'error') {
-            btn.textContent = '❌ Failed';
-            btn.style.background = '#666';
-            setTimeout(() => {
-              btn.textContent = '🎤 Try Again';
-              btn.disabled = false;
-              btn.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
-            }, 3000);
-          }
-        }
-      } catch (e) {
-        console.warn('[SPIKELY] ⚠️ Button update failed:', e);
-      }
+      // Forward button update to page script via postMessage
+      window.postMessage({
+        type: 'SPIKELY_UPDATE_BUTTON',
+        state: message.state,
+        message: message.message,
+        source: 'spikely-content-script'
+      }, '*');
       
       sendResponse({ success: true });
       
