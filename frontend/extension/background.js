@@ -495,6 +495,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'AUDIO_CAPTURE_RESULT') {
+    // Handle result from page script button click
+    console.log('[BG] 🔴 AUDIO_CAPTURE_RESULT received:', { 
+      success: message.success, 
+      error: message.error,
+      tracks: message.trackCount 
+    });
+    
+    if (message.success) {
+      console.log('[BG] ✅ Page button audio capture succeeded');
+      // Audio stream is already active, just update state
+      sendResponse({ success: true, source: 'page_button' });
+    } else {
+      console.log('[BG] ❌ Page button audio capture failed:', message.error);
+      sendResponse({ success: false, error: message.error, source: 'page_button' });
+    }
+    
   } else if (message.type === 'PROCESS_CAPTURED_STREAM') {
     (async () => {
       console.debug('[AUDIO:BG:PROCESS] PROCESS_CAPTURED_STREAM received', { tabId: message.tabId });
