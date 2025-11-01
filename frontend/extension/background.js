@@ -495,6 +495,103 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'BEGIN_AUDIO_CAPTURE') {
+    // Handle audio capture request from content script (only valid context for tabCapture)
+    console.log('[BG] 🔴 BEGIN_AUDIO_CAPTURE received from content script');
+    
+    (async () => {
+      try {
+        const tabId = sender.tab?.id;
+        if (!tabId) {
+          throw new Error('No tab ID in message sender');
+        }
+        
+        console.log('[BG] 🎤 Calling tabCapture.capture() from service worker context...');
+        
+        // Call tabCapture from background context (MV3 requirement)
+        chrome.tabCapture.capture({
+          audio: true,
+          video: false
+        }, (stream) => {
+          if (chrome.runtime.lastError) {
+            const error = chrome.runtime.lastError.message;
+            console.error('[BG] ❌ TabCapture failed:', error);
+            
+            // Update button via content script
+            chrome.tabs.sendMessage(tabId, {
+              type: 'UPDATE_BUTTON_STATE',
+              state: 'error',
+              message: error
+            });
+            
+            // Notify sidepanel
+            chrome.runtime.sendMessage({
+              type: 'AUDIO_CAPTURE_RESULT',
+              success: false,
+              error: error
+            });
+            
+          } else if (!stream || stream.getAudioTracks().length === 0) {
+            console.error('[BG] ❌ No audio tracks captured');
+            
+            // Update button via content script
+            chrome.tabs.sendMessage(tabId, {
+              type: 'UPDATE_BUTTON_STATE',
+              state: 'error',
+              message: 'No audio tracks'
+            });
+            
+            // Notify sidepanel
+            chrome.runtime.sendMessage({
+              type: 'AUDIO_CAPTURE_RESULT',
+              success: false,
+              error: 'No audio tracks captured'
+            });
+            
+          } else {
+            console.log('[BG] ✅ TabCapture SUCCESS:', stream.getAudioTracks().length, 'tracks');
+            
+            // Store stream for processing
+            audioCaptureState.set(tabId, {
+              isCapturing: true,
+              stream: stream,
+              startTime: Date.now()
+            });
+            
+            // Update button to success
+            chrome.tabs.sendMessage(tabId, {
+              type: 'UPDATE_BUTTON_STATE',
+              state: 'success'
+            });
+            
+            // Start correlation engine
+            correlationEngine.startAutoInsightTimer();
+            
+            // Notify sidepanel of success
+            chrome.runtime.sendMessage({
+              type: 'AUDIO_CAPTURE_RESULT',
+              success: true,
+              streamId: stream.id,
+              trackCount: stream.getAudioTracks().length
+            });
+            
+            console.log('[BG] 🎯 Audio capture complete - system ready');
+          }
+        });
+        
+      } catch (error) {
+        console.error('[BG] ❌ Audio capture setup failed:', error);
+        
+        chrome.runtime.sendMessage({
+          type: 'AUDIO_CAPTURE_RESULT',
+          success: false,
+          error: error.message
+        });
+      }
+    })();
+    
+    return true; // Keep message channel open
+    
   } else if (message.type === 'AUDIO_CAPTURE_RESULT') {
     // Handle result from page script button click
     console.log('[BG] 🔴 AUDIO_CAPTURE_RESULT received:', { 
