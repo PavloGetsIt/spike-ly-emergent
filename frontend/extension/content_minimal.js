@@ -153,13 +153,25 @@
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
+      // Match "Viewers • X" or similar 
       if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+        // Strategy 1: Exact "Viewers • 127" TikTok 2025 format
+        const exactMatch = text.match(/viewers?\s*•\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
+        if (exactMatch) {
+          const numericValue = parseViewerNumber(exactMatch[1]);
+          if (numericValue > 0) {
+            console.log('[SPIKELY] 👀 Viewer Count:', numericValue, '(exact pattern)');
+            return { element: el, count: numericValue, text: exactMatch[1] };
+          }
+        }
+        
+        // Strategy 2: Flexible pattern matching
         const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (match) {
           const countText = match[1];
           const numericValue = parseViewerNumber(countText);
           if (numericValue > 0) {
-            console.log('[SPIKELY] ✅ Found via "Viewers •":', countText, '→', numericValue);
+            console.log('[SPIKELY] 👀 Viewer Count:', numericValue, '(flexible pattern)');
             return { element: el, count: numericValue, text: countText };
           }
         }
@@ -193,19 +205,25 @@
       }
     }
     
-    // Strategy 3: Context-based number search
+    // Strategy 3: Ancestor lineage scanning for live viewer context
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
       if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
-        const parentText = el.parentElement?.textContent?.toLowerCase() || '';
+        let ancestor = el.parentElement;
+        let depth = 0;
         
-        if (parentText.includes('viewer') || parentText.includes('watching') || parentText.includes('live')) {
-          const numericValue = parseViewerNumber(text);
-          if (numericValue > 50) { // Filter out small numbers
-            console.log('[SPIKELY] ✅ Found via context:', text, '→', numericValue);
-            return { element: el, count: numericValue, text: text };
+        while (ancestor && depth < 3) {
+          const ancestorText = ancestor.textContent?.toLowerCase() || '';
+          if (/viewer|watching|live.*count/i.test(ancestorText)) {
+            const parsed = parseViewerNumber(text);
+            if (parsed > 50) {
+              console.log('[SPIKELY] 👀 Viewer Count:', parsed, '(ancestor scan)');
+              return { element: el, count: parsed, text: text };
+            }
           }
+          ancestor = ancestor.parentElement;
+          depth++;
         }
       }
     }
