@@ -45,8 +45,67 @@
   }
 
 // ============================================================================
-// TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
+// VARIABLE DECLARATIONS - Must be before any function calls
 // ============================================================================
+
+// Platform detection - declare before use
+function detectPlatform() {
+  const hostname = window.location.hostname;
+  if (hostname.includes('tiktok.com')) return 'tiktok';
+  if (hostname.includes('twitch.tv')) return 'twitch';
+  if (hostname.includes('kick.com')) return 'kick';
+  if (hostname.includes('youtube.com')) return 'youtube';
+  return 'unknown';
+}
+
+const platform = detectPlatform();
+
+// Viewer tracking state
+let currentViewerCount = 0;
+let detectionInterval = null;
+let isTracking = false;
+let lastSentCount = 0;
+let lastSentAt = 0;
+
+// Cached element + DOM observer to survive SPA/DOM changes
+let cachedViewerEl = null;
+let cachedContainer = null;
+let domObserver = null;
+
+// Warm-up state
+let warmupSamples = [];
+let warmupStartTime = 0;
+let warmupMutationTicks = 0;
+let isWarmupComplete = false;
+let warmupReselectTimer = null;
+let warmupStuckTimer = null;
+
+// Post-warm-up validation state
+let warmupMedian = 0;
+let warmupMAD = 0;
+let lastValidSamples = [];
+let lastEmittedCount = 0;
+let lastEmittedAt = 0;
+let lastZeroAt = 0;
+let consecutiveZeros = 0;
+
+// Navigation tracking
+let lastPathname = window.location.pathname;
+
+// Chat state
+let chatContainer = null;
+let chatObserver = null;
+let chatBuffer = [];
+let lastChatEmitTime = 0;
+let seenCommentIds = new Set();
+let chatMutationDebounce = null;
+let chatRetryInterval = null;
+let isChatTracking = false;
+
+// Retry state
+let viewerDetectionRetries = 0;
+const MAX_VIEWER_RETRIES = 60; // 60 * 500ms = 30 seconds max
+let viewerRetryInterval = null;
 const TT_CONFIG = {
   WARMUP_MS: 500,                     // Warm-up duration (REDUCED from 1500ms for instant display)
   WARMUP_MIN_TICKS: 1,                // Minimum mutation ticks (REDUCED from 3 for speed)
