@@ -1803,58 +1803,128 @@ if (startAudioBtn) {
       startAudioBtn.textContent = 'Starting...';
       
       try {
-        // STEP 1: Get active tab (MUST be in user gesture)
+        // STEP 1: Get active tab and focus it (preserve gesture)
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!activeTab?.id) {
           throw new Error('No active tab found');
         }
         
-        // STEP 2: Check for chrome:// URLs which can't be captured
-        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://') || activeTab.url.startsWith('moz-extension://')) {
+        // STEP 2: Check for chrome:// URLs
+        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
           throw new Error('Chrome pages cannot be captured. Please open a TikTok Live tab first.');
         }
         
-        console.log('[AUDIO:SP] 🎯 Target tab:', activeTab.url.substring(0, 50), 'ID:', activeTab.id);
+        console.log('[AUDIO:SP] 🎯 Target tab:', activeTab.url.substring(0, 50));
         
-        // STEP 3: Request activeTab permission (MUST be in user gesture)
-        console.log('[AUDIO:SP] 🔐 Requesting activeTab permission for current tab...');
-        const hasPermission = await chrome.permissions.request({
-          permissions: ['activeTab']
-        });
+        // STEP 3: Focus the TikTok tab to preserve user gesture context
+        await chrome.tabs.update(activeTab.id, { active: true });
+        console.log('[AUDIO:SP] 🔍 Focused TikTok tab');
         
-        if (!hasPermission) {
-          throw new Error('ActiveTab permission denied. Extension cannot access the current page.');
-        }
-        console.log('[AUDIO:SP] ✅ ActiveTab permission granted');
-        
-        // STEP 4: Inject content script (MUST be in user gesture)
-        console.log('[AUDIO:SP] 💉 Injecting content script into tab', activeTab.id);
+        // STEP 4: Inject content script first
+        console.log('[AUDIO:SP] 💉 Injecting content script...');
         await chrome.scripting.executeScript({
           target: { tabId: activeTab.id },
-          files: ['content.js']
+          files: ['content_minimal.js']
         });
-        console.log('[AUDIO:SP] ✅ Content script injected');
         
-        // STEP 5: Call tabCapture (MUST be in user gesture)
-        console.log('[AUDIO:SP] 📞 Starting tab audio capture...');
-        const stream = await new Promise((resolve, reject) => {
-          chrome.tabCapture.capture({
-            audio: true,
-            video: false
-          }, (captureStream) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else if (!captureStream || captureStream.getAudioTracks().length === 0) {
-              reject(new Error('No audio tracks captured - tab may not have audio'));
-            } else {
-              resolve(captureStream);
+        // STEP 5: Inject hidden button with tabCapture logic into TikTok page
+        console.log('[AUDIO:SP] 🔘 Injecting audio capture button into page...');
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          func: function() {
+            // Create hidden button in page DOM
+            const hiddenBtn = document.createElement('button');
+            hiddenBtn.id = '__SPIKELY_AUDIO_TRIGGER__';
+            hiddenBtn.style.display = 'none';
+            hiddenBtn.style.position = 'absolute';
+            hiddenBtn.style.top = '-9999px';
+            document.body.appendChild(hiddenBtn);
+            
+            // Add click handler that preserves user gesture
+            hiddenBtn.addEventListener('click', async () => {
+              console.log('[SPIKELY-PAGE] 🎤 Hidden button clicked - starting tabCapture...');
+              
+              try {
+                // tabCapture.capture() in page context with preserved gesture
+                const stream = await new Promise((resolve, reject) => {
+                  chrome.tabCapture.capture({
+                    audio: true,
+                    video: false
+                  }, (captureStream) => {
+                    if (chrome.runtime.lastError) {
+                      reject(new Error(chrome.runtime.lastError.message));
+                    } else if (!captureStream || captureStream.getAudioTracks().length === 0) {
+                      reject(new Error('No audio tracks captured'));
+                    } else {
+                      resolve(captureStream);
+                    }
+                  });
+                });
+                
+                console.log('[SPIKELY-PAGE] ✅ Audio captured successfully');
+                
+                // Send success back to extension
+                window.postMessage({
+                  type: 'SPIKELY_AUDIO_SUCCESS',
+                  tracks: stream.getAudioTracks().length
+                }, '*');
+                
+              } catch (error) {
+                console.error('[SPIKELY-PAGE] ❌ Audio capture failed:', error);
+                
+                // Send error back to extension  
+                window.postMessage({
+                  type: 'SPIKELY_AUDIO_ERROR',
+                  error: error.message
+                }, '*');
+              }
+            });
+            
+            console.log('[SPIKELY-PAGE] 🔘 Hidden audio trigger button ready');
+          }
+        });
+        
+        // STEP 6: Listen for messages from injected script
+        const messagePromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Audio capture timeout'));
+          }, 10000);
+          
+          const messageListener = (event) => {
+            if (event.data?.type === 'SPIKELY_AUDIO_SUCCESS') {
+              clearTimeout(timeout);
+              window.removeEventListener('message', messageListener);
+              resolve({ success: true, tracks: event.data.tracks });
+            } else if (event.data?.type === 'SPIKELY_AUDIO_ERROR') {
+              clearTimeout(timeout);
+              window.removeEventListener('message', messageListener);
+              reject(new Error(event.data.error));
             }
-          });
+          };
+          
+          window.addEventListener('message', messageListener);
         });
         
-        console.log('[AUDIO:SP] ✅ Audio stream captured:', stream.getAudioTracks().length, 'tracks');
+        // STEP 7: Trigger the hidden button click (preserves gesture chain)
+        console.log('[AUDIO:SP] 🖱️ Triggering hidden button click...');
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          func: function() {
+            const btn = document.getElementById('__SPIKELY_AUDIO_TRIGGER__');
+            if (btn) {
+              console.log('[SPIKELY-PAGE] 🖱️ Clicking hidden button...');
+              btn.click();
+            } else {
+              console.error('[SPIKELY-PAGE] ❌ Hidden button not found');
+            }
+          }
+        });
         
-        // STEP 6: Send to background for processing and start tracking
+        // STEP 8: Wait for audio capture result
+        const audioResult = await messagePromise;
+        console.log('[AUDIO:SP] ✅ Audio capture completed:', audioResult);
+        
+        // STEP 9: Send to background for processing
         chrome.runtime.sendMessage({ 
           type: 'PROCESS_CAPTURED_STREAM',
           tabId: activeTab.id,
@@ -1868,13 +1938,8 @@ if (startAudioBtn) {
             console.log('[Spikely Side Panel] ✅ System started successfully');
             
             // Start viewer tracking AFTER successful audio setup
-            console.log('[AUDIO:SP] 🎯 Starting viewer tracking...');
             chrome.tabs.sendMessage(activeTab.id, { type: 'START_TRACKING' }, (trackingResponse) => {
-              if (chrome.runtime.lastError) {
-                console.warn('[AUDIO:SP] ⚠️ Viewer tracking start failed:', chrome.runtime.lastError.message);
-              } else {
-                console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
-              }
+              console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
             });
             
             if (testInsightBtn) {
@@ -1887,7 +1952,7 @@ if (startAudioBtn) {
         
       } catch (error) {
         console.error('[AUDIO:SP] ❌ Audio capture failed:', error);
-        alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nPlease:\n1. Make sure you\'re on a TikTok Live tab\n2. Try reloading the extension\n3. Refresh the TikTok page');
+        alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nPlease:\n1. Make sure you\'re on a TikTok Live tab\n2. Try reloading the extension');
         
         updateAudioState(false);
         startAudioBtn.disabled = false;
