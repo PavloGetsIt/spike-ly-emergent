@@ -72,6 +72,83 @@ function detectPlatform() {
   return 'unknown';
 }
 
+const platform = detectPlatform();
+
+// HANDSHAKE - Send ready message to background script
+function sendContentScriptReady() {
+  try {
+    console.log('[SPIKELY] 📡 Sending CONTENT_SCRIPT_READY handshake...');
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      platform,
+      url: window.location.href,
+      timestamp: Date.now()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[SPIKELY] ⚠️ Handshake failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[SPIKELY] ✅ Handshake confirmed by background script');
+      }
+    });
+  } catch (e) {
+    console.error('[SPIKELY] ❌ Handshake error:', e);
+  }
+}
+
+// RETRY LOGIC - Keep trying to find viewer element until found
+let viewerDetectionRetries = 0;
+const MAX_VIEWER_RETRIES = 60; // 60 * 500ms = 30 seconds max
+let viewerRetryInterval = null;
+
+function startViewerDetectionWithRetry() {
+  console.log('[SPIKELY] 🔍 Starting viewer detection with retry logic...');
+  
+  function attemptViewerDetection() {
+    const node = queryViewerNode();
+    
+    if (node) {
+      const parsed = normalizeAndParse(node);
+      console.log('[SPIKELY] ✅ VIEWER DETECTION SUCCESS:', parsed, 'retries:', viewerDetectionRetries);
+      
+      // Clear retry interval
+      if (viewerRetryInterval) {
+        clearInterval(viewerRetryInterval);
+        viewerRetryInterval = null;
+      }
+      
+      // Start mutation observer for continuous tracking
+      setupMutationObserver();
+      
+      // Send initial count
+      if (parsed > 0) {
+        emitViewerCount(parsed, 0);
+      }
+      
+      return true;
+    } else {
+      viewerDetectionRetries++;
+      console.log('[SPIKELY] ⏳ Viewer element not found, retry', viewerDetectionRetries + '/' + MAX_VIEWER_RETRIES);
+      
+      if (viewerDetectionRetries >= MAX_VIEWER_RETRIES) {
+        console.warn('[SPIKELY] ❌ Viewer detection failed after', MAX_VIEWER_RETRIES, 'retries');
+        if (viewerRetryInterval) {
+          clearInterval(viewerRetryInterval);
+          viewerRetryInterval = null;
+        }
+        return false;
+      }
+      
+      return false;
+    }
+  }
+  
+  // Try once immediately
+  if (!attemptViewerDetection()) {
+    // If failed, start retry interval
+    viewerRetryInterval = setInterval(attemptViewerDetection, 500);
+  }
+}
+
 // Platform-specific selectors (COMPREHENSIVE 2025 UPDATE)
 const PLATFORM_SELECTORS = {
   tiktok: [
