@@ -88,25 +88,21 @@ function createAudioCaptureButton() {
     btn.style.boxShadow = '0 4px 12px rgba(255,68,68,0.3)';
   });
   
-  // CRITICAL: Real click handler - only sends message, background handles tabCapture
+  // CRITICAL: Real click handler - sends window.postMessage to content script
   btn.addEventListener('click', function() {
     console.log('🔴 [SPIKELY-PAGE] USER CLICKED AUDIO BUTTON');
     btn.textContent = '🎤 Processing...';
     btn.disabled = true;
     
-    // Send message to content script → background (proper MV3 flow)
-    try {
-      chrome.runtime.sendMessage({
-        type: 'USER_CLICKED_RED_BUTTON',
-        timestamp: Date.now(),
-        url: window.location.href
-      });
-      console.log('🔴 [SPIKELY-PAGE] ✅ Message sent to extension');
-    } catch (e) {
-      console.error('🔴 [SPIKELY-PAGE] ❌ Failed to send message:', e);
-      btn.textContent = '❌ Error';
-      btn.style.background = '#666';
-    }
+    // Send via window.postMessage to content script bridge
+    window.postMessage({
+      type: 'SPIKELY_USER_CLICKED_RED_BUTTON',
+      timestamp: Date.now(),
+      url: window.location.href,
+      source: 'spikely-page-script'
+    }, '*');
+    
+    console.log('🔴 [SPIKELY-PAGE] ✅ postMessage sent to content script');
   });
   
   document.body.appendChild(btn);
