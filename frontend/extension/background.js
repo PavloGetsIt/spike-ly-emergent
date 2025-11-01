@@ -114,6 +114,7 @@ let lastViewer = null;
 let lastViewerUpdateAt = 0;
 let audioStatus = { isCapturing: false, tabId: null };
 let lastLiveTabId = null;
+let contentScriptTabs = new Set(); // Track which tabs have active content scripts
 let authorizedTabId = null; // Tab granted via popup/sidepanel invocation
 
 // Audio capture state per tab (new unified approach)
