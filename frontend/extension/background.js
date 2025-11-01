@@ -533,6 +533,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         // Call tabCapture from background context (ONLY permitted location under MV3)
         chrome.tabCapture.capture({
+          consumerTabId: tabId,
           audio: true,
           video: false
         }, (stream) => {
