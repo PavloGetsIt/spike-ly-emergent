@@ -134,8 +134,6 @@ function detectPlatform() {
   return 'unknown';
 }
 
-const platform = detectPlatform();
-
 // HANDSHAKE - Send ready message to background script
 function sendContentScriptReady() {
   try {
