@@ -1845,13 +1845,16 @@ if (startAudioBtn) {
               clearTimeout(timeout);
               chrome.runtime.onMessage.removeListener(messageListener);
               
-              if (message.success && message.capture_started) {
+              if (message.capture_started) {
+                console.log('[AUDIO:SP] Confirmed → STREAMING');
                 console.log('[AUDIO:SP] ✅ Capture started confirmation received');
                 resolve(message);
               } else if (message.success) {
                 console.log('[AUDIO:SP] ⚠️ Success but no capture_started flag');
                 resolve(message);
               } else {
+                console.log('[AUDIO:SP] 🔴 STATE: CAPTURING → IDLE (ERROR)');
+                console.error('[AUDIO:SP] ❌ Audio capture failed:', message.error);
                 reject(new Error(message.error));
               }
             }
