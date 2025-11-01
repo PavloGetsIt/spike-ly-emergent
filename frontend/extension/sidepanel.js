@@ -1798,57 +1798,89 @@ async function startAudioViaScreenShare() {
 if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
-      console.log('[AUDIO:SP] ▶ START from sidepanel (gesture)');
+      console.log('[AUDIO:SP] ▶ START click');
+      
+      const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      console.log('[AUDIO:SP] ⏳ waiting response requestId=' + requestId);
+      
       startAudioBtn.disabled = true;
       startAudioBtn.textContent = 'Processing...';
       
-      try {
-        // Send START_AUDIO directly to background (no red button needed)
-        chrome.runtime.sendMessage({
-          type: 'START_AUDIO',
-          timestamp: Date.now()
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('[AUDIO:SP] ❌ AUDIO_FAILED code=RUNTIME_ERROR');
-            throw new Error('Failed to contact background: ' + chrome.runtime.lastError.message);
-          }
-          
-          if (response?.success) {
-            console.log('[AUDIO:SP] ✅ AUDIO_STARTED');
-            isSystemStarted = true;
-            audioIsCapturing = true;
-            updateAudioState(true);
-            startAudioBtn.disabled = false;
-            startAudioBtn.textContent = 'Stop Audio';
-            
-            if (testInsightBtn) {
-              testInsightBtn.style.display = 'inline-block';
-            }
-          } else {
-            console.error('[AUDIO:SP] ❌ AUDIO_FAILED code=' + (response?.errorCode || 'UNKNOWN'));
-            throw new Error(response?.error || 'Audio capture failed');
-          }
-        });
-        
-      } catch (error) {
-        console.error('[AUDIO:SP] ❌ Audio setup failed:', error);
-        
-        // Reset UI with retry option
+      // 6s client-side watchdog
+      const watchdog = setTimeout(() => {
+        console.error('[AUDIO:SP] ❌ Client watchdog fired - cancelling processing state');
         updateAudioState(false);
         startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Focus & Retry';
+        startAudioBtn.textContent = 'Try Again';
         isSystemStarted = false;
         
-        // Show actionable error
-        const errorCode = error.message.includes('chrome://') ? 'CHROME_PAGE_BLOCKED' 
-                         : error.message.includes('not found') ? 'NO_TAB'
-                         : 'GENERAL';
+        alert('⚠️ Audio Capture Timed Out\n\nTook longer than 6 seconds. Please:\n1. Make sure TikTok tab is focused\n2. Try "Try Again" button');
+      }, 6000);
+      
+      // Send START_AUDIO directly to background
+      chrome.runtime.sendMessage({
+        type: 'START_AUDIO',
+        requestId: requestId,
+        gesture: true,
+        timestamp: Date.now()
+      }, (response) => {
+        clearTimeout(watchdog);
         
-        alert('⚠️ Audio Capture Failed\n\nError: ' + error.message + '\n\n' +
-              (errorCode === 'CHROME_PAGE_BLOCKED' ? 'Please switch to a TikTok Live tab first.' :
-               errorCode === 'NO_TAB' ? 'Please open a TikTok Live tab.' :
-               'Try clicking "Focus & Retry" or reload the extension.'));
-      }
+        if (chrome.runtime.lastError) {
+          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          startAudioBtn.textContent = 'Try Again';
+          isSystemStarted = false;
+          
+          alert('⚠️ Extension Error\n\n' + chrome.runtime.lastError.message);
+          return;
+        }
+        
+        if (response?.ok) {
+          console.log('[AUDIO:SP] ✅ STARTED streamId=' + response.streamId);
+          
+          isSystemStarted = true;
+          audioIsCapturing = true;
+          updateAudioState(true);
+          startAudioBtn.disabled = false;
+          startAudioBtn.textContent = 'Stop Audio';
+          
+          if (testInsightBtn) {
+            testInsightBtn.style.display = 'inline-block';
+          }
+          
+        } else {
+          const errorCode = response?.code || 'UNKNOWN';
+          const errorMsg = response?.message || 'Unknown error';
+          
+          console.error('[AUDIO:SP] ❌ FAILED code=' + errorCode + ' msg=' + errorMsg);
+          
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          startAudioBtn.textContent = 'Focus & Retry';
+          isSystemStarted = false;
+          
+          // Map error codes to user messages
+          let userMessage = '';
+          if (errorCode === 'AUDIO_ERR_NOT_ELIGIBLE') {
+            userMessage = 'Open a TikTok Live tab and try again.';
+          } else if (errorCode === 'AUDIO_ERR_NOT_INVOKED') {
+            userMessage = 'Click the TikTok tab once, then press Start.';
+          } else if (errorCode === 'AUDIO_ERR_TIMEOUT') {
+            userMessage = 'Chrome didn\'t grant capture in time.';
+          } else if (errorCode === 'AUDIO_ERR_CHROME_PAGE_BLOCKED') {
+            userMessage = 'Chrome pages can\'t be captured.';
+          } else {
+            userMessage = errorMsg;
+          }
+          
+          alert('⚠️ Audio Capture Failed\n\n' + userMessage + '\n\nCode: ' + errorCode);
+        }
+      });
+      
+      // Enable system for UI state
+      isSystemStarted = true;
     } else {
       // Stop entire system
       console.debug('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
