@@ -1,0 +1,29 @@
+--- a/frontend/extension/sidepanel.js
++++ b/frontend/extension/sidepanel.js
+@@ -1826,6 +1826,8 @@
+       }, (response) => {
+         clearTimeout(watchdog);
+         
++        console.log('[AUDIO:SP] 📨 Response received:', response);
++        
+         if (chrome.runtime.lastError) {
+-          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
++          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR msg=' + chrome.runtime.lastError.message);
+           updateAudioState(false);
+@@ -1837,6 +1839,18 @@
+           return;
+         }
+         
++        if (!response) {
++          console.error('[AUDIO:SP] ❌ FAILED code=NO_RESPONSE msg=Background did not respond');
++          updateAudioState(false);
++          startAudioBtn.disabled = false;
++          startAudioBtn.textContent = 'Try Again';
++          isSystemStarted = false;
++          
++          alert('⚠️ No Response\\n\\nBackground script did not respond. Try reloading the extension.');
++          return;
++        }
++        
+         if (response?.ok) {
+           console.log('[AUDIO:SP] ✅ STARTED streamId=' + response.streamId);
