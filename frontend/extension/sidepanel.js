@@ -1834,19 +1834,27 @@ if (startAudioBtn) {
           files: ['page_script.js']
         });
         
-        // STEP 6: Listen for audio capture results with tight timeout
+        // STEP 6: Listen for audio capture results with acknowledgement
         const resultPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Timeout: Please click the RED audio button on the TikTok page'));
-          }, 5000); // Tight 5-second timeout
+          }, 15000); // 15-second timeout
+          
+          let acknowledgementReceived = false;
           
           const messageListener = (message) => {
-            if (message.type === 'AUDIO_CAPTURE_RESULT') {
+            if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
+              console.log('[AUDIO:SP] received capture_click_acknowledged');
+              acknowledgementReceived = true;
+              // Don't resolve yet, wait for actual capture result
+              
+            } else if (message.type === 'AUDIO_CAPTURE_RESULT') {
               clearTimeout(timeout);
               chrome.runtime.onMessage.removeListener(messageListener);
               
               if (message.capture_started) {
                 console.log('[AUDIO:SP] Confirmed → STREAMING');
+                console.log('[AUDIO:SP] STREAMING enabled');
                 console.log('[AUDIO:SP] ✅ Capture started confirmation received');
                 resolve(message);
               } else if (message.success) {
