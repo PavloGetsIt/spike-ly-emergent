@@ -1209,16 +1209,6 @@ const CHAT_CONFIG = {
   RETRY_FIND_INTERVAL_MS: 3000         // Retry finding chat container every 3s
 };
 
-// Chat state
-let chatContainer = null;
-let chatObserver = null;
-let chatBuffer = [];
-let lastChatEmitTime = 0;
-let seenCommentIds = new Set();
-let chatMutationDebounce = null;
-let chatRetryInterval = null;
-let isChatTracking = false;
-
 // Platform-specific chat selectors
 const CHAT_SELECTORS = {
   tiktok: {
