@@ -690,6 +690,168 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     return true; // Keep message channel open
     
+  } else if (message.type === 'START_AUDIO') {
+    // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
+    const requestId = message.requestId;
+    console.log('[AUDIO:BG] ▶ START requestId=' + requestId);
+    
+    (async () => {
+      const startTime = Date.now();
+      
+      try {
+        // STEP 1: Locate target TikTok Live tab
+        const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (!activeTab?.id || !activeTab.url) {
+          sendResponse({ 
+            ok: false, 
+            code: 'AUDIO_ERR_NOT_ELIGIBLE',
+            message: 'No active tab found'
+          });
+          return;
+        }
+        
+        const tabId = activeTab.id;
+        const url = activeTab.url;
+        
+        // STEP 2: Validate eligibility
+        if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) {
+          console.log('[AUDIO:BG] ❌ tabCapture FAIL code=CHROME_PAGE_BLOCKED');
+          sendResponse({ 
+            ok: false, 
+            code: 'AUDIO_ERR_CHROME_PAGE_BLOCKED',
+            message: 'Chrome pages cannot be captured'
+          });
+          return;
+        }
+        
+        const isTikTok = /tiktok\.com.*\/live/i.test(url);
+        const isEligible = isTikTok || /twitch\.tv|kick\.com|youtube\.com/i.test(url);
+        
+        console.log('[AUDIO:BG] 🔎 targetTab url=' + url.substring(0, 50) + ' focused=' + activeTab.active + ' eligible=' + isEligible);
+        
+        if (!isEligible) {
+          sendResponse({ 
+            ok: false, 
+            code: 'AUDIO_ERR_NOT_ELIGIBLE',
+            message: 'Please open a supported live stream (TikTok, Twitch, Kick, YouTube)'
+          });
+          return;
+        }
+        
+        // STEP 3: Stop existing capture cleanly
+        if (audioCaptureState.has(tabId)) {
+          console.log('[AUDIO:BG] ⏹ STOP reason=clean_restart');
+          const existing = audioCaptureState.get(tabId);
+          if (existing.stream) {
+            existing.stream.getTracks().forEach(track => track.stop());
+          }
+          audioCaptureState.delete(tabId);
+        }
+        
+        // STEP 4: Focus tab window + activation hop
+        await chrome.windows.update(activeTab.windowId, { focused: true });
+        await chrome.tabs.update(tabId, { active: true });
+        
+        console.log('[AUDIO:BG] 🪄 activation-hop starting...');
+        
+        // Critical: executeScript for activeTab grant
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: () => void 0 // no-op injection for activation
+        });
+        
+        console.log('[AUDIO:BG] 🪄 activation-hop injected ok');
+        
+        // STEP 5: Ensure offscreen
+        await ensureOffscreen();
+        
+        // STEP 6: tabCapture within gesture window (< 1.5s from start)
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 1500) {
+          throw new Error('AUDIO_ERR_TIMEOUT - Setup took ' + elapsed + 'ms');
+        }
+        
+        console.log('[AUDIO:BG] 🟢 tabCapture starting...');
+        
+        const stream = await new Promise((resolve, reject) => {
+          const captureTimeout = setTimeout(() => {
+            console.log('[AUDIO:BG] ❌ tabCapture FAIL code=TIMEOUT');
+            reject(new Error('AUDIO_ERR_TIMEOUT'));
+          }, 3000); // 3s for actual capture
+          
+          chrome.tabCapture.capture(
+            { audio: true, video: false },
+            (captureStream) => {
+              clearTimeout(captureTimeout);
+              
+              if (chrome.runtime.lastError) {
+                const lastError = chrome.runtime.lastError.message;
+                console.log('[AUDIO:BG] ❌ tabCapture FAIL code=API_ERROR lastError=' + lastError);
+                reject(new Error(lastError));
+              } else if (!captureStream || !captureStream.getAudioTracks || captureStream.getAudioTracks().length === 0) {
+                console.log('[AUDIO:BG] ❌ tabCapture FAIL code=NO_TRACKS');
+                reject(new Error('No audio tracks captured'));
+              } else {
+                console.log('[AUDIO:BG] 🟢 tabCapture OK with capture options');
+                resolve(captureStream);
+              }
+            }
+          );
+        });
+        
+        // STEP 7: Success - store and respond
+        audioCaptureState.set(tabId, {
+          isCapturing: true,
+          stream: stream,
+          startTime: Date.now(),
+          requestId: requestId
+        });
+        
+        startKeepAlive();
+        
+        // Setup cleanup on track end
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.onended = () => {
+            console.log('[AUDIO:BG] ⏹ STOP reason=track_ended');
+            audioCaptureState.delete(tabId);
+            stopKeepAlive();
+          };
+        }
+        
+        correlationEngine.startAutoInsightTimer();
+        
+        sendResponse({ 
+          ok: true, 
+          streamId: stream.id,
+          tabId: tabId,
+          diagnostics: { url, focused: true, activationOk: true }
+        });
+        
+        console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
+        
+      } catch (error) {
+        const totalTime = Date.now() - startTime;
+        const isTimeout = error.message.includes('TIMEOUT');
+        const isPermission = error.message.includes('permission') || error.message.includes('invoked');
+        
+        const errorCode = isTimeout ? 'AUDIO_ERR_TIMEOUT'
+                         : isPermission ? 'AUDIO_ERR_NOT_INVOKED' 
+                         : 'AUDIO_ERR_GENERAL';
+        
+        console.log('[AUDIO:BG] ❌ tabCapture FAIL code=' + errorCode + ' time=' + totalTime + 'ms');
+        
+        sendResponse({ 
+          ok: false, 
+          code: errorCode,
+          message: error.message,
+          diagnostics: { totalTime }
+        });
+      }
+    })();
+    
+    return true; // Keep message channel open
+    
   } else if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
     // Forward click acknowledgement to sidepanel
     console.log('[BG] 🔴 Click acknowledgement received, forwarding to sidepanel');
