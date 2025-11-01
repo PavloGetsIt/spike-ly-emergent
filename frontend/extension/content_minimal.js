@@ -87,36 +87,46 @@
     console.error('[SPIKELY] ❌ Handshake error:', e);
   }
   
-  // Enhanced viewer detection with shadow DOM support
+  // Enhanced viewer detection with TikTok selector cascade
   function findViewerCount() {
     if (platform !== 'tiktok') return null;
     
-    console.log('[SPIKELY] 🔍 Enhanced viewer search (including shadow DOM)...');
+    console.log('[SPIKELY] 🔍 Enhanced viewer search with TikTok cascade...');
     
-    // Get ALL elements including shadow DOM
-    function getAllElementsWithShadow(root = document) {
-      const elements = Array.from(root.querySelectorAll('*'));
-      const allElements = [...elements];
-      
-      // Check for shadow roots
-      for (const el of elements) {
-        if (el.shadowRoot) {
-          allElements.push(...getAllElementsWithShadow(el.shadowRoot));
+    // TikTok selector cascade  
+    const tiktokSelectors = [
+      '[data-e2e="live-viewer-count"]',
+      '[class*="viewer"]',
+      '[class*="Count"]',
+      'div[class*="viewer"] span',
+      'span[class*="count"]'
+    ];
+    
+    // Strategy 1: Priority selectors
+    for (const selector of tiktokSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent?.trim() || '';
+          const parsed = parseViewerNumber(text);
+          if (parsed > 0) {
+            console.log('[SPIKELY] 👀 Viewer Count:', parsed, '(selector:', selector + ')');
+            return { element: el, count: parsed, text: text };
+          }
         }
+      } catch (e) {
+        // Skip invalid selectors
       }
-      return allElements;
     }
     
-    const allElements = getAllElementsWithShadow();
-    console.log('[SPIKELY] Scanning', allElements.length, 'elements (including shadow DOM)');
+    const allElements = Array.from(document.querySelectorAll('*'));
+    console.log('[SPIKELY] Scanning', allElements.length, 'elements for viewer patterns...');
     
-    // Strategy 1: "Viewers • X" pattern
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
-      // Match "Viewers • X" or similar 
+      // Strategy 2: Exact "Viewers • 127" TikTok 2025 format
       if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
-        // Strategy 1: Exact "Viewers • 127" TikTok 2025 format
         const exactMatch = text.match(/viewers?\s*•\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (exactMatch) {
           const numericValue = parseViewerNumber(exactMatch[1]);
@@ -126,7 +136,7 @@
           }
         }
         
-        // Strategy 2: Flexible pattern matching
+        // Strategy 3: Flexible pattern matching
         const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (match) {
           const countText = match[1];
@@ -139,37 +149,11 @@
       }
     }
     
-    // Strategy 2: TikTok 2025 specific selectors
-    const tiktokSelectors = [
-      '[data-e2e="live-viewer-count"]',
-      '[data-e2e*="viewer"]',
-      '[data-testid*="viewer"]',
-      'div[class*="viewer"] span',
-      'div[class*="live"] span[class*="count"]',
-      'span[class*="viewer-count"]',
-      'div:has(> span:contains("Viewers"))'
-    ];
-    
-    for (const selector of tiktokSelectors) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          const text = el.textContent?.trim() || '';
-          const numericValue = parseViewerNumber(text);
-          if (numericValue > 0) {
-            console.log('[SPIKELY] ✅ Found via selector:', selector, '→', numericValue);
-            return { element: el, count: numericValue, text: text };
-          }
-        }
-      } catch (e) {
-        // Skip invalid selectors
-      }
-    }
-    
-    // Strategy 3: Ancestor lineage scanning for live viewer context
+    // Strategy 4: Ancestor lineage scanning with regex fallback
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
+      // Regex fallback for standalone numbers
       if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
         let ancestor = el.parentElement;
         let depth = 0;
@@ -189,12 +173,15 @@
       }
     }
     
-    console.log('[SPIKELY] ❌ No viewer count found after enhanced search');
+    console.log('[SPIKELY] ❌ No viewer count found after cascade search');
     return null;
   }
   
-  // Parse viewer number (handles K, M, B suffixes)
+  // Parse viewer number with comma and K/M/B handling
   function parseViewerNumber(text) {
+    if (!text) return 0;
+    
+    // Strip commas and whitespace
     const cleaned = text.toLowerCase().replace(/[,\s]/g, '');
     const match = cleaned.match(/^([\d.]+)([kmb])?$/);
     if (!match) return 0;
@@ -202,6 +189,7 @@
     let num = parseFloat(match[1]);
     const suffix = match[2];
     
+    // Handle K/M/B formatting
     if (suffix === 'k') num *= 1000;
     else if (suffix === 'm') num *= 1000000;
     else if (suffix === 'b') num *= 1000000000;
