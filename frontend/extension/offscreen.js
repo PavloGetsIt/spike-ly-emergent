@@ -73,37 +73,37 @@ async function startAudioCapture(streamId) {
     // Set up AudioContext at 16kHz for AssemblyAI
     audioContext = new AudioContext({ sampleRate: 16000 });
     source = audioContext.createMediaStreamSource(mediaStream);
-    
+
     // Create audio processor (2048 for lower latency)
     processor = audioContext.createScriptProcessor(2048, 1, 1);
-    
+
     processor.onaudioprocess = (e) => {
       if (!isCapturing) return;
-      
+
       const inputData = e.inputBuffer.getChannelData(0);
       const pcm16 = convertToPCM16(inputData);
-      
+
       // Send to AssemblyAI
       if (wsConnection?.readyState === WebSocket.OPEN) {
         wsConnection.send(pcm16.buffer);
       }
-      
+
       // Buffer for Hume AI
       humeAudioBuffer.push(...inputData);
-      
+
       // Trigger Hume AI analysis when buffer is full
       const now = Date.now();
-      if (humeAudioBuffer.length >= humeBufferSize && 
+      if (humeAudioBuffer.length >= humeBufferSize &&
           now - lastHumeAnalysis >= humeAnalysisInterval &&
           now >= humeCooldownUntil) {
         sendToHumeAI(humeAudioBuffer.slice(0, humeBufferSize));
         humeAudioBuffer = humeAudioBuffer.slice(humeBufferSize);
         lastHumeAnalysis = now;
       }
-      
+
       // Calculate audio level
       const level = calculateAudioLevel(inputData);
-      
+
       // Send level to background
       chrome.runtime.sendMessage({
         type: 'AUDIO_LEVEL',
@@ -115,10 +115,24 @@ async function startAudioCapture(streamId) {
     source.connect(processor);
     processor.connect(audioContext.destination);
 
-    // Connect to AssemblyAI
-    await connectToAssemblyAI();
-    
+    // Mark capture active before external connections complete
     isCapturing = true;
+
+    // Kick off AssemblyAI connection in the background so callers don't block on it
+    connectToAssemblyAI()
+      .then(() => {
+        console.log('[Offscreen] ✅ AssemblyAI streaming ready');
+      })
+      .catch((err) => {
+        console.error('[Offscreen] ❌ AssemblyAI connection failed:', err);
+        chrome.runtime.sendMessage({
+          type: 'AUDIO_CAPTURE_RESULT',
+          success: false,
+          error: err?.message || String(err)
+        });
+        stopAudioCapture();
+      });
+
     console.log('[Offscreen] ✅ Audio processing started');
   } catch (error) {
     console.error('[Offscreen] ❌ Error starting capture:', error);

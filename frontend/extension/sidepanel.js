@@ -688,7 +688,7 @@ function startCooldownTimer(seconds) {
 
 // Listen to messages from background script (viewer updates, transcripts, etc.)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE'];
+  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE', 'AUDIO_CAPTURE_RESULT'];
   
   if (!message || !message.type || !allowedTypes.includes(message.type)) {
     return;
@@ -866,6 +866,19 @@ function handleMessage(message) {
     case 'COUNTDOWN_UPDATE':
       console.log('[SIDEPANEL] ⏰ COUNTDOWN_UPDATE received:', message.seconds + 's');
       updateCountdown(message.seconds);
+      break;
+    case 'AUDIO_CAPTURE_RESULT':
+      if (!message.success) {
+        console.warn('[SIDEPANEL] ⚠️ AUDIO_CAPTURE_RESULT failure:', message.error);
+        audioIsCapturing = false;
+        isSystemStarted = false;
+        updateAudioState(false);
+        if (startAudioBtn) {
+          startAudioBtn.disabled = false;
+          startAudioBtn.textContent = 'Try Again';
+        }
+        alert('⚠️ Audio pipeline error\n\n' + (message.error || 'Unknown error. Please retry.'));
+      }
       break;
     case 'FULL_RESET':
       resetAllData();
