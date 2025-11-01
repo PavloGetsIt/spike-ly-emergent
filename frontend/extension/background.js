@@ -526,14 +526,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error('No tab ID in message sender');
         }
         
+        // Validate gesture timing (must be < 500ms old)
+        const gestureAge = performance.now() - (message.gestureTimestamp || 0);
+        if (gestureAge > 500) {
+          throw new Error(`Gesture too old: ${gestureAge}ms (max 500ms)`);
+        }
+        console.log('[BG] ✅ Gesture timing valid:', gestureAge + 'ms');
+        
         console.log('[BG] 🎤 STATE: CAPTURING - Calling tabCapture.capture()...');
         
         // Start keep-alive to prevent service worker sleep
         startKeepAlive();
         
-        // Call tabCapture from background context (ONLY permitted location under MV3)
+        // Call tabCapture from background context with MV3 requirements
         chrome.tabCapture.capture({
           consumerTabId: tabId,
+          targetTabId: tabId,
           audio: true,
           video: false
         }, (stream) => {
@@ -543,13 +551,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.error('[BG] ❌ TabCapture failed:', error);
             
             stopKeepAlive();
-            
-            // Update button via content script
-            chrome.tabs.sendMessage(tabId, {
-              type: 'UPDATE_BUTTON_STATE', 
-              state: 'error',
-              message: error
-            });
             
             // Notify sidepanel
             chrome.runtime.sendMessage({
@@ -564,14 +565,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             
             stopKeepAlive();
             
-            // Update button via content script
-            chrome.tabs.sendMessage(tabId, {
-              type: 'UPDATE_BUTTON_STATE',
-              state: 'error', 
-              message: 'No audio tracks'
-            });
-            
-            // Notify sidepanel
             chrome.runtime.sendMessage({
               type: 'AUDIO_CAPTURE_RESULT',
               success: false,
@@ -580,28 +573,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             
           } else {
             console.log('[BG] 🔴 STATE: CAPTURING → STREAMING');
+            console.log('[AUDIO] PERMISSION POPUP SHOWN');
+            console.log('[AUDIO] STREAM RECEIVED');
             console.log('[BG] ✅ TabCapture SUCCESS:', stream.getAudioTracks().length, 'tracks');
             
-            // Store stream for processing
+            // Store stream
             audioCaptureState.set(tabId, {
               isCapturing: true,
               stream: stream,
               startTime: Date.now()
             });
             
-            // Update button to success
-            chrome.tabs.sendMessage(tabId, {
-              type: 'UPDATE_BUTTON_STATE',
-              state: 'success'
-            });
-            
             // Start correlation engine
             correlationEngine.startAutoInsightTimer();
             
-            // Notify sidepanel with streamId for AssemblyAI
+            // Notify sidepanel with streamId
             chrome.runtime.sendMessage({
               type: 'AUDIO_CAPTURE_RESULT',
               success: true,
+              capture_started: true,
               streamId: stream.id,
               trackCount: stream.getAudioTracks().length
             });
@@ -624,7 +614,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })();
     
-    return true; // Keep message channel open
+    return true;
     
   } else if (message.type === 'AUDIO_CAPTURE_RESULT') {
     // Handle result from page script button click
