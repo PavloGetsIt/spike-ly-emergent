@@ -701,6 +701,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         console.debug('[AUDIO:BG:READY] Capture complete for tab', tabId);
         
+        // Start viewer tracking on content script
+        console.log('[AUDIO:BG] 🎯 Starting viewer tracking on content script...');
+        chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, (trackingResponse) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[AUDIO:BG] ⚠️ START_TRACKING failed:', chrome.runtime.lastError.message);
+          } else {
+            console.log('[AUDIO:BG] ✅ Viewer tracking started:', trackingResponse);
+          }
+        });
+        
         // Start 20-second auto-insight timer
         correlationEngine.startAutoInsightTimer();
         console.log('[AUDIO:BG] 🎯 Started auto-insight timer');
