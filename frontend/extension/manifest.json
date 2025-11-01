@@ -31,8 +31,9 @@
       "https://*.kick.com/*",
       "https://*.youtube.com/*"
     ],
-    "js": ["test_simple.js"],
-    "run_at": "document_end"
+    "js": ["content_minimal.js"],
+    "run_at": "document_end",
+    "all_frames": true
   }],
   "action": {
     "default_icon": {
