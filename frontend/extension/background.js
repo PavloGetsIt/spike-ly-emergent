@@ -495,6 +495,94 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'PROCESS_CAPTURED_STREAM') {
+    (async () => {
+      console.debug('[AUDIO:BG:PROCESS] PROCESS_CAPTURED_STREAM received', { tabId: message.tabId });
+      
+      try {
+        const tabId = message.tabId;
+        
+        if (!tabId) {
+          throw new Error('No tab ID provided');
+        }
+        
+        // STEP 1: Ensure content script is injected and ready
+        console.log('[AUDIO:BG] 💉 Checking content script readiness...');
+        
+        // Check if we have confirmation that content script is ready
+        const isContentScriptReady = contentScriptTabs.has(tabId);
+        console.log('[AUDIO:BG] Content script ready check:', { tabId, ready: isContentScriptReady });
+        
+        if (!isContentScriptReady) {
+          console.log('[AUDIO:BG] ⚠️ Content script not ready, injecting programmatically...');
+          
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: ['content.js']
+            });
+            console.log('[AUDIO:BG] ✅ Content script injected, waiting for handshake...');
+            
+            // Wait up to 3 seconds for handshake
+            let handshakeReceived = false;
+            for (let i = 0; i < 6; i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              if (contentScriptTabs.has(tabId)) {
+                handshakeReceived = true;
+                break;
+              }
+            }
+            
+            if (!handshakeReceived) {
+              throw new Error('Content script did not respond after injection');
+            }
+            
+            console.log('[AUDIO:BG] ✅ Content script handshake confirmed');
+          } catch (injectError) {
+            console.error('[AUDIO:BG] ❌ Content script injection failed:', injectError);
+            sendResponse({ 
+              success: false, 
+              error: 'Failed to initialize page tracking: ' + injectError.message
+            });
+            return;
+          }
+        }
+        
+        // Stream is already captured by side panel, just process it
+        console.log('[AUDIO:BG] ✅ Processing captured stream for tab', tabId);
+        
+        // Store capture state
+        audioCaptureState.set(tabId, {
+          isCapturing: true,
+          startTime: Date.now()
+        });
+        
+        // Start viewer tracking on content script
+        console.log('[AUDIO:BG] 🎯 Starting viewer tracking on content script...');
+        chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, (trackingResponse) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[AUDIO:BG] ⚠️ START_TRACKING failed:', chrome.runtime.lastError.message);
+          } else {
+            console.log('[AUDIO:BG] ✅ Viewer tracking started:', trackingResponse);
+          }
+        });
+        
+        // Start 20-second auto-insight timer
+        correlationEngine.startAutoInsightTimer();
+        console.log('[AUDIO:BG] 🎯 Started auto-insight timer');
+        
+        sendResponse({ success: true, tabId });
+        
+      } catch (error) {
+        console.debug('[AUDIO:BG:ERR] Stream processing error:', error.message);
+        sendResponse({ 
+          success: false, 
+          error: error.message
+        });
+      }
+    })();
+    return true;
+    
   } else if (message.type === 'START_AUDIO_CAPTURE') {
     (async () => {
       console.debug('[AUDIO:BG:START] START_AUDIO_CAPTURE received');
