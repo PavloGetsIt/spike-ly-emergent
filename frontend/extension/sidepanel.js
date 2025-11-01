@@ -1798,125 +1798,56 @@ async function startAudioViaScreenShare() {
 if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
-      console.debug('[AUDIO:SP:TX] START_AUDIO_CAPTURE - User gesture active');
+      console.log('[AUDIO:SP] ▶ START from sidepanel (gesture)');
       startAudioBtn.disabled = true;
-      startAudioBtn.textContent = 'Starting...';
+      startAudioBtn.textContent = 'Processing...';
       
       try {
-        // STEP 1: Get active tab and focus it
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!activeTab?.id) {
-          throw new Error('No active tab found');
-        }
-        
-        // STEP 2: Check for unsupported URLs
-        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
-          throw new Error('Chrome pages cannot be captured. Please open a TikTok Live tab first.');
-        }
-        
-        console.log('[AUDIO:SP] 🎯 Target tab:', activeTab.url.substring(0, 50));
-        
-        // STEP 3: Focus the TikTok tab
-        await chrome.tabs.update(activeTab.id, { active: true });
-        console.log('[AUDIO:SP] 🔍 Focused TikTok tab');
-        
-        // STEP 4: Inject content script first
-        await chrome.scripting.executeScript({
-          target: { tabId: activeTab.id },
-          files: ['content_minimal.js']
-        });
-        console.log('[AUDIO:SP] ✅ Content script injected');
-        
-        // STEP 5: Inject page script with real clickable button
-        console.log('[AUDIO:SP] 🔘 Injecting audio capture button into page...');
-        await chrome.scripting.executeScript({
-          target: { tabId: activeTab.id },
-          files: ['page_script.js']
-        });
-        
-        // STEP 6: Listen for audio capture results with acknowledgement
-        const resultPromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Timeout: Please click the RED audio button on the TikTok page'));
-          }, 15000); // 15-second timeout
+        // Send START_AUDIO directly to background (no red button needed)
+        chrome.runtime.sendMessage({
+          type: 'START_AUDIO',
+          timestamp: Date.now()
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('[AUDIO:SP] ❌ AUDIO_FAILED code=RUNTIME_ERROR');
+            throw new Error('Failed to contact background: ' + chrome.runtime.lastError.message);
+          }
           
-          let acknowledgementReceived = false;
-          
-          const messageListener = (message) => {
-            if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
-              console.log('[AUDIO:SP] received capture_click_acknowledged');
-              acknowledgementReceived = true;
-              // Don't resolve yet, wait for actual capture result
-              
-            } else if (message.type === 'AUDIO_CAPTURE_RESULT') {
-              clearTimeout(timeout);
-              chrome.runtime.onMessage.removeListener(messageListener);
-              
-              if (message.capture_started) {
-                console.log('[AUDIO:SP] Confirmed → STREAMING');
-                console.log('[AUDIO:SP] STREAMING enabled');
-                console.log('[AUDIO:SP] ✅ Capture started confirmation received');
-                resolve(message);
-              } else if (message.success) {
-                console.log('[AUDIO:SP] ⚠️ Success but no capture_started flag');
-                resolve(message);
-              } else {
-                console.log('[AUDIO:SP] 🔴 STATE: CAPTURING → IDLE (ERROR)');
-                console.error('[AUDIO:SP] ❌ Audio capture failed:', message.error);
-                reject(new Error(message.error));
-              }
+          if (response?.success) {
+            console.log('[AUDIO:SP] ✅ AUDIO_STARTED');
+            isSystemStarted = true;
+            audioIsCapturing = true;
+            updateAudioState(true);
+            startAudioBtn.disabled = false;
+            startAudioBtn.textContent = 'Stop Audio';
+            
+            if (testInsightBtn) {
+              testInsightBtn.style.display = 'inline-block';
             }
-          };
-          
-          chrome.runtime.onMessage.addListener(messageListener);
+          } else {
+            console.error('[AUDIO:SP] ❌ AUDIO_FAILED code=' + (response?.errorCode || 'UNKNOWN'));
+            throw new Error(response?.error || 'Audio capture failed');
+          }
         });
-        
-        // STEP 7: Update UI to instruct user
-        startAudioBtn.textContent = '👆 Click Red Button';
-        startAudioBtn.style.background = '#ff4444';
-        startAudioBtn.disabled = true;
-        
-        console.log('[AUDIO:SP] 🔴 Waiting for user to click red button on TikTok page...');
-        console.log('[AUDIO:SP] 💡 Look for the red "🎤 Start Spikely Audio" button');
-        
-        // STEP 8: Wait for user to click button and background to process
-        const result = await resultPromise;
-        console.log('[AUDIO:SP] ✅ Audio capture completed:', result);
-        
-        // STEP 9: Success - update UI and start tracking
-        isSystemStarted = true;
-        audioIsCapturing = true;
-        updateAudioState(true);
-        startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Stop Audio';
-        startAudioBtn.style.background = '';
-        
-        console.log('[Spikely Side Panel] ✅ System started successfully');
-        
-        // Start viewer tracking
-        chrome.tabs.sendMessage(activeTab.id, { type: 'START_TRACKING' }, (trackingResponse) => {
-          console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
-        });
-        
-        if (testInsightBtn) {
-          testInsightBtn.style.display = 'inline-block';
-        }
         
       } catch (error) {
         console.error('[AUDIO:SP] ❌ Audio setup failed:', error);
         
-        // Reset UI on error
+        // Reset UI with retry option
         updateAudioState(false);
         startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Start Audio';
-        startAudioBtn.style.background = '';
+        startAudioBtn.textContent = 'Focus & Retry';
         isSystemStarted = false;
         
-        if (error.message.includes('click the RED audio button')) {
-          alert('⚠️ Audio Capture Requires Your Click\n\nPlease:\n1. Look for the RED "🎤 Start Spikely Audio" button on the TikTok page (top-right)\n2. Click it to start audio capture\n3. Grant permission when Chrome asks');
-        } else {
-          alert('⚠️ Audio Setup Failed\n\n' + error.message);
-        }
+        // Show actionable error
+        const errorCode = error.message.includes('chrome://') ? 'CHROME_PAGE_BLOCKED' 
+                         : error.message.includes('not found') ? 'NO_TAB'
+                         : 'GENERAL';
+        
+        alert('⚠️ Audio Capture Failed\n\nError: ' + error.message + '\n\n' +
+              (errorCode === 'CHROME_PAGE_BLOCKED' ? 'Please switch to a TikTok Live tab first.' :
+               errorCode === 'NO_TAB' ? 'Please open a TikTok Live tab.' :
+               'Try clicking "Focus & Retry" or reload the extension.'));
       }
     } else {
       // Stop entire system
