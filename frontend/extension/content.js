@@ -1721,15 +1721,13 @@ window.__SPIKELY_TEST_CHAT__ = function() {
 };
 
 
-// Content script loaded - no auto-start, wait for explicit START_TRACKING
+// Content script loaded - DOM ready initialization complete
 console.log('🎉🎉🎉 [SPIKELY] CONTENT SCRIPT FULLY LOADED! 🎉🎉🎉');
-console.log('[Spikely] Content script loaded - Version 2.2.0-CHAT-STREAM + ENHANCED-LOGGING');
-console.log('[Spikely] 🧪 Viewer detection test: window.__SPIKELY_TEST__()');
-console.log('[Spikely] 💬 Chat detection test: window.__SPIKELY_TEST_CHAT__()');
+console.log('[Spikely] Version: 2.3.0-ROBUST-INJECTION');
 console.log('[Spikely] Platform detected:', platform);
-console.log('[Spikely] Ready to receive START_TRACKING command from background');
+console.log('[Spikely] 🧪 Manual tests: window.__SPIKELY_TEST__(), window.__SPIKELY_TEST_CHAT__()');
 
-// Expose manual testing function
+// Expose manual testing functions
 window.__SPIKELY_TEST__ = function() {
   console.log('='.repeat(60));
   console.log('🧪 SPIKELY MANUAL VIEWER DETECTION TEST');
@@ -1748,6 +1746,34 @@ window.__SPIKELY_TEST__ = function() {
     
     // Try to trigger an update
     if (parsed !== null) {
+      console.log('\n📤 Sending test message to background script...');
+      safeSendMessage({
+        type: 'VIEWER_COUNT_UPDATE',
+        platform,
+        count: parsed,
+        delta: 0,
+        timestamp: Date.now(),
+        source: 'manual_test'
+      });
+      console.log('   Message sent!');
+    }
+  } else {
+    console.log('❌ FAILED - No viewer count element found');
+    console.log('\n🔍 Debugging info:');
+    console.log('   Platform:', platform);
+    console.log('   URL:', window.location.href);
+    console.log('   Is tracking:', isTracking);
+    
+    console.log('\n💡 Suggestions:');
+    console.log('   1. Make sure you\'re on a TikTok Live page');
+    console.log('   2. Open DevTools and inspect the viewer count element');
+    console.log('   3. Look for a number like "2.1K" near the text "Viewers"');
+    console.log('   4. Check the console logs above for detailed search results');
+  }
+  
+  console.log('='.repeat(60));
+  return node;
+};
       console.log('\n📤 Sending test message to background script...');
       safeSendMessage({
         type: 'VIEWER_COUNT_UPDATE',
