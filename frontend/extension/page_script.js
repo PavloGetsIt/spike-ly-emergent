@@ -1,5 +1,34 @@
-// SPIKELY PAGE SCRIPT - Real button with tabCapture in page context
+// SPIKELY PAGE SCRIPT - Real button with proper MV3 message flow
 console.log('🟡 [SPIKELY-PAGE] Audio capture script loaded');
+
+let audioButton = null;
+
+// Listen for button state updates from background
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'UPDATE_BUTTON_STATE') {
+    console.log('🔘 [SPIKELY-PAGE] Button state update:', message.state);
+    
+    if (audioButton) {
+      if (message.state === 'success') {
+        audioButton.textContent = '✅ Success!';
+        audioButton.style.background = 'linear-gradient(135deg, #44ff44, #66ff66)';
+        setTimeout(() => {
+          audioButton.style.display = 'none';
+        }, 3000);
+      } else if (message.state === 'error') {
+        audioButton.textContent = '❌ ' + (message.message || 'Failed');
+        audioButton.style.background = '#666';
+        setTimeout(() => {
+          audioButton.textContent = '🎤 Try Again';
+          audioButton.disabled = false;
+          audioButton.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
+        }, 3000);
+      }
+    }
+    
+    sendResponse({ success: true });
+  }
+});
 
 // Create visible button for user to click
 function createAudioCaptureButton() {
@@ -39,13 +68,13 @@ function createAudioCaptureButton() {
     btn.style.boxShadow = '0 4px 12px rgba(255,68,68,0.3)';
   });
   
-  // CRITICAL: Real click handler - only sends message, NO tabCapture here
+  // CRITICAL: Real click handler - only sends message, background handles tabCapture
   btn.addEventListener('click', function() {
     console.log('🔴 [SPIKELY-PAGE] USER CLICKED AUDIO BUTTON');
     btn.textContent = '🎤 Processing...';
     btn.disabled = true;
     
-    // Send message to content script (no capture here)
+    // Send message to content script → background (proper MV3 flow)
     try {
       chrome.runtime.sendMessage({
         type: 'USER_CLICKED_RED_BUTTON',
@@ -59,6 +88,13 @@ function createAudioCaptureButton() {
       btn.style.background = '#666';
     }
   });
+  
+  document.body.appendChild(btn);
+  audioButton = btn;
+  console.log('🔴 [SPIKELY-PAGE] ✅ Audio capture button created and visible');
+  
+  return btn;
+}
   
   document.body.appendChild(btn);
   console.log('🔴 [SPIKELY-PAGE] ✅ Audio capture button created and visible');
