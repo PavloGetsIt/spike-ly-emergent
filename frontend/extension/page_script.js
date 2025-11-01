@@ -2,6 +2,8 @@
 console.log('🟡 [SPIKELY-PAGE] Audio capture script loaded');
 
 let audioButton = null;
+let mountRetries = 0;
+const MAX_MOUNT_RETRIES = 10;
 
 // Listen for button state updates from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -30,11 +32,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Create visible button for user to click
+// Create visible button with exponential retry
 function createAudioCaptureButton() {
+  // Check if TikTok DOM is fully loaded
+  if (!document.body || document.readyState === 'loading') {
+    const delay = Math.min(1000 * Math.pow(1.5, mountRetries), 5000); // Exponential backoff, max 5s
+    mountRetries++;
+    
+    if (mountRetries <= MAX_MOUNT_RETRIES) {
+      console.log(`🔄 [SPIKELY-PAGE] DOM not ready, retry ${mountRetries}/${MAX_MOUNT_RETRIES} in ${delay}ms`);
+      setTimeout(createAudioCaptureButton, delay);
+      return;
+    } else {
+      console.error('❌ [SPIKELY-PAGE] Failed to mount button after', MAX_MOUNT_RETRIES, 'retries');
+      return;
+    }
+  }
+  
   // Remove existing button if any
   const existing = document.getElementById('__SPIKELY_CAPTURE_BTN__');
   if (existing) existing.remove();
+  
+  console.log('🔴 [SPIKELY-PAGE] Creating audio capture button...');
   
   // Create styled button
   const btn = document.createElement('button');
@@ -55,6 +74,7 @@ function createAudioCaptureButton() {
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(255,68,68,0.3);
     transition: all 0.2s;
+    font-family: system-ui, -apple-system, sans-serif;
   `;
   
   // Hover effect
