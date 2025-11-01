@@ -1834,11 +1834,11 @@ if (startAudioBtn) {
           files: ['page_script.js']
         });
         
-        // STEP 6: Listen for audio capture results from background
+        // STEP 6: Listen for audio capture results with tight timeout
         const resultPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Timeout: Please click the RED audio button on the TikTok page'));
-          }, 30000);
+          }, 5000); // Tight 5-second timeout
           
           const messageListener = (message) => {
             if (message.type === 'AUDIO_CAPTURE_RESULT') {
