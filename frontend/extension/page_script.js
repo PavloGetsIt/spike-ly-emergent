@@ -5,32 +5,35 @@ let audioButton = null;
 let mountRetries = 0;
 const MAX_MOUNT_RETRIES = 10;
 
-// Listen for button state updates from background
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'UPDATE_BUTTON_STATE') {
-    console.log('🔘 [SPIKELY-PAGE] Button state update:', message.state);
-    
-    if (audioButton) {
-      if (message.state === 'success') {
-        audioButton.textContent = '✅ Success!';
-        audioButton.style.background = 'linear-gradient(135deg, #44ff44, #66ff66)';
-        setTimeout(() => {
-          audioButton.style.display = 'none';
-        }, 3000);
-      } else if (message.state === 'error') {
-        audioButton.textContent = '❌ ' + (message.message || 'Failed');
-        audioButton.style.background = '#666';
-        setTimeout(() => {
-          audioButton.textContent = '🎤 Try Again';
-          audioButton.disabled = false;
-          audioButton.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
-        }, 3000);
-      }
+// Listen for postMessage from content script (button state updates)
+window.addEventListener('message', function(event) {
+  if (event.source !== window || event.data?.source !== 'spikely-content-script') {
+    return;
+  }
+  
+  console.log('🔘 [SPIKELY-PAGE] Received postMessage:', event.data.type);
+  
+  if (event.data.type === 'SPIKELY_UPDATE_BUTTON' && audioButton) {
+    if (event.data.state === 'success') {
+      audioButton.textContent = '✅ Success!';
+      audioButton.style.background = 'linear-gradient(135deg, #44ff44, #66ff66)';
+      setTimeout(() => {
+        audioButton.style.display = 'none';
+      }, 3000);
+    } else if (event.data.state === 'error') {
+      audioButton.textContent = '❌ ' + (event.data.message || 'Failed');
+      audioButton.style.background = '#666';
+      setTimeout(() => {
+        audioButton.textContent = '🎤 Try Again';
+        audioButton.disabled = false;
+        audioButton.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
+      }, 3000);
     }
-    
-    sendResponse({ success: true });
   }
 });
+
+// Listen for button state updates from background (REMOVED - now use postMessage bridge)
+// chrome.runtime.onMessage.addListener(...) - REMOVED
 
 // Create visible button with exponential retry
 function createAudioCaptureButton() {
