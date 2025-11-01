@@ -46,6 +46,14 @@ class CorrelationEngine {
     this.currentGoal = 'engagement';     // FORCED for interactive content
     this.lastDetectedActivity = 'general';
     
+    // Viewer DOM detection state
+    this.viewerDetectionState = {
+      isScanning: false,
+      lastFoundElement: null,
+      scanInterval: null,
+      retryCount: 0
+    };
+    
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
     console.log('[Correlation] 🎯 Dynamic insights mode enabled');
     console.log('[Correlation] 🎯 Template fallback system loaded: 30 templates');
