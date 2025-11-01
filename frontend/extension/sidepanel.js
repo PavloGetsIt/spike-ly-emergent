@@ -1798,54 +1798,45 @@ async function startAudioViaScreenShare() {
 if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
-      // Start entire system
-      console.debug('[AUDIO:SP:TX] START_AUDIO_CAPTURE');
+      console.debug('[AUDIO:SP:TX] START_AUDIO_CAPTURE - User gesture active');
       startAudioBtn.disabled = true;
       startAudioBtn.textContent = 'Starting...';
       
-      // Enable system
-      isSystemStarted = true;
-      
-      // Start viewer tracking
-      sendToActive('START_VIEWER_TRACKING');
-      
-      // Start audio capture - MUST call tabCapture in user gesture context (side panel)
       try {
-        console.log('[AUDIO:SP] 📞 Starting tab audio capture (user gesture context)...');
-        
-        // Get active tab info
+        // STEP 1: Get active tab (MUST be in user gesture)
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!activeTab?.id) {
           throw new Error('No active tab found');
         }
         
-        // Check for chrome:// URLs which can't be captured
-        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
-          throw new Error('Chrome pages cannot be captured. Please switch to a TikTok Live tab.');
+        // STEP 2: Check for chrome:// URLs which can't be captured
+        if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://') || activeTab.url.startsWith('moz-extension://')) {
+          throw new Error('Chrome pages cannot be captured. Please open a TikTok Live tab first.');
         }
         
-        // Request activeTab permission for current tab
-        console.log('[AUDIO:SP] 🔐 Requesting activeTab permission...');
+        console.log('[AUDIO:SP] 🎯 Target tab:', activeTab.url.substring(0, 50), 'ID:', activeTab.id);
+        
+        // STEP 3: Request activeTab permission (MUST be in user gesture)
+        console.log('[AUDIO:SP] 🔐 Requesting activeTab permission for current tab...');
         const hasPermission = await chrome.permissions.request({
-          permissions: ['activeTab'],
-          origins: [activeTab.url]
+          permissions: ['activeTab']
         });
         
         if (!hasPermission) {
-          throw new Error('Permission denied for tab access');
+          throw new Error('ActiveTab permission denied. Extension cannot access the current page.');
         }
+        console.log('[AUDIO:SP] ✅ ActiveTab permission granted');
         
-        // Inject content script via chrome.scripting.executeScript (user gesture preserved)
-        console.log('[AUDIO:SP] 💉 Injecting content script via scripting API...');
+        // STEP 4: Inject content script (MUST be in user gesture)
+        console.log('[AUDIO:SP] 💉 Injecting content script into tab', activeTab.id);
         await chrome.scripting.executeScript({
           target: { tabId: activeTab.id },
           files: ['content.js']
         });
+        console.log('[AUDIO:SP] ✅ Content script injected');
         
-        // Wait for content script to initialize
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Call tabCapture DIRECTLY in button click (preserves user gesture)
+        // STEP 5: Call tabCapture (MUST be in user gesture)
+        console.log('[AUDIO:SP] 📞 Starting tab audio capture...');
         const stream = await new Promise((resolve, reject) => {
           chrome.tabCapture.capture({
             audio: true,
@@ -1854,34 +1845,28 @@ if (startAudioBtn) {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message));
             } else if (!captureStream || captureStream.getAudioTracks().length === 0) {
-              reject(new Error('No audio tracks captured from tab'));
+              reject(new Error('No audio tracks captured - tab may not have audio'));
             } else {
               resolve(captureStream);
             }
           });
         });
         
-        if (!stream || stream.getAudioTracks().length === 0) {
-          throw new Error('No audio tracks captured from tab');
-        }
+        console.log('[AUDIO:SP] ✅ Audio stream captured:', stream.getAudioTracks().length, 'tracks');
         
-        console.log('[AUDIO:SP] ✅ Tab audio captured successfully');
-        
-        // Send stream to background for processing
+        // STEP 6: Send to background for processing
         chrome.runtime.sendMessage({ 
           type: 'PROCESS_CAPTURED_STREAM',
           tabId: activeTab.id,
           streamActive: true
         }, (response) => {
-          console.debug('[AUDIO:SP:RX]', response);
-          
           if (response?.success) {
+            isSystemStarted = true;
             audioIsCapturing = true;
             updateAudioState(true);
             startAudioBtn.disabled = false;
-            console.log('[Spikely Side Panel] ✅ System started');
+            console.log('[Spikely Side Panel] ✅ System started successfully');
             
-            // Show test button when system starts
             if (testInsightBtn) {
               testInsightBtn.style.display = 'inline-block';
             }
@@ -1892,25 +1877,12 @@ if (startAudioBtn) {
         
       } catch (error) {
         console.error('[AUDIO:SP] ❌ Audio capture failed:', error);
+        alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nPlease:\n1. Make sure you\'re on a TikTok Live tab\n2. Try reloading the extension\n3. Refresh the TikTok page');
         
-        // Check if fallback is appropriate
-        if (error.message.includes('not supported') || error.message.includes('permission')) {
-          console.log('[AUDIO:SP:UI] Auto-falling back to screen share');
-          try {
-            await startAudioViaScreenShare();
-          } catch (fallbackErr) {
-            // Error already handled in helper
-            updateAudioState(false);
-            startAudioBtn.disabled = false;
-            isSystemStarted = false;
-          }
-        } else {
-          // Show friendly inline error
-          alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nTry refreshing the page or reloading the extension.');
-          updateAudioState(false);
-          startAudioBtn.disabled = false;
-          isSystemStarted = false;
-        }
+        updateAudioState(false);
+        startAudioBtn.disabled = false;
+        startAudioBtn.textContent = 'Start Audio';
+        isSystemStarted = false;
       }
     } else {
       // Stop entire system
