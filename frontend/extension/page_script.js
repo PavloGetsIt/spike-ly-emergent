@@ -112,9 +112,6 @@ function createAudioCaptureButton() {
   document.body.appendChild(btn);
   audioButton = btn;
   console.log('🔴 [SPIKELY-PAGE] ✅ Audio capture button created and visible');
-  document.body.appendChild(btn);
-  audioButton = btn;
-  console.log('🔴 [SPIKELY-PAGE] ✅ Audio capture button created and visible');
   
   return btn;
 }
