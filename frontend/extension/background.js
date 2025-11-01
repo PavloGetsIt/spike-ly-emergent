@@ -637,16 +637,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         );
         
-      } catch (error) {
-        console.log('[BG] 🔴 STATE: CAPTURING → IDLE (EXCEPTION)');
-        console.error('[BG] ❌ Audio capture setup failed:', error);
+      } catch (captureError) {
+        console.log('[BG] 🔴 STATE: CAPTURING → IDLE (CAPTURE_EXCEPTION)');
+        console.error('[BG] ❌ tabCapture.capture() failed:', captureError);
         
         stopKeepAlive();
         
         chrome.runtime.sendMessage({
           type: 'AUDIO_CAPTURE_RESULT',
           success: false,
-          error: error.message
+          error: captureError.message
         });
       }
     })();
