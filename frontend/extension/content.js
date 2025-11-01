@@ -247,9 +247,6 @@ function sendContentScriptReady() {
   }
 }
 
-// Navigation tracking
-let lastPathname = window.location.pathname;
-
 // Silence noisy unhandled rejections when extension reloads
 try {
   window.addEventListener('unhandledrejection', (e) => {
