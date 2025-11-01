@@ -1854,7 +1854,7 @@ if (startAudioBtn) {
         
         console.log('[AUDIO:SP] ✅ Audio stream captured:', stream.getAudioTracks().length, 'tracks');
         
-        // STEP 6: Send to background for processing
+        // STEP 6: Send to background for processing and start tracking
         chrome.runtime.sendMessage({ 
           type: 'PROCESS_CAPTURED_STREAM',
           tabId: activeTab.id,
@@ -1867,8 +1867,15 @@ if (startAudioBtn) {
             startAudioBtn.disabled = false;
             console.log('[Spikely Side Panel] ✅ System started successfully');
             
-            // Start viewer tracking
-            sendToActive('START_VIEWER_TRACKING');
+            // Start viewer tracking AFTER successful audio setup
+            console.log('[AUDIO:SP] 🎯 Starting viewer tracking...');
+            chrome.tabs.sendMessage(activeTab.id, { type: 'START_TRACKING' }, (trackingResponse) => {
+              if (chrome.runtime.lastError) {
+                console.warn('[AUDIO:SP] ⚠️ Viewer tracking start failed:', chrome.runtime.lastError.message);
+              } else {
+                console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
+              }
+            });
             
             if (testInsightBtn) {
               testInsightBtn.style.display = 'inline-block';
