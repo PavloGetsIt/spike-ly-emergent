@@ -219,7 +219,7 @@ async function startTrackingOnActiveTabs() {
       if (chrome.runtime.lastError) {
         console.warn(`[Spikely] sendMessage failed on tab ${tab.id}, injecting content script and retrying...`, chrome.runtime.lastError);
         // Fallback: manually inject content script then retry
-        chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] })
+        chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content_minimal.js'] })
           .then(() => {
             chrome.tabs.sendMessage(tab.id, { type: 'START_TRACKING' }, (resp2) => {
               if (chrome.runtime.lastError) {
@@ -473,7 +473,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Try sending first. If it fails, inject then retry.
         chrome.tabs.sendMessage(tabId, { type: forwardType, reset: message.reset === true }, (res) => {
           if (chrome.runtime.lastError) {
-            chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
+            chrome.scripting.executeScript({ target: { tabId }, files: ['content_minimal.js'] })
               .then(() => {
                 chrome.tabs.sendMessage(tabId, { type: forwardType, reset: message.reset === true }, (res2) => {
                   sendResponse?.({ success: !chrome.runtime.lastError, response: res2 });
@@ -519,7 +519,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             await chrome.scripting.executeScript({
               target: { tabId },
-              files: ['content.js']
+              files: ['content_minimal.js']
             });
             console.log('[AUDIO:BG] ✅ Content script injected, waiting for handshake...');
             
@@ -617,7 +617,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             await chrome.scripting.executeScript({
               target: { tabId },
-              files: ['content.js']
+              files: ['content_minimal.js']
             });
             console.log('[AUDIO:BG] ✅ Content script injected, waiting for handshake...');
             
@@ -1206,7 +1206,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   chrome.tabs.sendMessage(details.tabId, { type: 'START_TRACKING' }, () => {
     if (chrome.runtime.lastError) {
       // Attempt to inject if content script isn't present, then retry
-      chrome.scripting.executeScript({ target: { tabId: details.tabId }, files: ['content.js'] })
+      chrome.scripting.executeScript({ target: { tabId: details.tabId }, files: ['content_minimal.js'] })
         .then(() => {
           chrome.tabs.sendMessage(details.tabId, { type: 'START_TRACKING' }, () => {});
         })
@@ -1228,7 +1228,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     try {
       const u = new URL(tab.url);
       if (/(tiktok\.com|twitch\.tv|kick\.com|youtube\.com)/.test(u.hostname)) {
-        chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
+        chrome.scripting.executeScript({ target: { tabId }, files: ['content_minimal.js'] })
           .then(() => {
             chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, () => {});
           })
