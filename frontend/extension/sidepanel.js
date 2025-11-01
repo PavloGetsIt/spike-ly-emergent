@@ -1820,9 +1820,19 @@ if (startAudioBtn) {
         }
         
         // Call tabCapture DIRECTLY in button click (preserves user gesture)
-        const stream = await chrome.tabCapture.capture({
-          audio: true,
-          video: false
+        const stream = await new Promise((resolve, reject) => {
+          chrome.tabCapture.capture({
+            audio: true,
+            video: false
+          }, (captureStream) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else if (!captureStream || captureStream.getAudioTracks().length === 0) {
+              reject(new Error('No audio tracks captured from tab'));
+            } else {
+              resolve(captureStream);
+            }
+          });
         });
         
         if (!stream || stream.getAudioTracks().length === 0) {
