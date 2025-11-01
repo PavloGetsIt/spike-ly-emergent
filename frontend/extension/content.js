@@ -207,32 +207,27 @@ function startViewerDetectionWithRetry() {
 // Platform-specific selectors (COMPREHENSIVE 2025 UPDATE)
 const PLATFORM_SELECTORS = {
   tiktok: [
-    // 2025 TikTok Live selectors (most common patterns)
+    // 2025 TikTok Live selectors - Updated for current structure
     '[data-e2e="live-viewer-count"]',
     '[data-e2e*="viewer"]',
+    '[data-testid*="viewer"]',
     '[class*="LiveViewerCount"]',
     '[class*="ViewerCount"]',
     '[class*="live-viewer"]',
     '[class*="viewer-count"]',
     
-    // Original working selectors
+    // Updated patterns for TikTok's 2025 redesign
+    'div[class*="live"] span[class*="text"]',
+    'div[role="presentation"] span',
+    'div:has(> span:contains("Viewers"))',
+    
+    // Generic number patterns
+    'span:matches(text, /^[\\d,]+\\.?\\d*[KkMm]?$/)',
+    'div:matches(text, /^[\\d,]+\\.?\\d*[KkMm]?$/)',
+    
+    // Original working selectors (preserved)
     '.P4-Regular.text-UIText3',
-    'div:has(> span.inline-flex.justify-center)',
-    
-    // Generic class-based patterns
-    '[class*="viewer"]',
-    '[class*="Viewer"]',
-    
-    // Aria labels for accessibility
-    '[aria-label*="viewer"]',
-    '[aria-label*="Viewer"]',
-    
-    // Role-based selectors
-    '[role="status"]:has-text(/\d+[KkMm]?/)',
-    
-    // Generic fallbacks
-    'span:has-text(/^\d+\.?\d*[KkMm]?$/)',
-    'div:has-text(/^\d+\.?\d*[KkMm]?$/)'
+    'div:has(> span.inline-flex.justify-center)'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
