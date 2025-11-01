@@ -31,7 +31,7 @@
       "https://*.kick.com/*",
       "https://*.youtube.com/*"
     ],
-    "js": ["content.js"],
+    "js": ["content_minimal.js"],
     "run_at": "document_end"
   }],
   "action": {
