@@ -1834,19 +1834,19 @@ if (startAudioBtn) {
           files: ['page_script.js']
         });
         
-        // STEP 6: Listen for audio capture results
+        // STEP 6: Listen for audio capture results from background
         const resultPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error('Please click the red audio button that appeared on the TikTok page'));
-          }, 30000); // 30 second timeout
+            reject(new Error('Timeout: Please click the RED audio button on the TikTok page'));
+          }, 30000);
           
-          const messageListener = (message, sender, sendResponse) => {
+          const messageListener = (message) => {
             if (message.type === 'AUDIO_CAPTURE_RESULT') {
               clearTimeout(timeout);
               chrome.runtime.onMessage.removeListener(messageListener);
               
               if (message.success) {
-                resolve({ success: true, streamId: message.streamId, tracks: message.trackCount });
+                resolve(message);
               } else {
                 reject(new Error(message.error));
               }
@@ -1859,12 +1859,14 @@ if (startAudioBtn) {
         // STEP 7: Update UI to instruct user
         startAudioBtn.textContent = '👆 Click Red Button';
         startAudioBtn.style.background = '#ff4444';
+        startAudioBtn.disabled = true;
         
-        console.log('[AUDIO:SP] 🔴 Waiting for user to click the red audio button on TikTok page...');
+        console.log('[AUDIO:SP] 🔴 Waiting for user to click red button on TikTok page...');
+        console.log('[AUDIO:SP] 💡 Look for the red "🎤 Start Spikely Audio" button');
         
-        // STEP 8: Wait for user to click the injected button
+        // STEP 8: Wait for user to click button and background to process
         const result = await resultPromise;
-        console.log('[AUDIO:SP] ✅ Audio capture result:', result);
+        console.log('[AUDIO:SP] ✅ Audio capture completed:', result);
         
         // STEP 9: Success - update UI and start tracking
         isSystemStarted = true;
