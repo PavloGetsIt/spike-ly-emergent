@@ -59,54 +59,6 @@
   let trackingInterval = null;
   let lastViewerCount = 0;
   
-  // ==================== WINDOW.POSTMESSAGE BRIDGE ====================
-  // Bridge page_script.js → content_minimal.js → background.js
-  
-  console.log('[SPIKELY] 🌉 Setting up postMessage bridge...');
-  
-  // Listen for postMessage from page_script.js
-  window.addEventListener('message', function(event) {
-    // Validate source and message type
-    if (event.source !== window || !event.data?.source === 'spikely-page-script') {
-      return;
-    }
-    
-    console.log('[SPIKELY] 📨 Received postMessage:', event.data.type);
-    
-    if (event.data.type === 'SPIKELY_USER_CLICKED_RED_BUTTON') {
-      console.log('[SPIKELY] 🔴 Bridging user click to background script...');
-      
-      // Forward to background via chrome.runtime.sendMessage
-      chrome.runtime.sendMessage({
-        type: 'BEGIN_AUDIO_CAPTURE',
-        timestamp: event.data.timestamp,
-        url: event.data.url
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn('[SPIKELY] ⚠️ Background message failed:', chrome.runtime.lastError.message);
-          
-          // Send error back to page
-          window.postMessage({
-            type: 'SPIKELY_BRIDGE_ERROR',
-            error: chrome.runtime.lastError.message,
-            source: 'spikely-content-script'
-          }, '*');
-        } else {
-          console.log('[SPIKELY] ✅ Audio capture request bridged to background');
-          
-          // Send acknowledgment back to page
-          window.postMessage({
-            type: 'SPIKELY_BRIDGE_SUCCESS',
-            response: response,
-            source: 'spikely-content-script'
-          }, '*');
-        }
-      });
-    }
-  });
-  
-  console.log('[SPIKELY] ✅ postMessage bridge active');
-  
   // Send handshake immediately
   try {
     console.log('[SPIKELY] 📡 Sending handshake...');
