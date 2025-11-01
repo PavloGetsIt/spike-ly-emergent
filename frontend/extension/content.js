@@ -201,7 +201,6 @@ let detectionInterval = null;
 let isTracking = false;
 let lastSentCount = 0;
 let lastSentAt = 0;
-const platform = detectPlatform();
 
 // Cached element + DOM observer to survive SPA/DOM changes
 let cachedViewerEl = null;
