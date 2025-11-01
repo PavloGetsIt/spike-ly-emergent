@@ -516,66 +516,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log('[AUDIO:BG] 💉 Injecting content script before audio capture...');
         await injectContentScript(tabId);
         
-        // STEP 0: Ensure content script is injected (with fallback)
-        console.log('[AUDIO:BG] 💉 Ensuring content script is injected...');
+        // STEP 0: Ensure content script is injected and ready
+        console.log('[AUDIO:BG] 💉 Checking content script readiness...');
         
-        // First, try to ping existing content script
-        let contentScriptReady = false;
-        try {
-          const pingResponse = await new Promise((resolve, reject) => {
-            chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(response);
-              }
-            });
-            // Timeout after 1 second
-            setTimeout(() => reject(new Error('Ping timeout')), 1000);
-          });
+        // Check if we have confirmation that content script is ready
+        const isContentScriptReady = contentScriptTabs.has(tabId);
+        console.log('[AUDIO:BG] Content script ready check:', { tabId, ready: isContentScriptReady });
+        
+        if (!isContentScriptReady) {
+          console.log('[AUDIO:BG] ⚠️ Content script not ready, injecting programmatically...');
           
-          if (pingResponse?.type === 'PONG') {
-            console.log('[AUDIO:BG] ✅ Content script already active');
-            contentScriptReady = true;
-          }
-        } catch (pingError) {
-          console.log('[AUDIO:BG] ⚠️ Content script not responding, injecting...', pingError.message);
-        }
-        
-        // If content script not ready, inject it programmatically
-        if (!contentScriptReady) {
           try {
             await chrome.scripting.executeScript({
               target: { tabId },
               files: ['content.js']
             });
-            console.log('[AUDIO:BG] ✅ Content script injected successfully');
+            console.log('[AUDIO:BG] ✅ Content script injected, waiting for handshake...');
             
-            // Wait for content script to initialize
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Verify injection worked by pinging again
-            try {
-              const verifyResponse = await new Promise((resolve, reject) => {
-                chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                  } else {
-                    resolve(response);
-                  }
-                });
-                setTimeout(() => reject(new Error('Verify timeout')), 1000);
-              });
-              
-              if (verifyResponse?.type === 'PONG') {
-                console.log('[AUDIO:BG] ✅ Content script injection verified');
-                contentScriptReady = true;
+            // Wait up to 3 seconds for handshake
+            let handshakeReceived = false;
+            for (let i = 0; i < 6; i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              if (contentScriptTabs.has(tabId)) {
+                handshakeReceived = true;
+                break;
               }
-            } catch (verifyError) {
-              console.warn('[AUDIO:BG] ⚠️ Content script injection could not be verified:', verifyError.message);
             }
+            
+            if (!handshakeReceived) {
+              throw new Error('Content script did not respond after injection');
+            }
+            
+            console.log('[AUDIO:BG] ✅ Content script handshake confirmed');
           } catch (injectError) {
-            console.error('[AUDIO:BG] ❌ Failed to inject content script:', injectError);
+            console.error('[AUDIO:BG] ❌ Content script injection failed:', injectError);
             sendResponse({ 
               success: false, 
               error: 'Failed to initialize page tracking: ' + injectError.message
