@@ -148,6 +148,10 @@ export class AudioProcessor {
         console.log(`🎙️ [ASSEMBLYAI v3] WebSocket CLOSED: code=${event.code}, reason=${event.reason || 'none'}`);
         this.debug?.('ws_closed', `code=${event.code}`);
         this.log(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
+        
+        // Stop heartbeat
+        this.stopHeartbeat();
+        
         if (this.isProcessing) {
           console.error('🎙️ [ASSEMBLYAI v3] ❌ Connection closed unexpectedly during processing');
           this.error('WebSocket closed unexpectedly during processing');
