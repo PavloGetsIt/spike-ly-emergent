@@ -16,11 +16,12 @@
     
     console.log('[SPIKELY] 📨 Bridge received postMessage:', event.data.type);
     
-    if (event.data.type === 'SPIKELY_USER_CLICKED_RED_BUTTON') {
-      console.log('[SPIKELY] 🔴 Forwarding user click to background...');
+    if (event.data.type === 'BEGIN_CAPTURE') {
+      console.log('[SPIKELY] 🔴 BEGIN_CAPTURE - Forwarding to background with gesture timing...');
       
       chrome.runtime.sendMessage({
         type: 'BEGIN_AUDIO_CAPTURE',
+        gestureTimestamp: event.data.gestureTimestamp,
         timestamp: event.data.timestamp,
         url: event.data.url
       }, (response) => {
