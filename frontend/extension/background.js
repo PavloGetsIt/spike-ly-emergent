@@ -573,64 +573,96 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Start keep-alive to prevent service worker sleep
         startKeepAlive();
         
+        // Helper function for successful stream processing
+        function processSuccessfulStream(stream, tabId) {
+          console.log('[BG] 🔴 STATE: CAPTURING → STREAMING');
+          console.log('[AUDIO] PERMISSION POPUP SHOWN');
+          console.log('[AUDIO] STREAM RECEIVED');
+          console.log('[AUDIO:BG] stream returned');
+          console.log('[AUDIO:BG] audio tracks:', stream.getAudioTracks().length);
+          console.log('[AUDIO] Stream returned successfully');
+          
+          // Store stream
+          audioCaptureState.set(tabId, {
+            isCapturing: true,
+            stream: stream,
+            startTime: Date.now()
+          });
+          
+          // Setup track end detection (replaces onStatusChanged)
+          const audioTrack = stream.getAudioTracks()[0];
+          if (audioTrack) {
+            audioTrack.onended = () => {
+              console.warn('[AUDIO] Track ended');
+              chrome.runtime.sendMessage({
+                type: 'AUDIO_CAPTURE_RESULT',
+                success: false,
+                error: 'track ended'
+              });
+            };
+          }
+          
+          // Start correlation engine
+          correlationEngine.startAutoInsightTimer();
+          
+          // Send immediate confirmation to sidepanel
+          chrome.runtime.sendMessage({
+            type: 'AUDIO_CAPTURE_RESULT',
+            success: true,
+            capture_started: true,
+            streamId: stream.id,
+            trackCount: stream.getAudioTracks().length
+          });
+          
+          console.log('[AUDIO] capture_started message sent');
+          console.log('[BG] 🔴 STATE: STREAMING - System ready');
+        }
+        
         // Call tabCapture from background context (MV3 - remove consumerTabId/targetTabId)
         chrome.tabCapture.capture(
           {audio: true, video: false},
-          (stream) => {
+          async (stream) => {
             try {
               console.log('[BG] capture callback fired');
+              console.log('[AUDIO:BG] tabCapture.capture invoked');
               
               // Validate stream immediately
               if (!stream) {
+                console.error('[AUDIO:BG] Stream validation failed: null stream');
                 throw new Error("null stream");
               }
               if (!stream.getAudioTracks) {
+                console.error('[AUDIO:BG] Stream validation failed: no accessor');
                 throw new Error("no accessor");
               }
               if (stream.getAudioTracks().length === 0) {
-                throw new Error("zero tracks");
+                console.error('[AUDIO:BG] Stream validation failed: zero tracks');
+                
+                // Retry capture once
+                console.log('[AUDIO:BG] Retrying capture once...');
+                chrome.tabCapture.capture(
+                  {audio: true, video: false},
+                  (retryStream) => {
+                    if (chrome.runtime.lastError || !retryStream || retryStream.getAudioTracks().length === 0) {
+                      console.error('[AUDIO:BG] Retry failed, surfacing warning');
+                      
+                      chrome.runtime.sendMessage({
+                        type: 'AUDIO_CAPTURE_RESULT',
+                        success: false,
+                        error: 'No audio tracks after retry - tab may be muted'
+                      });
+                      return;
+                    }
+                    
+                    // Retry succeeded, continue with retryStream
+                    processSuccessfulStream(retryStream, tabId);
+                  }
+                );
+                return;
               }
               
-              console.log('[BG] 🔴 STATE: CAPTURING → STREAMING');
-              console.log('[AUDIO] PERMISSION POPUP SHOWN');
-              console.log('[AUDIO] STREAM RECEIVED');
-              console.log('[AUDIO] Stream returned successfully');
-              console.log('[BG] ✅ TabCapture SUCCESS:', stream.getAudioTracks().length, 'tracks');
-              
-              // Store stream
-              audioCaptureState.set(tabId, {
-                isCapturing: true,
-                stream: stream,
-                startTime: Date.now()
-              });
-              
-              // Setup track end detection (replaces onStatusChanged)
-              const audioTrack = stream.getAudioTracks()[0];
-              if (audioTrack) {
-                audioTrack.onended = () => {
-                  console.warn('[AUDIO] Track ended');
-                  chrome.runtime.sendMessage({
-                    type: 'AUDIO_CAPTURE_RESULT',
-                    success: false,
-                    error: 'track ended'
-                  });
-                };
-              }
-              
-              // Start correlation engine
-              correlationEngine.startAutoInsightTimer();
-              
-              // Send immediate confirmation to sidepanel
-              chrome.runtime.sendMessage({
-                type: 'AUDIO_CAPTURE_RESULT',
-                success: true,
-                capture_started: true,
-                streamId: stream.id,
-                trackCount: stream.getAudioTracks().length
-              });
-              
-              console.log('[AUDIO] capture_started message sent');
-              console.log('[BG] 🔴 STATE: STREAMING - System ready');
+              // Process successful stream
+              processSuccessfulStream(stream, tabId);
               
             } catch (streamError) {
               console.log('[BG] 🔴 STATE: CAPTURING → IDLE (STREAM_ERROR)');
