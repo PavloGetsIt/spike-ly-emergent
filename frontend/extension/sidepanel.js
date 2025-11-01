@@ -1845,7 +1845,11 @@ if (startAudioBtn) {
               clearTimeout(timeout);
               chrome.runtime.onMessage.removeListener(messageListener);
               
-              if (message.success) {
+              if (message.success && message.capture_started) {
+                console.log('[AUDIO:SP] ✅ Capture started confirmation received');
+                resolve(message);
+              } else if (message.success) {
+                console.log('[AUDIO:SP] ⚠️ Success but no capture_started flag');
                 resolve(message);
               } else {
                 reject(new Error(message.error));
