@@ -1867,6 +1867,9 @@ if (startAudioBtn) {
             startAudioBtn.disabled = false;
             console.log('[Spikely Side Panel] ✅ System started successfully');
             
+            // Start viewer tracking
+            sendToActive('START_VIEWER_TRACKING');
+            
             if (testInsightBtn) {
               testInsightBtn.style.display = 'inline-block';
             }
