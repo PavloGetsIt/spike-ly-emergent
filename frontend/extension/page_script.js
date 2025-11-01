@@ -93,13 +93,23 @@ function createAudioCaptureButton() {
   
   // CRITICAL: Use pointerdown for earlier gesture capture (before TikTok overlay swallows)
   btn.addEventListener('pointerdown', function(e) {
+    console.log('[AUDIO:PAGE] capture button clicked');
     console.log('🔴 [SPIKELY-PAGE] USER POINTER DOWN - GESTURE CONFIRMED');
     console.log('[AUDIO] GESTURE CONFIRMED');
     
     btn.textContent = '🎤 Capturing...';
     btn.disabled = true;
     
-    // Send via window.postMessage with gesture timestamp
+    // Send click acknowledgement first
+    console.log('[AUDIO:PAGE] sending click acknowledgement');
+    window.postMessage({
+      type: 'capture_click_acknowledged',
+      gestureTimestamp: performance.now(),
+      timestamp: Date.now(),
+      source: 'spikely-page-script'
+    }, '*');
+    
+    // Then send capture request
     window.postMessage({
       type: 'BEGIN_CAPTURE',
       gestureTimestamp: performance.now(),
@@ -108,12 +118,19 @@ function createAudioCaptureButton() {
       source: 'spikely-page-script'
     }, '*');
     
-    console.log('🔴 [SPIKELY-PAGE] ✅ BEGIN_CAPTURE postMessage sent');
+    console.log('🔴 [SPIKELY-PAGE] ✅ Both acknowledgement and BEGIN_CAPTURE sent');
     e.preventDefault();
     e.stopPropagation();
   });
   
-  // Body-level fallback listener for pointerdown
+  // Document-level fallback listener (DO NOT REMOVE existing listener)
+  document.addEventListener('pointerdown', function(e) {
+    if (e.target && e.target.id === '__SPIKELY_CAPTURE_BTN__') {
+      console.log('[AUDIO:PAGE] document fallback captured button click');
+    }
+  }, { capture: true });
+  
+  // Body-level fallback listener for pointerdown  
   document.body.addEventListener('pointerdown', function(e) {
     if (e.target && e.target.id === '__SPIKELY_CAPTURE_BTN__') {
       console.log('🔴 [SPIKELY-PAGE] FALLBACK pointerdown captured');
