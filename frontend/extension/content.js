@@ -225,6 +225,29 @@ let lastEmittedAt = 0;
 let lastZeroAt = 0;
 let consecutiveZeros = 0;
 
+let lastPathname = window.location.pathname;
+
+// Handshake function
+function sendContentScriptReady() {
+  try {
+    console.log('[SPIKELY] 📡 Sending CONTENT_SCRIPT_READY handshake...');
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      platform,
+      url: window.location.href,
+      timestamp: Date.now()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[SPIKELY] ⚠️ Handshake failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[SPIKELY] ✅ Handshake confirmed by background script');
+      }
+    });
+  } catch (e) {
+    console.error('[SPIKELY] ❌ Handshake error:', e);
+  }
+}
+
 // Navigation tracking
 let lastPathname = window.location.pathname;
 
