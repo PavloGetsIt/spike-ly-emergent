@@ -1793,34 +1793,6 @@ window.__SPIKELY_TEST__ = function() {
   console.log('='.repeat(60));
   return node;
 };
-      console.log('\n📤 Sending test message to background script...');
-      safeSendMessage({
-        type: 'VIEWER_COUNT_UPDATE',
-        platform,
-        count: parsed,
-        delta: 0,
-        timestamp: Date.now(),
-        source: 'manual_test'
-      });
-      console.log('   Message sent!');
-    }
-  } else {
-    console.log('❌ FAILED - No viewer count element found');
-    console.log('\n🔍 Debugging info:');
-    console.log('   Platform:', platform);
-    console.log('   URL:', window.location.href);
-    console.log('   Is tracking:', isTracking);
-    
-    console.log('\n💡 Suggestions:');
-    console.log('   1. Make sure you\'re on a TikTok Live page');
-    console.log('   2. Open DevTools and inspect the viewer count element');
-    console.log('   3. Look for a number like "2.1K" near the text "Viewers"');
-    console.log('   4. Check the console logs above for detailed search results');
-  }
-  
-  console.log('='.repeat(60));
-  return node;
-};
 
 // Run parser validation tests
 validateParserFix();
