@@ -1,47 +1,48 @@
 (function(){
-  // PAGE CONSOLE LOGGING - User must see these logs
-  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 16px');
+  'use strict';
+  
+  // IMMEDIATE LOAD CHECK
+  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING v2.5.0... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 16px');
   console.log('[SPIKELY] URL:', window.location.href);
   console.log('[SPIKELY] DOM ready state:', document.readyState);
   
-  try {
-    // Check if already fully initialized (has both flag AND functions)
-    const hasFlag = !!window.__SPIKELY_CONTENT_ACTIVE__;
-    const hasFunctions = typeof window.__SPIKELY_TEST__ === 'function';
-    
-    if (hasFlag && hasFunctions) {
-      console.warn('[Spikely] ⚠️ Content script already fully initialized - skipping reinjection');
-      return;
-    }
-    
-    if (hasFlag && !hasFunctions) {
-      console.warn('[Spikely] ⚠️ Flag set but functions missing - forcing re-initialization');
-    }
-    
-    window.__SPIKELY_CONTENT_ACTIVE__ = true;
-    console.log('[Spikely] ✅ Marking script as active');
-    
-    // DOM READINESS CHECK - Wait for DOM before viewer detection
-    if (document.readyState === 'loading') {
-      console.log('[SPIKELY] 📄 DOM still loading, waiting for DOMContentLoaded...');
-      document.addEventListener('DOMContentLoaded', initializeAfterDOM);
-    } else {
-      console.log('[SPIKELY] 📄 DOM already ready, initializing immediately');
-      initializeAfterDOM();
-    }
-    
-  } catch (e) {
-    console.error('[Spikely] ❌ Error in initialization:', e);
+  // Prevent double initialization
+  if (window.__SPIKELY_CONTENT_ACTIVE__) {
+    console.warn('[Spikely] ⚠️ Content script already active - skipping');
+    return;
   }
   
-  function initializeAfterDOM() {
-    console.log('[SPIKELY] 🏁 DOM ready, starting initialization...');
-    
-    // Send handshake to background script
-    sendContentScriptReady();
-    
-    // Start viewer detection with retry logic
-    startViewerDetectionWithRetry();
+  // Initialize IMMEDIATELY - no waiting for DOM
+  console.log('[SPIKELY] 🏁 Starting immediate initialization...');
+  window.__SPIKELY_CONTENT_ACTIVE__ = true;
+  
+  // Platform detection
+  const hostname = window.location.hostname;
+  const platform = hostname.includes('tiktok.com') ? 'tiktok' 
+                 : hostname.includes('twitch.tv') ? 'twitch'
+                 : hostname.includes('kick.com') ? 'kick'
+                 : hostname.includes('youtube.com') ? 'youtube'
+                 : 'unknown';
+  
+  console.log('[SPIKELY] Platform detected:', platform);
+  
+  // Send handshake immediately
+  try {
+    console.log('[SPIKELY] 📡 Sending handshake...');
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      platform: platform,
+      url: window.location.href,
+      timestamp: Date.now()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[SPIKELY] ⚠️ Handshake failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[SPIKELY] ✅ Handshake confirmed');
+      }
+    });
+  } catch (e) {
+    console.error('[SPIKELY] ❌ Handshake error:', e);
   }
 
 // ============================================================================
