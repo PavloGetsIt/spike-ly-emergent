@@ -164,7 +164,7 @@ let contentScriptTabs = new Set(); // Track which tabs have active content scrip
 let authorizedTabId = null; // Tab granted via popup/sidepanel invocation
 
 // Audio capture state per tab (new unified approach)
-const audioCaptureState = new Map(); // tabId → { stream, audioContext, isCapturing, startedAt }
+const audioCaptureState = new Map(); // tabId → { streamId, stream, audioContext, isCapturing, startTime }
 
 // Hume AI request gating
 const humeState = { 
@@ -545,10 +545,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
     const requestId = message.requestId;
     console.log('[AUDIO:BG] ▶ START requestId=' + requestId);
-    
+
     (async () => {
       const startTime = Date.now();
-      
+      let keepAliveStarted = false;
+
       try {
         // STEP 1: Locate target TikTok Live tab
         const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -593,6 +594,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (audioCaptureState.has(tabId)) {
           console.log('[AUDIO:BG] ⏹ STOP reason=clean_restart');
           const existing = audioCaptureState.get(tabId);
+          try {
+            audioCaptureManager.stopCapture();
+          } catch (stopErr) {
+            console.warn('[AUDIO:BG] ⚠️ stopCapture before restart failed:', stopErr.message);
+          }
           if (existing.stream) {
             existing.stream.getTracks().forEach(track => track.stop());
           }
@@ -610,97 +616,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           target: { tabId: tabId },
           func: () => void 0 // no-op injection for activation
         });
-        
+
         console.log('[AUDIO:BG] 🪄 activation-hop injected ok');
-        
-        // STEP 5: Ensure offscreen
-        await ensureOffscreen();
-        
-        // STEP 6: tabCapture within gesture window (< 1.5s from start)
-        const elapsed = Date.now() - startTime;
-        if (elapsed > 1500) {
-          throw new Error('AUDIO_ERR_TIMEOUT - Setup took ' + elapsed + 'ms');
+
+        startKeepAlive();
+        keepAliveStarted = true;
+
+        console.log('[AUDIO:BG] 🎛 Using audioCaptureManager for offscreen capture');
+
+        const captureResult = await audioCaptureManager.startCapture(tabId);
+
+        if (!captureResult?.success) {
+          const errorMsg = captureResult?.error || 'Audio capture failed';
+          throw new Error(errorMsg);
         }
-        
-        console.log('[AUDIO:BG] 🟢 tabCapture starting...');
-        
-        const stream = await new Promise((resolve, reject) => {
-          const captureTimeout = setTimeout(() => {
-            console.log('[AUDIO:BG] ❌ tabCapture FAIL code=TIMEOUT');
-            reject(new Error('AUDIO_ERR_TIMEOUT'));
-          }, 3000); // 3s for actual capture
-          
-          chrome.tabCapture.capture(
-            { audio: true, video: false },
-            (captureStream) => {
-              clearTimeout(captureTimeout);
-              
-              if (chrome.runtime.lastError) {
-                const lastError = chrome.runtime.lastError.message;
-                console.log('[AUDIO:BG] ❌ tabCapture FAIL code=API_ERROR lastError=' + lastError);
-                reject(new Error(lastError));
-              } else if (!captureStream || !captureStream.getAudioTracks || captureStream.getAudioTracks().length === 0) {
-                console.log('[AUDIO:BG] ❌ tabCapture FAIL code=NO_TRACKS');
-                reject(new Error('No audio tracks captured'));
-              } else {
-                console.log('[AUDIO:BG] 🟢 tabCapture OK with capture options');
-                resolve(captureStream);
-              }
-            }
-          );
-        });
-        
-        // STEP 7: Success - store and respond
+
         audioCaptureState.set(tabId, {
           isCapturing: true,
-          stream: stream,
+          streamId: captureResult.streamId || null,
+          stream: null,
           startTime: Date.now(),
           requestId: requestId
         });
-        
-        startKeepAlive();
-        
-        // Setup cleanup on track end
-        const audioTrack = stream.getAudioTracks()[0];
-        if (audioTrack) {
-          audioTrack.onended = () => {
-            console.log('[AUDIO:BG] ⏹ STOP reason=track_ended');
-            audioCaptureState.delete(tabId);
-            stopKeepAlive();
-          };
-        }
-        
+
+        console.log('[AUDIO:BG] 🟢 Offscreen capture started streamId=' + (captureResult.streamId || 'unknown'));
+
         correlationEngine.startAutoInsightTimer();
-        
-        sendResponse({ 
-          ok: true, 
-          streamId: stream.id,
-          tabId: tabId,
-          diagnostics: { url, focused: true, activationOk: true }
+
+        chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[AUDIO:BG] ⚠️ START_TRACKING failed:', chrome.runtime.lastError.message);
+          }
         });
-        
+
+        sendResponse({
+          ok: true,
+          streamId: captureResult.streamId || null,
+          tabId: tabId,
+          diagnostics: { url, focused: true, activationOk: true, offscreen: true }
+        });
+
         console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
-        
+
       } catch (error) {
+        if (keepAliveStarted) {
+          stopKeepAlive();
+        }
+
         const totalTime = Date.now() - startTime;
-        const isTimeout = error.message.includes('TIMEOUT');
-        const isPermission = error.message.includes('permission') || error.message.includes('invoked');
-        
-        const errorCode = isTimeout ? 'AUDIO_ERR_TIMEOUT'
-                         : isPermission ? 'AUDIO_ERR_NOT_INVOKED' 
-                         : 'AUDIO_ERR_GENERAL';
-        
+        const errorMessage = error?.message || String(error);
+        const normalized = errorMessage.toLowerCase();
+        const errorCode = normalized.includes('timeout')
+          ? 'AUDIO_ERR_TIMEOUT'
+          : (normalized.includes('permission') || normalized.includes('invoked'))
+            ? 'AUDIO_ERR_NOT_INVOKED'
+            : normalized.includes('chrome pages') || normalized.includes('cannot be captured')
+              ? 'AUDIO_ERR_CHROME_PAGE_BLOCKED'
+              : normalized.includes('no active tab') || normalized.includes('not found')
+                ? 'AUDIO_ERR_NOT_ELIGIBLE'
+                : 'AUDIO_ERR_GENERAL';
+
         console.log('[AUDIO:BG] ❌ tabCapture FAIL code=' + errorCode + ' time=' + totalTime + 'ms');
-        
-        sendResponse({ 
-          ok: false, 
+
+        sendResponse({
+          ok: false,
           code: errorCode,
-          message: error.message,
+          message: errorMessage,
           diagnostics: { totalTime }
         });
       }
     })();
-    
+
     return true; // Keep message channel open
     
   } else if (message.type === 'CAPTURE_CLICK_ACKNOWLEDGED') {
@@ -1239,7 +1225,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const tabId = activeTab?.id;
         
         console.debug('[AUDIO:BG:STOP]', { tabId });
-        
+
+        try {
+          audioCaptureManager.stopCapture();
+        } catch (stopErr) {
+          console.warn('[AUDIO:BG] ⚠️ stopCapture during STOP failed:', stopErr.message);
+        }
+
         if (tabId && audioCaptureState.has(tabId)) {
           const state = audioCaptureState.get(tabId);
           
@@ -1263,7 +1255,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage({
           type: 'STOP_OFFSCREEN_CAPTURE'
         }, () => { void chrome.runtime.lastError; });
-        
+
+        stopKeepAlive();
+
         // Reset correlation engine
         correlationEngine.reset();
         
