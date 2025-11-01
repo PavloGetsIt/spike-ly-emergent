@@ -39,83 +39,25 @@ function createAudioCaptureButton() {
     btn.style.boxShadow = '0 4px 12px rgba(255,68,68,0.3)';
   });
   
-  // CRITICAL: Real click handler - no async boundaries
+  // CRITICAL: Real click handler - only sends message, NO tabCapture here
   btn.addEventListener('click', function() {
-    console.log('🔴 [SPIKELY-PAGE] USER CLICKED AUDIO BUTTON - Starting tabCapture...');
-    btn.textContent = '🎤 Capturing...';
+    console.log('🔴 [SPIKELY-PAGE] USER CLICKED AUDIO BUTTON');
+    btn.textContent = '🎤 Processing...';
     btn.disabled = true;
     
-    // Call tabCapture.capture IMMEDIATELY - no async/await
-    chrome.tabCapture.capture({
-      audio: true,
-      video: false
-    }, function(stream) {
-      if (chrome.runtime.lastError) {
-        console.error('🔴 [SPIKELY-PAGE] ❌ TabCapture failed:', chrome.runtime.lastError.message);
-        btn.textContent = '❌ Failed';
-        btn.style.background = '#666';
-        
-        // Send error to extension
-        try {
-          chrome.runtime.sendMessage({
-            type: 'AUDIO_CAPTURE_RESULT',
-            success: false,
-            error: chrome.runtime.lastError.message
-          });
-        } catch (e) {
-          console.error('🔴 [SPIKELY-PAGE] Failed to send error message:', e);
-        }
-        
-        setTimeout(() => {
-          btn.textContent = '🎤 Try Again';
-          btn.disabled = false;
-          btn.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
-        }, 3000);
-        
-      } else if (!stream || stream.getAudioTracks().length === 0) {
-        console.error('🔴 [SPIKELY-PAGE] ❌ No audio tracks captured');
-        btn.textContent = '❌ No Audio';
-        btn.style.background = '#666';
-        
-        try {
-          chrome.runtime.sendMessage({
-            type: 'AUDIO_CAPTURE_RESULT',
-            success: false,
-            error: 'No audio tracks captured from tab'
-          });
-        } catch (e) {
-          console.error('🔴 [SPIKELY-PAGE] Failed to send error message:', e);
-        }
-        
-        setTimeout(() => {
-          btn.textContent = '🎤 Try Again';
-          btn.disabled = false;
-          btn.style.background = 'linear-gradient(135deg, #ff4444, #ff6666)';
-        }, 3000);
-        
-      } else {
-        console.log('🔴 [SPIKELY-PAGE] ✅ Audio capture SUCCESS!', stream.getAudioTracks().length, 'tracks');
-        btn.textContent = '✅ Success!';
-        btn.style.background = 'linear-gradient(135deg, #44ff44, #66ff66)';
-        
-        // Send success to extension
-        try {
-          chrome.runtime.sendMessage({
-            type: 'AUDIO_CAPTURE_RESULT',
-            success: true,
-            streamId: stream.id,
-            trackCount: stream.getAudioTracks().length
-          });
-        } catch (e) {
-          console.error('🔴 [SPIKELY-PAGE] Failed to send success message:', e);
-        }
-        
-        // Hide button after success
-        setTimeout(() => {
-          btn.style.display = 'none';
-        }, 2000);
-      }
-    });
+    // Send message to content script (no capture here)
+    try {
+      chrome.runtime.sendMessage({
+        type: 'USER_CLICKED_RED_BUTTON',
+        timestamp: Date.now(),
+        url: window.location.href
+      });
+      console.log('🔴 [SPIKELY-PAGE] ✅ Message sent to extension');
+    } catch (e) {
+      console.error('🔴 [SPIKELY-PAGE] ❌ Failed to send message:', e);
+      btn.textContent = '❌ Error';
+      btn.style.background = '#666';
+    }
   });
   
   document.body.appendChild(btn);
