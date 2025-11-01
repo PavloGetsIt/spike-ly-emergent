@@ -87,22 +87,23 @@
     console.error('[SPIKELY] ❌ Handshake error:', e);
   }
   
-  // Enhanced viewer detection with TikTok selector cascade
+  // Enhanced TikTok viewer detection with selector cascade
   function findViewerCount() {
     if (platform !== 'tiktok') return null;
     
-    console.log('[SPIKELY] 🔍 Enhanced viewer search with TikTok cascade...');
+    console.log('[SPIKELY] 🔍 TikTok selector cascade search...');
     
-    // TikTok selector cascade  
+    // TikTok selector cascade (2025 patterns)
     const tiktokSelectors = [
       '[data-e2e="live-viewer-count"]',
-      '[class*="viewer"]',
+      '[class*="viewer"]', 
       '[class*="Count"]',
       'div[class*="viewer"] span',
-      'span[class*="count"]'
+      'span[class*="count"]',
+      '[data-testid*="viewer"]'
     ];
     
-    // Strategy 1: Priority selectors
+    // Strategy 1: Priority CSS selectors
     for (const selector of tiktokSelectors) {
       try {
         const elements = document.querySelectorAll(selector);
@@ -120,40 +121,39 @@
     }
     
     const allElements = Array.from(document.querySelectorAll('*'));
-    console.log('[SPIKELY] Scanning', allElements.length, 'elements for viewer patterns...');
     
+    // Strategy 2: Exact "Viewers • 127" TikTok 2025 format
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
-      // Strategy 2: Exact "Viewers • 127" TikTok 2025 format
-      if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+      if (/viewers?\s*•\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
         const exactMatch = text.match(/viewers?\s*•\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (exactMatch) {
           const numericValue = parseViewerNumber(exactMatch[1]);
           if (numericValue > 0) {
-            console.log('[SPIKELY] 👀 Viewer Count:', numericValue, '(exact pattern)');
+            console.log('[SPIKELY] 👀 Viewer Count:', numericValue, '(exact bullet pattern)');
             return { element: el, count: numericValue, text: exactMatch[1] };
           }
         }
-        
-        // Strategy 3: Flexible pattern matching
+      }
+      
+      // Strategy 3: Flexible viewer pattern matching  
+      if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
         const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
         if (match) {
-          const countText = match[1];
-          const numericValue = parseViewerNumber(countText);
+          const numericValue = parseViewerNumber(match[1]);
           if (numericValue > 0) {
             console.log('[SPIKELY] 👀 Viewer Count:', numericValue, '(flexible pattern)');
-            return { element: el, count: numericValue, text: countText };
+            return { element: el, count: numericValue, text: match[1] };
           }
         }
       }
     }
     
-    // Strategy 4: Ancestor lineage scanning with regex fallback
+    // Strategy 4: Regex fallback with ancestor scanning
     for (const el of allElements) {
       const text = el.textContent?.trim() || '';
       
-      // Regex fallback for standalone numbers
       if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
         let ancestor = el.parentElement;
         let depth = 0;
@@ -163,7 +163,7 @@
           if (/viewer|watching|live.*count/i.test(ancestorText)) {
             const parsed = parseViewerNumber(text);
             if (parsed > 50) {
-              console.log('[SPIKELY] 👀 Viewer Count:', parsed, '(ancestor scan)');
+              console.log('[SPIKELY] 👀 Viewer Count:', parsed, '(regex fallback)');
               return { element: el, count: parsed, text: text };
             }
           }
@@ -173,15 +173,15 @@
       }
     }
     
-    console.log('[SPIKELY] ❌ No viewer count found after cascade search');
+    console.log('[SPIKELY] ❌ No viewer count found with cascade');
     return null;
   }
   
-  // Parse viewer number with comma and K/M/B handling
+  // Parse viewer number - strips commas and handles K formatting
   function parseViewerNumber(text) {
     if (!text) return 0;
     
-    // Strip commas and whitespace
+    // Strip commas, spaces, and normalize
     const cleaned = text.toLowerCase().replace(/[,\s]/g, '');
     const match = cleaned.match(/^([\d.]+)([kmb])?$/);
     if (!match) return 0;
