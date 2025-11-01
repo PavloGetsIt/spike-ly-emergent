@@ -1803,161 +1803,103 @@ if (startAudioBtn) {
       startAudioBtn.textContent = 'Starting...';
       
       try {
-        // STEP 1: Get active tab and focus it (preserve gesture)
+        // STEP 1: Get active tab and focus it
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!activeTab?.id) {
           throw new Error('No active tab found');
         }
         
-        // STEP 2: Check for chrome:// URLs
+        // STEP 2: Check for unsupported URLs
         if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
           throw new Error('Chrome pages cannot be captured. Please open a TikTok Live tab first.');
         }
         
         console.log('[AUDIO:SP] 🎯 Target tab:', activeTab.url.substring(0, 50));
         
-        // STEP 3: Focus the TikTok tab to preserve user gesture context
+        // STEP 3: Focus the TikTok tab
         await chrome.tabs.update(activeTab.id, { active: true });
         console.log('[AUDIO:SP] 🔍 Focused TikTok tab');
         
         // STEP 4: Inject content script first
-        console.log('[AUDIO:SP] 💉 Injecting content script...');
         await chrome.scripting.executeScript({
           target: { tabId: activeTab.id },
           files: ['content_minimal.js']
         });
+        console.log('[AUDIO:SP] ✅ Content script injected');
         
-        // STEP 5: Inject hidden button with tabCapture logic into TikTok page
+        // STEP 5: Inject page script with real clickable button
         console.log('[AUDIO:SP] 🔘 Injecting audio capture button into page...');
         await chrome.scripting.executeScript({
           target: { tabId: activeTab.id },
-          func: function() {
-            // Create hidden button in page DOM
-            const hiddenBtn = document.createElement('button');
-            hiddenBtn.id = '__SPIKELY_AUDIO_TRIGGER__';
-            hiddenBtn.style.display = 'none';
-            hiddenBtn.style.position = 'absolute';
-            hiddenBtn.style.top = '-9999px';
-            document.body.appendChild(hiddenBtn);
-            
-            // Add click handler that preserves user gesture
-            hiddenBtn.addEventListener('click', async () => {
-              console.log('[SPIKELY-PAGE] 🎤 Hidden button clicked - starting tabCapture...');
-              
-              try {
-                // tabCapture.capture() in page context with preserved gesture
-                const stream = await new Promise((resolve, reject) => {
-                  chrome.tabCapture.capture({
-                    audio: true,
-                    video: false
-                  }, (captureStream) => {
-                    if (chrome.runtime.lastError) {
-                      reject(new Error(chrome.runtime.lastError.message));
-                    } else if (!captureStream || captureStream.getAudioTracks().length === 0) {
-                      reject(new Error('No audio tracks captured'));
-                    } else {
-                      resolve(captureStream);
-                    }
-                  });
-                });
-                
-                console.log('[SPIKELY-PAGE] ✅ Audio captured successfully');
-                
-                // Send success back to extension
-                window.postMessage({
-                  type: 'SPIKELY_AUDIO_SUCCESS',
-                  tracks: stream.getAudioTracks().length
-                }, '*');
-                
-              } catch (error) {
-                console.error('[SPIKELY-PAGE] ❌ Audio capture failed:', error);
-                
-                // Send error back to extension  
-                window.postMessage({
-                  type: 'SPIKELY_AUDIO_ERROR',
-                  error: error.message
-                }, '*');
-              }
-            });
-            
-            console.log('[SPIKELY-PAGE] 🔘 Hidden audio trigger button ready');
-          }
+          files: ['page_script.js']
         });
         
-        // STEP 6: Listen for messages from injected script
-        const messagePromise = new Promise((resolve, reject) => {
+        // STEP 6: Listen for audio capture results
+        const resultPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error('Audio capture timeout'));
-          }, 10000);
+            reject(new Error('Please click the red audio button that appeared on the TikTok page'));
+          }, 30000); // 30 second timeout
           
-          const messageListener = (event) => {
-            if (event.data?.type === 'SPIKELY_AUDIO_SUCCESS') {
+          const messageListener = (message, sender, sendResponse) => {
+            if (message.type === 'AUDIO_CAPTURE_RESULT') {
               clearTimeout(timeout);
-              window.removeEventListener('message', messageListener);
-              resolve({ success: true, tracks: event.data.tracks });
-            } else if (event.data?.type === 'SPIKELY_AUDIO_ERROR') {
-              clearTimeout(timeout);
-              window.removeEventListener('message', messageListener);
-              reject(new Error(event.data.error));
+              chrome.runtime.onMessage.removeListener(messageListener);
+              
+              if (message.success) {
+                resolve({ success: true, streamId: message.streamId, tracks: message.trackCount });
+              } else {
+                reject(new Error(message.error));
+              }
             }
           };
           
-          window.addEventListener('message', messageListener);
+          chrome.runtime.onMessage.addListener(messageListener);
         });
         
-        // STEP 7: Trigger the hidden button click (preserves gesture chain)
-        console.log('[AUDIO:SP] 🖱️ Triggering hidden button click...');
-        await chrome.scripting.executeScript({
-          target: { tabId: activeTab.id },
-          func: function() {
-            const btn = document.getElementById('__SPIKELY_AUDIO_TRIGGER__');
-            if (btn) {
-              console.log('[SPIKELY-PAGE] 🖱️ Clicking hidden button...');
-              btn.click();
-            } else {
-              console.error('[SPIKELY-PAGE] ❌ Hidden button not found');
-            }
-          }
+        // STEP 7: Update UI to instruct user
+        startAudioBtn.textContent = '👆 Click Red Button';
+        startAudioBtn.style.background = '#ff4444';
+        
+        console.log('[AUDIO:SP] 🔴 Waiting for user to click the red audio button on TikTok page...');
+        
+        // STEP 8: Wait for user to click the injected button
+        const result = await resultPromise;
+        console.log('[AUDIO:SP] ✅ Audio capture result:', result);
+        
+        // STEP 9: Success - update UI and start tracking
+        isSystemStarted = true;
+        audioIsCapturing = true;
+        updateAudioState(true);
+        startAudioBtn.disabled = false;
+        startAudioBtn.textContent = 'Stop Audio';
+        startAudioBtn.style.background = '';
+        
+        console.log('[Spikely Side Panel] ✅ System started successfully');
+        
+        // Start viewer tracking
+        chrome.tabs.sendMessage(activeTab.id, { type: 'START_TRACKING' }, (trackingResponse) => {
+          console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
         });
         
-        // STEP 8: Wait for audio capture result
-        const audioResult = await messagePromise;
-        console.log('[AUDIO:SP] ✅ Audio capture completed:', audioResult);
-        
-        // STEP 9: Send to background for processing
-        chrome.runtime.sendMessage({ 
-          type: 'PROCESS_CAPTURED_STREAM',
-          tabId: activeTab.id,
-          streamActive: true
-        }, (response) => {
-          if (response?.success) {
-            isSystemStarted = true;
-            audioIsCapturing = true;
-            updateAudioState(true);
-            startAudioBtn.disabled = false;
-            console.log('[Spikely Side Panel] ✅ System started successfully');
-            
-            // Start viewer tracking AFTER successful audio setup
-            chrome.tabs.sendMessage(activeTab.id, { type: 'START_TRACKING' }, (trackingResponse) => {
-              console.log('[AUDIO:SP] ✅ Viewer tracking started:', trackingResponse);
-            });
-            
-            if (testInsightBtn) {
-              testInsightBtn.style.display = 'inline-block';
-            }
-          } else {
-            throw new Error(response?.error || 'Stream processing failed');
-          }
-        });
+        if (testInsightBtn) {
+          testInsightBtn.style.display = 'inline-block';
+        }
         
       } catch (error) {
-        console.error('[AUDIO:SP] ❌ Audio capture failed:', error);
-        alert('⚠️ Audio Capture Failed\n\n' + error.message + '\n\nPlease:\n1. Make sure you\'re on a TikTok Live tab\n2. Try reloading the extension');
+        console.error('[AUDIO:SP] ❌ Audio setup failed:', error);
         
+        // Reset UI on error
         updateAudioState(false);
         startAudioBtn.disabled = false;
         startAudioBtn.textContent = 'Start Audio';
+        startAudioBtn.style.background = '';
         isSystemStarted = false;
+        
+        if (error.message.includes('click the red audio button')) {
+          alert('⚠️ Audio Capture Requires Your Click\n\nPlease:\n1. Look for the RED audio button on the TikTok page\n2. Click it to grant audio permission\n3. If no button appears, try reloading the extension');
+        } else {
+          alert('⚠️ Audio Setup Failed\n\n' + error.message);
+        }
       }
     } else {
       // Stop entire system
