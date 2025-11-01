@@ -1339,6 +1339,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Auto-connect on extension load
 console.log('[Spikely] Background script loaded');
+startKeepAlive(); // Start heartbeat immediately
 connectToWebApp();
 
 // Reconnect when browser starts
