@@ -156,14 +156,20 @@ function sendContentScriptReady() {
 }
 
 function startViewerDetectionWithRetry() {
-  console.log('[SPIKELY] 🔍 Starting viewer detection with retry logic...');
+  console.log('[SPIKELY] 🔍 Starting viewer detection with retry logic (no cache assumptions)...');
+  
+  // Clear any cached elements - start fresh
+  cachedViewerEl = null;
+  cachedContainer = null;
   
   function attemptViewerDetection() {
+    console.log(`[SPIKELY] 🔄 Attempt ${viewerDetectionRetries + 1}/${MAX_VIEWER_RETRIES}`);
+    
     const node = queryViewerNode();
     
     if (node) {
       const parsed = normalizeAndParse(node);
-      console.log('[SPIKELY] ✅ VIEWER DETECTION SUCCESS:', parsed, 'retries:', viewerDetectionRetries);
+      console.log('[SPIKELY] ✅ VIEWER DETECTION SUCCESS:', parsed, 'after', viewerDetectionRetries, 'retries');
       
       // Clear retry interval
       if (viewerRetryInterval) {
@@ -171,25 +177,40 @@ function startViewerDetectionWithRetry() {
         viewerRetryInterval = null;
       }
       
-      // Start mutation observer for continuous tracking
+      // Setup mutation observer to monitor this element
       setupMutationObserver();
       
-      // Send initial count
+      // Send initial count immediately
       if (parsed > 0) {
+        console.log('[SPIKELY] 📤 Sending initial viewer count:', parsed);
         emitViewerCount(parsed, 0);
       }
       
       return true;
     } else {
       viewerDetectionRetries++;
-      console.log('[SPIKELY] ⏳ Viewer element not found, retry', viewerDetectionRetries + '/' + MAX_VIEWER_RETRIES);
       
       if (viewerDetectionRetries >= MAX_VIEWER_RETRIES) {
-        console.warn('[SPIKELY] ❌ Viewer detection failed after', MAX_VIEWER_RETRIES, 'retries');
+        console.warn('[SPIKELY] ❌ Viewer detection failed after', MAX_VIEWER_RETRIES, 'retries (30 seconds)');
         if (viewerRetryInterval) {
           clearInterval(viewerRetryInterval);
           viewerRetryInterval = null;
         }
+        
+        // Start a slower background retry (every 5 seconds)
+        console.log('[SPIKELY] 🔄 Starting background retry every 5 seconds...');
+        const backgroundRetry = setInterval(() => {
+          console.log('[SPIKELY] 🔍 Background retry...');
+          const bgNode = queryViewerNode();
+          if (bgNode) {
+            clearInterval(backgroundRetry);
+            const parsed = normalizeAndParse(bgNode);
+            console.log('[SPIKELY] ✅ Background retry SUCCESS:', parsed);
+            setupMutationObserver();
+            if (parsed > 0) emitViewerCount(parsed, 0);
+          }
+        }, 5000);
+        
         return false;
       }
       
@@ -200,6 +221,7 @@ function startViewerDetectionWithRetry() {
   // Try once immediately
   if (!attemptViewerDetection()) {
     // If failed, start retry interval
+    console.log('[SPIKELY] ⏰ Starting retry interval (500ms)...');
     viewerRetryInterval = setInterval(attemptViewerDetection, 500);
   }
 }
