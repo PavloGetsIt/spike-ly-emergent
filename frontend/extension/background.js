@@ -335,6 +335,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }, () => { void chrome.runtime.lastError; });
       }
     });
+  } else if (message.type === 'CONTENT_SCRIPT_READY') {
+    // Handle handshake from content script
+    console.log('[BG] ✅ CONTENT_SCRIPT_READY handshake received', { 
+      platform: message.platform, 
+      url: message.url?.substring(0, 50),
+      tabId: sender.tab?.id 
+    });
+    
+    // Store that this tab has an active content script
+    if (sender.tab?.id) {
+      contentScriptTabs.add(sender.tab.id);
+      console.log('[BG] 📝 Tab', sender.tab.id, 'marked as content script ready');
+    }
+    
+    sendResponse({ success: true, acknowledged: true });
+    
   } else if (message.type === 'VIEWER_COUNT_UPDATE') {
     // Log synthetic test messages
     if (message.source === 'test_trigger') {
