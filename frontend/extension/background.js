@@ -62,15 +62,19 @@ async function injectContentScript(tabId) {
 }
 
 // Inject content script when side panel opens
-chrome.sidePanel.onChanged.addListener(async (details) => {
-  if (details.opened) {
-    console.log('[BG] 📂 Side panel opened, injecting content script...');
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab && tab.url.includes('tiktok.com')) {
-      await injectContentScript(tab.id);
+if (typeof chrome !== 'undefined' && chrome.sidePanel?.onChanged?.addListener) {
+  chrome.sidePanel.onChanged.addListener(async (details) => {
+    if (details.opened) {
+      console.log('[BG] 📂 Side panel opened, injecting content script...');
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.url.includes('tiktok.com')) {
+        await injectContentScript(tab.id);
+      }
     }
-  }
-});
+  });
+} else {
+  console.warn('[BG] Side panel API not available; skipping onChanged listener registration');
+}
 
 // Also inject when tracking starts
 async function injectAndStartTracking() {
@@ -297,7 +301,10 @@ async function stopTrackingOnAllTabs() {
 }
 
 // Listen for messages from content scripts and side panel
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+if (!chrome?.runtime?.onMessage?.addListener) {
+  console.error('[Spikely] chrome.runtime.onMessage API unavailable; background listener not registered');
+} else {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'POPUP_ACTIVATED') {
     // Track that popup was opened on this tab (grants activeTab permission)
     (async () => {
@@ -1656,7 +1663,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
   return message.type === 'OPEN_SIDE_PANEL' || message.type === 'START_AUDIO_CAPTURE' || message.type === 'HUME_ANALYZE';
-});
+  });
+}
 
 // Auto-connect on extension load
 console.log('[Spikely] Background script loaded');
