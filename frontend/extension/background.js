@@ -121,7 +121,7 @@ async function ensureOffscreen() {
     if (!offscreenExists) {
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
-        reasons: ['USER_MEDIA'],
+        reasons: ['USER_MEDIA', 'AUDIO_CAPTURE'],
         justification: 'Audio capture for transcription'
       });
       console.log('[BG] ✅ Offscreen document created');
@@ -680,7 +680,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         let capturePromise;
         try {
-          capturePromise = Promise.resolve().then(() => audioCaptureManager.startCapture(tabId));
+          capturePromise = audioCaptureManager.startCapture(tabId);
+          if (!(capturePromise instanceof Promise)) {
+            capturePromise = Promise.resolve(capturePromise);
+          }
         } catch (startErr) {
           handleCaptureFailure(startErr);
           return;
@@ -803,20 +806,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log('[BG] 🎤 STATE: CAPTURING - Calling tabCapture.capture()...');
         
         // Ensure offscreen document exists for MV3 compliance
-        async function ensureOffscreen() {
-          const existing = await chrome.offscreen.hasDocument();
-          if (!existing) {
-            await chrome.offscreen.createDocument({
-              url: chrome.runtime.getURL("offscreen.html"),
-              reasons: ["AUDIO_CAPTURE"],
-              justification: "Process tab audio in MV3"
-            });
-            console.log('[BG] ✅ Offscreen document created');
-          } else {
-            console.log('[BG] ✅ Offscreen document exists');
-          }
-        }
-        
         // Bootstrap offscreen before capture
         await ensureOffscreen();
         console.log("[PRECAP] Tab active:", tabId);
