@@ -106,34 +106,44 @@ function formatTimeAgo(timestamp) {
 /**
  * Update audio state display
  */
+function setStartAudioButton(label, iconOverride) {
+  if (!startAudioBtn) return;
+
+  const iconSpan = startAudioBtn.querySelector('.btn-icon');
+  const textSpan = startAudioBtn.querySelector('.btn-text');
+  const labelTarget = textSpan ?? startAudioBtn;
+
+  labelTarget.textContent = label;
+
+  if (iconSpan && iconOverride !== undefined) {
+    iconSpan.textContent = iconOverride;
+  }
+}
+
 function updateAudioState(recording) {
   isAudioRecording = recording;
-  
+
   const audioBtn = startAudioBtn;
   const statusDot = document.getElementById('audioStatusDot');
   const statusLabel = document.getElementById('audioStatusLabel');
-  const btnIcon = audioBtn?.querySelector('.btn-icon');
-  const btnText = audioBtn?.querySelector('.btn-text');
-  
+
   if (!audioBtn) return;
-  
+
   if (recording) {
     audioBtn.classList.add('recording');
     statusDot?.classList.add('recording');
     statusLabel?.classList.add('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Recording';
-    if (btnIcon) btnIcon.textContent = '⏹️';
-    if (btnText) btnText.textContent = 'Stop Audio';
+    setStartAudioButton('Stop Audio', '⏹️');
     audioBtn.setAttribute('aria-label', 'Stop audio recording');
   } else {
     audioBtn.classList.remove('recording');
     statusDot?.classList.remove('recording');
     statusLabel?.classList.remove('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Stopped';
-    if (btnIcon) btnIcon.textContent = '🎤';
-    if (btnText) btnText.textContent = 'Start Audio';
+    setStartAudioButton('Start Audio', '🎤');
     audioBtn.setAttribute('aria-label', 'Start audio recording');
   }
 }
@@ -893,7 +903,7 @@ function handleMessage(message) {
 
       if (startAudioBtn) {
         startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Stop Audio';
+        setStartAudioButton('Stop Audio');
       }
 
       if (testInsightBtn) {
@@ -919,7 +929,7 @@ function handleMessage(message) {
 
       if (startAudioBtn) {
         startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Try Again';
+        setStartAudioButton('Try Again', '🎤');
       }
 
       if (testInsightBtn) {
@@ -943,7 +953,10 @@ function handleMessage(message) {
         updateAudioState(false);
         if (startAudioBtn) {
           startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Try Again';
+          setStartAudioButton('Try Again', '🎤');
+        }
+        if (testInsightBtn) {
+          testInsightBtn.style.display = 'none';
         }
         if (testInsightBtn) {
           testInsightBtn.style.display = 'none';
@@ -1777,7 +1790,7 @@ if (testInsightBtn) {
 
 // Helper function for screen-share audio fallback
 async function startAudioViaScreenShare() {
-  startAudioBtn.textContent = 'Select tab to share...';
+  setStartAudioButton('Select tab to share...', '🎤');
   try {
     // Fallback to getDisplayMedia
     console.log('[Spikely] getDisplayMedia fallback invoked');
@@ -1805,7 +1818,7 @@ async function startAudioViaScreenShare() {
       deviceId: settings.deviceId
     }));
     
-    startAudioBtn.textContent = 'Connecting...';
+    setStartAudioButton('Connecting...');
     
     // Fetch v3 token from secure relay
     console.log('🎙️ [ASSEMBLYAI v3] Step 1: Requesting temporary token...');
@@ -1890,7 +1903,7 @@ if (startAudioBtn) {
       pendingAudioRequestId = requestId;
 
       startAudioBtn.disabled = true;
-      startAudioBtn.textContent = 'Processing...';
+      setStartAudioButton('Processing…');
 
       if (audioStartWatchdog) {
         clearTimeout(audioStartWatchdog);
@@ -1903,7 +1916,7 @@ if (startAudioBtn) {
         pendingAudioRequestId = null;
         updateAudioState(false);
         startAudioBtn.disabled = false;
-        startAudioBtn.textContent = 'Try Again';
+        setStartAudioButton('Try Again', '🎤');
         isSystemStarted = false;
 
         alert('⚠️ Audio Capture Timed Out\n\nTook longer than 6 seconds. Please:\n1. Make sure TikTok tab is focused\n2. Try "Try Again" button');
@@ -1925,7 +1938,7 @@ if (startAudioBtn) {
           console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
           updateAudioState(false);
           startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Try Again';
+          setStartAudioButton('Try Again', '🎤');
           isSystemStarted = false;
           pendingAudioRequestId = null;
 
@@ -1936,7 +1949,7 @@ if (startAudioBtn) {
         if (response?.ok && response?.status === 'pending') {
           console.log('[AUDIO:SP] ⏳ Pending response received for requestId=' + requestId);
           startAudioBtn.disabled = true;
-          startAudioBtn.textContent = 'Awaiting Chrome prompt…';
+          setStartAudioButton('Awaiting Chrome prompt…');
           return;
         }
 
@@ -1947,7 +1960,6 @@ if (startAudioBtn) {
           audioIsCapturing = true;
           updateAudioState(true);
           startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Stop Audio';
 
           if (testInsightBtn) {
             testInsightBtn.style.display = 'inline-block';
@@ -1963,7 +1975,7 @@ if (startAudioBtn) {
           
           updateAudioState(false);
           startAudioBtn.disabled = false;
-          startAudioBtn.textContent = 'Focus & Retry';
+          setStartAudioButton('Focus & Retry', '🎤');
           isSystemStarted = false;
           
           // Map error codes to user messages

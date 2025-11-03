@@ -121,7 +121,7 @@ async function ensureOffscreen() {
     if (!offscreenExists) {
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
-        reasons: ['USER_MEDIA'],
+        reasons: ['USER_MEDIA', 'AUDIO_CAPTURE'],
         justification: 'Audio capture for transcription'
       });
       console.log('[BG] ✅ Offscreen document created');
@@ -626,20 +626,68 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         console.log('[AUDIO:BG] 🎛 Using audioCaptureManager for offscreen capture');
 
+        const respondPending = () => {
+          if (!ackSent) {
+            sendResponse({
+              ok: true,
+              status: 'pending',
+              requestId,
+              tabId
+            });
+            ackSent = true;
+          }
+        };
+
+        const handleCaptureFailure = (error) => {
+          respondPending();
+
+          console.error('[AUDIO:BG] ❌ capturePromise rejection:', error);
+
+          if (keepAliveStarted) {
+            stopKeepAlive();
+            keepAliveStarted = false;
+          }
+
+          try {
+            audioCaptureManager.stopCapture();
+          } catch (stopErr) {
+            console.warn('[AUDIO:BG] ⚠️ stopCapture during failure cleanup failed:', stopErr?.message || stopErr);
+          }
+
+          if (tabId !== undefined) {
+            const existing = audioCaptureState.get(tabId);
+            if (existing?.stream) {
+              try {
+                existing.stream.getTracks().forEach(track => track.stop());
+              } catch (trackErr) {
+                console.warn('[AUDIO:BG] ⚠️ error stopping tracks during failure cleanup:', trackErr);
+              }
+            }
+            audioCaptureState.delete(tabId);
+          }
+
+          const errorMessage = error?.message || String(error);
+
+          chrome.runtime.sendMessage({
+            type: 'AUDIO_CAPTURE_FAILED',
+            tabId,
+            requestId,
+            error: errorMessage
+          });
+        };
+
+        respondPending();
+
         let capturePromise;
         try {
           capturePromise = audioCaptureManager.startCapture(tabId);
+          if (!(capturePromise instanceof Promise)) {
+            capturePromise = Promise.resolve(capturePromise);
+          }
         } catch (startErr) {
-          throw startErr;
+          handleCaptureFailure(startErr);
+          return;
         }
-
-        sendResponse({
-          ok: true,
-          status: 'pending',
-          requestId,
-          tabId
-        });
-        ackSent = true;
 
         capturePromise
           .then((captureResult) => {
@@ -676,39 +724,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
           })
           .catch((error) => {
-            console.error('[AUDIO:BG] ❌ capturePromise rejection:', error);
-
-            if (keepAliveStarted) {
-              stopKeepAlive();
-              keepAliveStarted = false;
-            }
-
-            try {
-              audioCaptureManager.stopCapture();
-            } catch (stopErr) {
-              console.warn('[AUDIO:BG] ⚠️ stopCapture during failure cleanup failed:', stopErr?.message || stopErr);
-            }
-
-            if (tabId !== undefined) {
-              const existing = audioCaptureState.get(tabId);
-              if (existing?.stream) {
-                try {
-                  existing.stream.getTracks().forEach(track => track.stop());
-                } catch (trackErr) {
-                  console.warn('[AUDIO:BG] ⚠️ error stopping tracks during failure cleanup:', trackErr);
-                }
-              }
-              audioCaptureState.delete(tabId);
-            }
-
-            const errorMessage = error?.message || String(error);
-
-            chrome.runtime.sendMessage({
-              type: 'AUDIO_CAPTURE_FAILED',
-              tabId,
-              requestId,
-              error: errorMessage
-            });
+            handleCaptureFailure(error);
           })
           .catch(unhandled => {
             console.error('[AUDIO:BG] ⚠️ Unhandled audio capture start rejection:', unhandled);
@@ -790,20 +806,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log('[BG] 🎤 STATE: CAPTURING - Calling tabCapture.capture()...');
         
         // Ensure offscreen document exists for MV3 compliance
-        async function ensureOffscreen() {
-          const existing = await chrome.offscreen.hasDocument();
-          if (!existing) {
-            await chrome.offscreen.createDocument({
-              url: chrome.runtime.getURL("offscreen.html"),
-              reasons: ["AUDIO_CAPTURE"],
-              justification: "Process tab audio in MV3"
-            });
-            console.log('[BG] ✅ Offscreen document created');
-          } else {
-            console.log('[BG] ✅ Offscreen document exists');
-          }
-        }
-        
         // Bootstrap offscreen before capture
         await ensureOffscreen();
         console.log("[PRECAP] Tab active:", tabId);
