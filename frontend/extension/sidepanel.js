@@ -958,9 +958,6 @@ function handleMessage(message) {
         if (testInsightBtn) {
           testInsightBtn.style.display = 'none';
         }
-        if (testInsightBtn) {
-          testInsightBtn.style.display = 'none';
-        }
         alert('⚠️ Audio pipeline error\n\n' + (message.error || 'Unknown error. Please retry.'));
       }
       break;

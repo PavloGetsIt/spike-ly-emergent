@@ -680,10 +680,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         let capturePromise;
         try {
-          capturePromise = audioCaptureManager.startCapture(tabId);
-          if (!(capturePromise instanceof Promise)) {
-            capturePromise = Promise.resolve(capturePromise);
-          }
+          capturePromise = Promise.resolve(audioCaptureManager.startCapture(tabId));
         } catch (startErr) {
           handleCaptureFailure(startErr);
           return;
