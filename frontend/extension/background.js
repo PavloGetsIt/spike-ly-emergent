@@ -62,15 +62,19 @@ async function injectContentScript(tabId) {
 }
 
 // Inject content script when side panel opens
-chrome.sidePanel.onChanged.addListener(async (details) => {
-  if (details.opened) {
-    console.log('[BG] 📂 Side panel opened, injecting content script...');
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab && tab.url.includes('tiktok.com')) {
-      await injectContentScript(tab.id);
+if (typeof chrome !== 'undefined' && chrome.sidePanel?.onChanged?.addListener) {
+  chrome.sidePanel.onChanged.addListener(async (details) => {
+    if (details.opened) {
+      console.log('[BG] 📂 Side panel opened, injecting content script...');
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.url.includes('tiktok.com')) {
+        await injectContentScript(tab.id);
+      }
     }
-  }
-});
+  });
+} else {
+  console.warn('[BG] Side panel API not available; skipping onChanged listener registration');
+}
 
 // Also inject when tracking starts
 async function injectAndStartTracking() {
@@ -121,7 +125,7 @@ async function ensureOffscreen() {
     if (!offscreenExists) {
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
-        reasons: ['USER_MEDIA'],
+        reasons: ['USER_MEDIA', 'AUDIO_CAPTURE'],
         justification: 'Audio capture for transcription'
       });
       console.log('[BG] ✅ Offscreen document created');
@@ -297,7 +301,10 @@ async function stopTrackingOnAllTabs() {
 }
 
 // Listen for messages from content scripts and side panel
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+if (!chrome?.runtime?.onMessage?.addListener) {
+  console.error('[Spikely] chrome.runtime.onMessage API unavailable; background listener not registered');
+} else {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'POPUP_ACTIVATED') {
     // Track that popup was opened on this tab (grants activeTab permission)
     (async () => {
@@ -549,6 +556,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
       const startTime = Date.now();
       let keepAliveStarted = false;
+      let ackSent = false;
+      let tabId;
 
       try {
         // STEP 1: Locate target TikTok Live tab
@@ -562,7 +571,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         
-        const tabId = activeTab.id;
+        tabId = activeTab.id;
         const url = activeTab.url;
         
         // STEP 2: Validate eligibility
@@ -624,43 +633,111 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         console.log('[AUDIO:BG] 🎛 Using audioCaptureManager for offscreen capture');
 
-        const captureResult = await audioCaptureManager.startCapture(tabId);
+        const respondPending = () => {
+          if (!ackSent) {
+            sendResponse({
+              ok: true,
+              status: 'pending',
+              requestId,
+              tabId
+            });
+            ackSent = true;
+          }
+        };
 
-        if (!captureResult?.success) {
-          const errorMsg = captureResult?.error || 'Audio capture failed';
-          throw new Error(errorMsg);
+        const handleCaptureFailure = (error) => {
+          respondPending();
+
+          console.error('[AUDIO:BG] ❌ capturePromise rejection:', error);
+
+          if (keepAliveStarted) {
+            stopKeepAlive();
+            keepAliveStarted = false;
+          }
+
+          try {
+            audioCaptureManager.stopCapture();
+          } catch (stopErr) {
+            console.warn('[AUDIO:BG] ⚠️ stopCapture during failure cleanup failed:', stopErr?.message || stopErr);
+          }
+
+          if (tabId !== undefined) {
+            const existing = audioCaptureState.get(tabId);
+            if (existing?.stream) {
+              try {
+                existing.stream.getTracks().forEach(track => track.stop());
+              } catch (trackErr) {
+                console.warn('[AUDIO:BG] ⚠️ error stopping tracks during failure cleanup:', trackErr);
+              }
+            }
+            audioCaptureState.delete(tabId);
+          }
+
+          const errorMessage = error?.message || String(error);
+
+          chrome.runtime.sendMessage({
+            type: 'AUDIO_CAPTURE_FAILED',
+            tabId,
+            requestId,
+            error: errorMessage
+          });
+        };
+
+        respondPending();
+
+        let capturePromise;
+        try {
+          capturePromise = Promise.resolve(audioCaptureManager.startCapture(tabId));
+        } catch (startErr) {
+          handleCaptureFailure(startErr);
+          return;
         }
 
-        audioCaptureState.set(tabId, {
-          isCapturing: true,
-          streamId: captureResult.streamId || null,
-          stream: null,
-          startTime: Date.now(),
-          requestId: requestId
-        });
+        capturePromise
+          .then((captureResult) => {
+            if (!captureResult?.success) {
+              const errorMsg = captureResult?.error || 'Audio capture failed';
+              throw new Error(errorMsg);
+            }
 
-        console.log('[AUDIO:BG] 🟢 Offscreen capture started streamId=' + (captureResult.streamId || 'unknown'));
+            audioCaptureState.set(tabId, {
+              isCapturing: true,
+              streamId: captureResult.streamId || null,
+              stream: null,
+              startTime: Date.now(),
+              requestId: requestId
+            });
 
-        correlationEngine.startAutoInsightTimer();
+            console.log('[AUDIO:BG] 🟢 Offscreen capture started streamId=' + (captureResult.streamId || 'unknown'));
 
-        chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, () => {
-          if (chrome.runtime.lastError) {
-            console.warn('[AUDIO:BG] ⚠️ START_TRACKING failed:', chrome.runtime.lastError.message);
-          }
-        });
+            correlationEngine.startAutoInsightTimer();
 
-        sendResponse({
-          ok: true,
-          streamId: captureResult.streamId || null,
-          tabId: tabId,
-          diagnostics: { url, focused: true, activationOk: true, offscreen: true }
-        });
+            chrome.tabs.sendMessage(tabId, { type: 'START_TRACKING' }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[AUDIO:BG] ⚠️ START_TRACKING failed:', chrome.runtime.lastError.message);
+              }
+            });
 
-        console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
+            chrome.runtime.sendMessage({
+              type: 'AUDIO_CAPTURE_STARTED',
+              tabId,
+              streamId: captureResult.streamId || null,
+              requestId
+            });
+
+            console.log('[AUDIO:BG] ✅ Audio capture complete for requestId=' + requestId);
+          })
+          .catch((error) => {
+            handleCaptureFailure(error);
+          })
+          .catch(unhandled => {
+            console.error('[AUDIO:BG] ⚠️ Unhandled audio capture start rejection:', unhandled);
+          });
 
       } catch (error) {
         if (keepAliveStarted) {
           stopKeepAlive();
+          keepAliveStarted = false;
         }
 
         const totalTime = Date.now() - startTime;
@@ -678,12 +755,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         console.log('[AUDIO:BG] ❌ tabCapture FAIL code=' + errorCode + ' time=' + totalTime + 'ms');
 
-        sendResponse({
-          ok: false,
-          code: errorCode,
-          message: errorMessage,
-          diagnostics: { totalTime }
-        });
+        if (ackSent) {
+          if (tabId !== undefined) {
+            audioCaptureState.delete(tabId);
+          }
+          chrome.runtime.sendMessage({
+            type: 'AUDIO_CAPTURE_FAILED',
+            tabId,
+            requestId,
+            error: errorMessage,
+            code: errorCode
+          });
+        } else {
+          sendResponse({
+            ok: false,
+            code: errorCode,
+            message: errorMessage,
+            diagnostics: { totalTime }
+          });
+        }
       }
     })();
 
@@ -720,20 +810,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log('[BG] 🎤 STATE: CAPTURING - Calling tabCapture.capture()...');
         
         // Ensure offscreen document exists for MV3 compliance
-        async function ensureOffscreen() {
-          const existing = await chrome.offscreen.hasDocument();
-          if (!existing) {
-            await chrome.offscreen.createDocument({
-              url: chrome.runtime.getURL("offscreen.html"),
-              reasons: ["AUDIO_CAPTURE"],
-              justification: "Process tab audio in MV3"
-            });
-            console.log('[BG] ✅ Offscreen document created');
-          } else {
-            console.log('[BG] ✅ Offscreen document exists');
-          }
-        }
-        
         // Bootstrap offscreen before capture
         await ensureOffscreen();
         console.log("[PRECAP] Tab active:", tabId);
@@ -1587,7 +1663,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
   return message.type === 'OPEN_SIDE_PANEL' || message.type === 'START_AUDIO_CAPTURE' || message.type === 'HUME_ANALYZE';
-});
+  });
+}
 
 // Auto-connect on extension load
 console.log('[Spikely] Background script loaded');
