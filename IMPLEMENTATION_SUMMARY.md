@@ -155,7 +155,7 @@ The following keys need to be added to your Supabase project environment variabl
 - [ ] Verify insights appear when viewer count changes ±3
 
 ### Web App Testing:
-- [ ] Open `https://stream-insights-2.preview.emergentagent.com`
+- [ ] Open `https://live-assistant-2.preview.emergentagent.com`
 - [ ] Start a session
 - [ ] Allow screen capture and audio
 - [ ] Verify transcripts appear

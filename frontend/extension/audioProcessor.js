@@ -128,6 +128,9 @@ export class AudioProcessor {
         
         // V3 with token query param - no auth message needed
         
+        // Start heartbeat to prevent connection closure
+        this.startHeartbeat();
+        
         this.debug?.('ws_open', 'v3:ready');
         this.log('✅ WebSocket connected (v3 Universal Streaming)');
         resolve();
@@ -145,6 +148,10 @@ export class AudioProcessor {
         console.log(`🎙️ [ASSEMBLYAI v3] WebSocket CLOSED: code=${event.code}, reason=${event.reason || 'none'}`);
         this.debug?.('ws_closed', `code=${event.code}`);
         this.log(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
+        
+        // Stop heartbeat
+        this.stopHeartbeat();
+        
         if (this.isProcessing) {
           console.error('🎙️ [ASSEMBLYAI v3] ❌ Connection closed unexpectedly during processing');
           this.error('WebSocket closed unexpectedly during processing');
@@ -382,11 +389,36 @@ export class AudioProcessor {
     }
   }
 
+  // WebSocket heartbeat to prevent connection closure
+  startHeartbeat() {
+    this.stopHeartbeat(); // Clear any existing
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        console.log('🎙️ [ASSEMBLYAI] 💓 Sending heartbeat ping...');
+        this.ws.send(JSON.stringify({ message_type: 'KeepAlive' }));
+      }
+    }, 30000); // Every 30 seconds
+    
+    console.log('🎙️ [ASSEMBLYAI] ❤️ Heartbeat started (30s interval)');
+  }
+  
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log('🎙️ [ASSEMBLYAI] 💔 Heartbeat stopped');
+    }
+  }
+
   // Stop processing and cleanup
   stop() {
     this.log('Stopping audio processor...');
     
     this.isProcessing = false;
+    
+    // Stop heartbeat
+    this.stopHeartbeat();
     
     // Reset Hume buffers
     this.humeAudioBuffer = [];

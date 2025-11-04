@@ -1,8 +1,7 @@
-// Spikely Side Panel - WebSocket Integration
-// VERSION: 2025-06-21-002 - FORCE RELOAD TEST
-alert('🔥 NEW CODE LOADING! Version 2025-06-21-002 🔥');
-console.log('🎯 SIDEPANEL.JS LOADING - Version 2025-06-21-002 (FORCE RELOAD)');
-console.log('🎯 This version includes: Audio button init, tooltips, animations');
+// Spikely Side Panel - WebSocket Integration  
+// VERSION: 2.1.2-UNIFIED-BACKEND
+console.log('🎯 SIDEPANEL.JS LOADING - Version 2.1.2-UNIFIED-BACKEND');
+console.log('🏗️ Unified: All AI calls (Claude + Hume) now use FastAPI backend only');
 
 import { AudioProcessor } from './audioProcessor.js';
 
@@ -26,6 +25,36 @@ let losingActions = [];
 let audioProcessor = null;
 
 let isAudioRecording = false;
+let pendingAudioRequestId = null;
+let audioStartWatchdog = null;
+
+// Session statistics tracking
+let sessionStats = {
+  totalSpikes: 0,
+  totalDrops: 0,
+  bestSpike: { delta: 0, label: '', timestamp: null },
+  worstDrop: { delta: 0, label: '', timestamp: null },
+  insightsGenerated: 0,
+  insightsShown: 0,
+  viewerHistory: [] // For trend graph: [{count: X, timestamp: Y, label: Z}]
+};
+
+// Track last insight for linking to actions
+let lastInsightGiven = null;
+
+// ==================== CLEANUP FUNCTION ====================
+// Clean any legacy "Neutral" labels from stored actions
+function cleanLegacyLabels(actions) {
+  return actions.map(action => {
+    if (action.label && 
+        (action.label.toLowerCase() === 'neutral' || 
+         action.label.toLowerCase() === 'unknown' ||
+         action.label.toLowerCase() === 'speech')) {
+      action.label = 'Chat interaction';
+    }
+    return action;
+  });
+}
 
 // ==================== UI UTILITY FUNCTIONS ====================
 
@@ -77,34 +106,44 @@ function formatTimeAgo(timestamp) {
 /**
  * Update audio state display
  */
+function setStartAudioButton(label, iconOverride) {
+  if (!startAudioBtn) return;
+
+  const iconSpan = startAudioBtn.querySelector('.btn-icon');
+  const textSpan = startAudioBtn.querySelector('.btn-text');
+  const labelTarget = textSpan ?? startAudioBtn;
+
+  labelTarget.textContent = label;
+
+  if (iconSpan && iconOverride !== undefined) {
+    iconSpan.textContent = iconOverride;
+  }
+}
+
 function updateAudioState(recording) {
   isAudioRecording = recording;
-  
+
   const audioBtn = startAudioBtn;
   const statusDot = document.getElementById('audioStatusDot');
   const statusLabel = document.getElementById('audioStatusLabel');
-  const btnIcon = audioBtn?.querySelector('.btn-icon');
-  const btnText = audioBtn?.querySelector('.btn-text');
-  
+
   if (!audioBtn) return;
-  
+
   if (recording) {
     audioBtn.classList.add('recording');
     statusDot?.classList.add('recording');
     statusLabel?.classList.add('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Recording';
-    if (btnIcon) btnIcon.textContent = '⏹️';
-    if (btnText) btnText.textContent = 'Stop Audio';
+    setStartAudioButton('Stop Audio', '⏹️');
     audioBtn.setAttribute('aria-label', 'Stop audio recording');
   } else {
     audioBtn.classList.remove('recording');
     statusDot?.classList.remove('recording');
     statusLabel?.classList.remove('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Stopped';
-    if (btnIcon) btnIcon.textContent = '🎤';
-    if (btnText) btnText.textContent = 'Start Audio';
+    setStartAudioButton('Start Audio', '🎤');
     audioBtn.setAttribute('aria-label', 'Start audio recording');
   }
 }
@@ -179,6 +218,73 @@ function setupTooltips() {
   console.log('[UI:INIT] ✅ Tooltips setup complete');
 }
 
+// ==================== COUNTDOWN TIMER ====================
+let countdownSeconds = 20;
+let countdownInterval = null;
+
+/**
+ * Update countdown display
+ */
+function updateCountdown(seconds) {
+  console.log('[COUNTDOWN] ⏰ updateCountdown called with:', seconds + 's');
+  
+  countdownSeconds = seconds;
+  
+  // Show permanent countdown container
+  const permanentCountdown = document.getElementById('permanentCountdown');
+  if (permanentCountdown) {
+    permanentCountdown.style.display = 'flex';
+    console.log('[COUNTDOWN] ✅ Permanent countdown container shown');
+  }
+  
+  // Update countdown display
+  const countdownEl = document.getElementById('countdownDisplay');
+  if (countdownEl) {
+    countdownEl.textContent = `${seconds}s`;
+    console.log('[COUNTDOWN] ✅ Display updated to:', seconds + 's');
+  } else {
+    console.error('[COUNTDOWN] ❌ countdownDisplay element still not found!');
+  }
+  
+  // Start countdown interval if not already running
+  if (!countdownInterval && seconds > 0) {
+    startCountdownInterval();
+  }
+}
+
+/**
+ * Start countdown interval (decrements every second)
+ */
+function startCountdownInterval() {
+  stopCountdownInterval(); // Clear any existing
+  
+  countdownInterval = setInterval(() => {
+    countdownSeconds--;
+    
+    const countdownEl = document.getElementById('countdownDisplay');
+    if (countdownEl) {
+      countdownEl.textContent = `${countdownSeconds}s`;
+    }
+    
+    // Stop at 0
+    if (countdownSeconds <= 0) {
+      stopCountdownInterval();
+    }
+  }, 1000); // Update every second
+  
+  console.log('[COUNTDOWN] ⏰ Interval started');
+}
+
+/**
+ * Stop countdown interval
+ */
+function stopCountdownInterval() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+}
+// =========================================================
 /**
  * Apply pulse animation fallback via JavaScript
  */
@@ -294,6 +400,60 @@ const sessionTime = document.getElementById('sessionTime');
 const insightContent = document.getElementById('insightContent');
 const winningActionsContainer = document.getElementById('winningActions');
 const losingActionsContainer = document.getElementById('losingActions');
+
+// Niche/Goal selection elements
+const nicheSelector = document.getElementById('nicheSelector');
+const goalSelector = document.getElementById('goalSelector');
+
+// Niche template selector instance
+let nicheTemplateSelector = null;
+
+// Initialize niche template system
+function initializeNicheSystem() {
+  console.log('[Niche] Initializing niche template system');
+  
+  // Setup niche selector event listener
+  if (nicheSelector) {
+    nicheSelector.addEventListener('change', (e) => {
+      const selectedNiche = e.target.value;
+      const selectedGoal = goalSelector?.value || 'generalGrowth';
+      
+      console.log('[Niche] Niche changed to:', selectedNiche);
+      
+      // Send update to background for correlation engine
+      chrome.runtime.sendMessage({
+        type: 'NICHE_UPDATE',
+        niche: selectedNiche,
+        goal: selectedGoal
+      });
+    });
+  }
+  
+  // Setup goal selector event listener
+  if (goalSelector) {
+    goalSelector.addEventListener('change', (e) => {
+      const selectedGoal = e.target.value;
+      const selectedNiche = nicheSelector?.value || 'general';
+      
+      console.log('[Niche] Goal changed to:', selectedGoal);
+      
+      // Send update to background for correlation engine
+      chrome.runtime.sendMessage({
+        type: 'NICHE_UPDATE',
+        niche: selectedNiche,
+        goal: selectedGoal
+      });
+    });
+  }
+  
+  console.log('[Niche] Event listeners setup complete');
+}
+
+// Call initialization after DOM loads
+setTimeout(() => {
+  initializeNicheSystem();
+}, 1000);
+
 const connectionStatus = document.getElementById('connectionStatus');
 const panelContainer = document.getElementById('panelContainer');
 const collapsedTab = document.getElementById('collapsedTab');
@@ -540,7 +700,7 @@ function startCooldownTimer(seconds) {
 
 // Listen to messages from background script (viewer updates, transcripts, etc.)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS'];
+  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE', 'AUDIO_CAPTURE_RESULT', 'AUDIO_CAPTURE_STARTED', 'AUDIO_CAPTURE_FAILED'];
   
   if (!message || !message.type || !allowedTypes.includes(message.type)) {
     return;
@@ -555,7 +715,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleMessage(message);
     return;
   }
-  
+
   // Gate ENGINE_STATUS on system started state
   if (message.type === 'ENGINE_STATUS') {
     console.debug('[ENGINE_STATUS:SP:RX]', message.status, message.meta);
@@ -568,6 +728,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
   
+  if (['AUDIO_CAPTURE_RESULT', 'AUDIO_CAPTURE_STARTED', 'AUDIO_CAPTURE_FAILED'].includes(message.type)) {
+    handleMessage(message);
+    return;
+  }
+
   // Other messages only when system is started
   if (isSystemStarted) {
     handleMessage(message);
@@ -594,8 +759,21 @@ function connectToWebSocket() {
     };
     
     wsConnection.onmessage = (event) => {
+      console.log('🔬 NUCLEAR: WebSocket message received');
+      console.log('🔬 NUCLEAR: Raw WebSocket data:', event.data.substring(0, 200));
+      
       try {
         const message = JSON.parse(event.data);
+        console.log('🔬 NUCLEAR: Parsed WebSocket message type:', message.type);
+        
+        if (message.type === 'INSIGHT') {
+          console.log('🔬 NUCLEAR: ⚠️ INSIGHT FROM WEBSOCKET! This is the mystery source!');
+          console.log('🔬 NUCLEAR: WebSocket INSIGHT:', {
+            emotionalLabel: message.emotionalLabel,
+            nextMove: message.nextMove?.substring(0, 50)
+          });
+        }
+        
         handleMessage(message);
       } catch (error) {
         console.error('[Spikely Side Panel] Error parsing message:', error);
@@ -630,7 +808,17 @@ function handleMessage(message) {
       console.debug('[VC:SP:RX] VIEWER_COUNT', { count: message.count, delta: message.delta });
       console.log('[Spikely Side Panel] VIEWER_COUNT payload:', { count: message.count, delta: message.delta });
       
-      // Handle warm-up phase UI
+      // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
+      if (message.source === 'initial_instant') {
+        console.log('[SIDEPANEL] ⚡ Initial count received INSTANTLY:', message.count);
+        firstCountReceived = true;
+        isInWarmup = false;
+        updateEngineStatus('IDLE', {});
+        updateViewerCount(message.count, 0);
+        break;
+      }
+      
+      // Handle warm-up phase UI (for subsequent updates)
       if (isSystemStarted && message.count === 0 && !firstCountReceived) {
         // During warm-up: show "Collecting..."
         updateEngineStatus('COLLECTING', {});
@@ -658,6 +846,21 @@ function handleMessage(message) {
       }
       break;
     case 'INSIGHT':
+      console.log('🔬 NUCLEAR: INSIGHT message received in sidepanel');
+      console.log('🔬 NUCLEAR: Message details:', {
+        emotionalLabel: message.emotionalLabel,
+        nextMove: message.nextMove?.substring(0, 50),
+        delta: message.delta,
+        source: message.source,
+        isTimedInsight: message.isTimedInsight,
+        isReminder: message.isReminder
+      });
+      console.log('[SIDEPANEL] 🎯 INSIGHT received:', {
+        emotionalLabel: message.emotionalLabel,
+        nextMove: message.nextMove,
+        delta: message.delta,
+        text: message.text?.substring(0, 50)
+      });
       updateInsight(message);
       break;
     case 'ACTION':
@@ -676,6 +879,87 @@ function handleMessage(message) {
       break;
     case 'ENGINE_STATUS':
       updateEngineStatus(message.status, message.meta);
+      break;
+    case 'COUNTDOWN_UPDATE':
+      console.log('[SIDEPANEL] ⏰ COUNTDOWN_UPDATE received:', message.seconds + 's');
+      updateCountdown(message.seconds);
+      break;
+    case 'AUDIO_CAPTURE_STARTED':
+      if (message.requestId && pendingAudioRequestId && message.requestId !== pendingAudioRequestId) {
+        console.warn('[SIDEPANEL] ⚠️ Ignoring AUDIO_CAPTURE_STARTED for stale request', message.requestId);
+        break;
+      }
+
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
+
+      console.log('[SIDEPANEL] ✅ AUDIO_CAPTURE_STARTED received');
+      isSystemStarted = true;
+      audioIsCapturing = true;
+      updateAudioState(true);
+
+      if (startAudioBtn) {
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Stop Audio');
+      }
+
+      if (testInsightBtn) {
+        testInsightBtn.style.display = 'inline-block';
+      }
+      break;
+    case 'AUDIO_CAPTURE_FAILED':
+      if (message.requestId && pendingAudioRequestId && message.requestId !== pendingAudioRequestId) {
+        console.warn('[SIDEPANEL] ⚠️ Ignoring AUDIO_CAPTURE_FAILED for stale request', message.requestId);
+        break;
+      }
+
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
+
+      console.warn('[SIDEPANEL] ❌ AUDIO_CAPTURE_FAILED received:', message.error);
+      audioIsCapturing = false;
+      isSystemStarted = false;
+      updateAudioState(false);
+
+      if (startAudioBtn) {
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Try Again', '🎤');
+      }
+
+      if (testInsightBtn) {
+        testInsightBtn.style.display = 'none';
+      }
+
+      const failureMessage = message.error || 'Unknown error. Please retry.';
+      const failureCode = message.code ? `\n\nCode: ${message.code}` : '';
+      alert('⚠️ Audio Capture Failed\n\n' + failureMessage + failureCode);
+      break;
+    case 'AUDIO_CAPTURE_RESULT':
+      if (!message.success) {
+        console.warn('[SIDEPANEL] ⚠️ AUDIO_CAPTURE_RESULT failure:', message.error);
+        if (audioStartWatchdog) {
+          clearTimeout(audioStartWatchdog);
+          audioStartWatchdog = null;
+        }
+        pendingAudioRequestId = null;
+        audioIsCapturing = false;
+        isSystemStarted = false;
+        updateAudioState(false);
+        if (startAudioBtn) {
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Try Again', '🎤');
+        }
+        if (testInsightBtn) {
+          testInsightBtn.style.display = 'none';
+        }
+        alert('⚠️ Audio pipeline error\n\n' + (message.error || 'Unknown error. Please retry.'));
+      }
       break;
     case 'FULL_RESET':
       resetAllData();
@@ -742,8 +1026,7 @@ function resetAllData() {
   audioIsCapturing = false;
   isSystemStarted = false;
   if (startAudioBtn) {
-    startAudioBtn.textContent = 'Start';
-    startAudioBtn.classList.remove('active');
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
   }
   
@@ -869,14 +1152,46 @@ function updateViewerCount(count, delta) {
 
 // Update insight
 function updateInsight(data) {
-  console.log('[Spikely Side Panel] Updating insight:', data);
+  console.log('🔬 NUCLEAR: updateInsight() called');
+  console.log('🔬 NUCLEAR: Insight data received:', {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove?.substring(0, 50),
+    delta: data.delta,
+    source: data.source,
+    timestamp: Date.now()
+  });
+  
+  console.log('[Spikely Side Panel] 🎯 updateInsight called with:', {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove,
+    delta: data.delta,
+    textLength: data.text?.length || 0
+  });
   
   const delta = data.delta || 0;
+  
+  // Store last insight for linking to actions
+  lastInsightGiven = {
+    emotionalLabel: data.emotionalLabel,
+    nextMove: data.nextMove,
+    delta: delta,
+    timestamp: Date.now()
+  };
+  
+  // Track session stats
+  sessionStats.insightsGenerated++;
+  sessionStats.insightsShown++;
   
   // Apply UI-level sanitization safety net
   const emotionalLabel = sanitizeForDisplay(data.emotionalLabel, 3, '✅ Neutral');
   const nextMove = sanitizeForDisplay(data.nextMove, 8, 'Keep momentum');
   const text = data.text || '';
+  
+  console.log('[Spikely Side Panel] 🎯 After sanitization:', {
+    emotionalLabel,
+    nextMove,
+    delta
+  });
   
   const isPositive = delta > 0;
   const arrowIcon = isPositive 
@@ -908,6 +1223,13 @@ function updateInsight(data) {
     }
   }
   
+  // Show cooldown timer with countdown
+  const cooldownEl = document.getElementById('cooldownTimer');
+  if (cooldownEl) {
+    cooldownEl.style.display = 'flex';
+    console.log('[COUNTDOWN] ⏰ Cooldown timer displayed');
+  }
+  
   // Start cooldown timer and update status
   startCooldownTimer(5);
   updateSystemStatus('ANALYZING');
@@ -915,62 +1237,283 @@ function updateInsight(data) {
 
 // Add action to winning/losing list
 function addAction(action) {
+  // Build better label (NEVER use "Neutral" or "Unknown")
+  let betterLabel = 'Chat';  // Default fallback
+  
+  // Priority: Keywords > Label > Topic
+  if (action.keywords && action.keywords.length > 0) {
+    // Use first keyword, capitalize
+    betterLabel = action.keywords[0].charAt(0).toUpperCase() + action.keywords[0].slice(1);
+  } else if (action.label && 
+             action.label.toLowerCase() !== 'neutral' && 
+             action.label.toLowerCase() !== 'unknown' &&
+             action.label.toLowerCase() !== 'speech') {
+    // Use provided label if it's meaningful
+    betterLabel = action.label.charAt(0).toUpperCase() + action.label.slice(1);
+  } else if (action.topic && 
+             action.topic.toLowerCase() !== 'general' && 
+             action.topic.toLowerCase() !== 'speech') {
+    // Use topic if meaningful
+    betterLabel = action.topic.charAt(0).toUpperCase() + action.topic.slice(1);
+  }
+  
+  // Add "talk" suffix if single word to make it clearer
+  if (betterLabel.split(' ').length === 1 && betterLabel !== 'Chat') {
+    betterLabel = betterLabel + ' talk';
+  }
+  
+  // Get current viewer count from UI
+  const currentViewerCount = parseInt(document.getElementById('viewerCount')?.textContent.replace(/,/g, '')) || 0;
+  
   const actionItem = {
     id: `${Date.now()}-${Math.random()}`,
-    label: action.label || action.topic || 'Unknown',
+    label: betterLabel,  // Use improved label
     delta: action.delta,
     snippet: truncate(action.text || '', 40),
+    fullText: action.text || '',
     time: formatActionTime(action.startTime, action.endTime),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    keywords: action.keywords || [],
+    // Enhanced data for rich cards
+    insightGiven: lastInsightGiven ? lastInsightGiven.nextMove : null,
+    emotion: lastInsightGiven ? lastInsightGiven.emotionalLabel : null,
+    viewerCount: currentViewerCount
   };
   
+  // Update session stats
   if (action.delta > 0) {
+    sessionStats.totalSpikes++;
+    if (action.delta > sessionStats.bestSpike.delta) {
+      sessionStats.bestSpike = {
+        delta: action.delta,
+        label: betterLabel,
+        timestamp: Date.now()
+      };
+    }
     winningActions.push(actionItem);
     winningActions.sort((a, b) => b.delta - a.delta);
     winningActions = winningActions.slice(0, 10);
     renderActions('winning');
   } else {
+    sessionStats.totalDrops++;
+    if (Math.abs(action.delta) > Math.abs(sessionStats.worstDrop.delta)) {
+      sessionStats.worstDrop = {
+        delta: action.delta,
+        label: betterLabel,
+        timestamp: Date.now()
+      };
+    }
     losingActions.push(actionItem);
     losingActions.sort((a, b) => a.delta - b.delta);
     losingActions = losingActions.slice(0, 10);
     renderActions('losing');
   }
+  
+  // Add to viewer history for trend graph
+  sessionStats.viewerHistory.push({
+    count: currentViewerCount,
+    delta: action.delta,
+    label: betterLabel,
+    timestamp: Date.now()
+  });
+  
+  // Keep last 50 points for trend graph
+  if (sessionStats.viewerHistory.length > 50) {
+    sessionStats.viewerHistory.shift();
+  }
+  
+  // Update session stats display
+  updateSessionStats();
 }
 
-// Render actions
+// Update session stats display
+function updateSessionStats() {
+  let statsContainer = document.getElementById('sessionStatsContainer');
+  
+  if (!statsContainer) {
+    // Create container if doesn't exist
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    statsContainer = document.createElement('div');
+    statsContainer.id = 'sessionStatsContainer';
+    statsContainer.className = 'session-stats';
+    
+    // Insert after pattern summary, before "Top Actions" title
+    const cardTitle = actionsCard.querySelector('.card-title-large');
+    if (cardTitle) {
+      cardTitle.parentNode.insertBefore(statsContainer, cardTitle.nextSibling);
+    }
+  }
+  
+  // Calculate average viewer gain
+  const totalDelta = [...winningActions, ...losingActions].reduce((sum, a) => sum + a.delta, 0);
+  const totalActions = winningActions.length + losingActions.length;
+  const avgGain = totalActions > 0 ? (totalDelta / totalActions).toFixed(1) : 0;
+  
+  const html = `
+    <div class="stats-title">📊 THIS SESSION</div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.totalSpikes}</div>
+        <div class="stat-label">Total Spikes</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.totalDrops}</div>
+        <div class="stat-label">Total Drops</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value positive">+${sessionStats.bestSpike.delta}</div>
+        <div class="stat-label">Best Spike</div>
+        <div class="stat-sublabel">${sessionStats.bestSpike.label || 'None yet'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value negative">${sessionStats.worstDrop.delta}</div>
+        <div class="stat-label">Worst Drop</div>
+        <div class="stat-sublabel">${sessionStats.worstDrop.label || 'None yet'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${sessionStats.insightsShown}/${sessionStats.insightsGenerated}</div>
+        <div class="stat-label">Insights</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value ${avgGain > 0 ? 'positive' : avgGain < 0 ? 'negative' : ''}">${avgGain > 0 ? '+' : ''}${avgGain}</div>
+        <div class="stat-label">Avg Impact</div>
+      </div>
+    </div>
+  `;
+  
+  statsContainer.innerHTML = html;
+}
+
+// Render actions - ENHANCED VERSION with top 3, better labels, and pattern summary
 function renderActions(type) {
+  // Clean legacy labels before rendering
+  winningActions = cleanLegacyLabels(winningActions);
+  losingActions = cleanLegacyLabels(losingActions);
+  
   const actions = type === 'winning' ? winningActions : losingActions;
   const container = type === 'winning' ? winningActionsContainer : losingActionsContainer;
   
   if (actions.length === 0) {
-    container.innerHTML = `<div class="actions-empty">No ${type} actions yet</div>`;
+    const emptyMessage = type === 'winning' ? 'No winning spikes yet' : 'No drops yet - keep it up!';
+    container.innerHTML = `<div class="actions-empty">${emptyMessage}</div>`;
     return;
   }
   
-  const html = actions.map(action => {
+  // Show top 3 only (not all 10)
+  const topActions = actions.slice(0, 3);
+  
+  const html = topActions.map((action, index) => {
     const isPositive = action.delta > 0;
     const arrowSvg = isPositive 
       ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>';
     
+    // Better label: Capitalize and add context
+    const betterLabel = action.label === 'Unknown' || action.label === 'Neutral' || action.label === 'Speech'
+      ? (action.snippet.length > 10 ? 'Chat interaction' : 'Action')
+      : action.label.charAt(0).toUpperCase() + action.label.slice(1);
+    
+    // Rank indicator
+    const rankBadge = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+    
     // Use timestamp to format relative time
     const timeText = action.timestamp ? formatTimeAgo(action.timestamp) : action.time;
     const fullTimestamp = action.timestamp ? new Date(action.timestamp).toLocaleString() : '';
     
+    // Full text for expandable tooltip
+    const fullText = action.fullText || action.snippet;
+    
+    // Insight context
+    const insightHtml = action.insightGiven 
+      ? `<div class="action-insight">💡 Insight: "${escapeHtml(action.insightGiven)}"</div>`
+      : '';
+    
+    // Emotion + viewer count context
+    const contextHtml = `
+      <div class="action-context">
+        ${action.emotion ? `<span class="action-emotion">🎭 ${escapeHtml(action.emotion)}</span>` : ''}
+        ${action.viewerCount > 0 ? `<span class="action-viewers">👁️ ${action.viewerCount.toLocaleString()} viewers</span>` : ''}
+      </div>
+    `;
+    
+    // Try Again button (copies insight to clipboard)
+    const tryAgainBtn = action.insightGiven 
+      ? `<button class="try-again-btn" data-insight="${escapeHtml(action.insightGiven)}" title="Copy insight to clipboard">🔄 Try Again</button>`
+      : '';
+    
     return `
-      <div class="action-item">
+      <div class="action-item enhanced" data-action-id="${action.id}">
         <div class="action-header">
+          <span class="rank-badge">${rankBadge}</span>
           <span class="action-arrow ${isPositive ? 'positive' : 'negative'}">${arrowSvg}</span>
-          <span class="action-label">${escapeHtml(action.label)}</span>
+          <span class="action-label">${escapeHtml(betterLabel)}</span>
           <span class="action-delta ${isPositive ? 'positive' : 'negative'}">${action.delta > 0 ? '+' : ''}${action.delta}</span>
         </div>
-        <div class="action-snippet" title="${escapeHtml(action.snippet)}">"${escapeHtml(action.snippet)}"</div>
-        <div class="action-time" data-timestamp="${action.timestamp || ''}" title="${fullTimestamp}">${timeText}</div>
+        <div class="action-snippet expandable-text" 
+             data-full-text="${escapeHtml(fullText)}"
+             title="${escapeHtml(fullText)}">"${escapeHtml(action.snippet)}"</div>
+        ${insightHtml}
+        ${contextHtml}
+        <div class="action-footer">
+          <span class="action-time" 
+               data-timestamp="${action.timestamp || ''}" 
+               title="${fullTimestamp}">${timeText}</span>
+          ${tryAgainBtn}
+        </div>
       </div>
     `;
   }).join('');
   
   container.innerHTML = html;
+  
+  // Add click-to-expand functionality
+  container.querySelectorAll('.expandable-text').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function() {
+      const fullText = this.getAttribute('data-full-text');
+      if (this.textContent === `"${this.getAttribute('data-full-text')}"`) {
+        // Currently expanded, collapse it
+        this.textContent = `"${truncate(fullText, 40)}"`;
+      } else {
+        // Currently collapsed, expand it
+        this.textContent = `"${fullText}"`;
+      }
+    });
+  });
+  
+  // Add Try Again button click handlers
+  container.querySelectorAll('.try-again-btn').forEach(btn => {
+    btn.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const insight = this.getAttribute('data-insight');
+      
+      try {
+        // Copy to clipboard
+        await navigator.clipboard.writeText(insight);
+        
+        // Show feedback
+        const originalText = this.textContent;
+        this.textContent = '✅ Copied!';
+        this.style.background = 'rgba(0, 255, 127, 0.2)';
+        
+        setTimeout(() => {
+          this.textContent = originalText;
+          this.style.background = '';
+        }, 2000);
+        
+        console.log('[Action] Insight copied to clipboard:', insight);
+      } catch (err) {
+        console.error('[Action] Failed to copy:', err);
+        this.textContent = '❌ Failed';
+      }
+    });
+  });
+  
+  // Update recommendations after rendering (pattern summary removed per user request)
+  // updatePatternSummary();  // DISABLED - user found not useful
+  updateReplayRecommendations();
 }
 
 // Format action time
@@ -989,6 +1532,175 @@ function formatActionTime(startTime, endTime) {
   const durationStr = minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
   
   return `${timeStr} (${durationStr})`;
+}
+
+// Update pattern summary based on top actions
+function updatePatternSummary() {
+  // Find or create pattern summary container
+  let summaryContainer = document.getElementById('patternSummary');
+  
+  if (!summaryContainer) {
+    // Create pattern summary container above Top Actions
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    summaryContainer = document.createElement('div');
+    summaryContainer.id = 'patternSummary';
+    summaryContainer.className = 'pattern-summary';
+    actionsCard.insertBefore(summaryContainer, actionsCard.firstChild);
+  }
+  
+  // Calculate patterns
+  if (winningActions.length === 0 && losingActions.length === 0) {
+    summaryContainer.innerHTML = '';
+    summaryContainer.style.display = 'none';
+    return;
+  }
+  
+  summaryContainer.style.display = 'block';
+  
+  // Find best category (FILTER OUT "Neutral" and generic labels)
+  const categoryTotals = {};
+  winningActions.forEach(action => {
+    let category = action.label || 'Chat';
+    
+    // Transform generic labels to "Chat interaction"
+    if (category.toLowerCase() === 'neutral' || 
+        category.toLowerCase() === 'unknown' || 
+        category.toLowerCase() === 'speech') {
+      category = 'Chat interaction';
+    }
+    
+    categoryTotals[category] = (categoryTotals[category] || 0) + action.delta;
+  });
+  
+  const bestCategory = Object.keys(categoryTotals).length > 0
+    ? Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+  
+  // Find worst category (FILTER OUT "Neutral" and generic labels)
+  const worstTotals = {};
+  losingActions.forEach(action => {
+    let category = action.label || 'Chat';
+    
+    // Transform generic labels to "Chat interaction"
+    if (category.toLowerCase() === 'neutral' || 
+        category.toLowerCase() === 'unknown' || 
+        category.toLowerCase() === 'speech') {
+      category = 'Chat interaction';
+    }
+    
+    worstTotals[category] = (worstTotals[category] || 0) + Math.abs(action.delta);
+  });
+  
+  const worstCategory = Object.keys(worstTotals).length > 0
+    ? Object.entries(worstTotals).sort((a, b) => b[1] - a[1])[0]
+    : null;
+  
+  // Calculate averages
+  const avgWinning = winningActions.length > 0
+    ? Math.round(winningActions.reduce((sum, a) => sum + a.delta, 0) / winningActions.length)
+    : 0;
+  
+  const avgLosing = losingActions.length > 0
+    ? Math.round(Math.abs(losingActions.reduce((sum, a) => sum + a.delta, 0) / losingActions.length))
+    : 0;
+  
+  // Build summary HTML
+  let summaryHtml = '<div class="pattern-summary-title">📊 YOUR SPIKE PATTERNS</div>';
+  summaryHtml += '<div class="pattern-summary-content">';
+  
+  if (bestCategory) {
+    summaryHtml += `<div class="pattern-item best">🔥 Best Topic: <strong>${escapeHtml(bestCategory[0])}</strong> (+${avgWinning} avg)</div>`;
+  }
+  
+  if (worstCategory && losingActions.length > 0) {
+    summaryHtml += `<div class="pattern-item worst">⚠️ Avoid: <strong>${escapeHtml(worstCategory[0])}</strong> (-${avgLosing} avg)</div>`;
+  }
+  
+  // Total stats
+  const totalSpikes = winningActions.length;
+  const totalDrops = losingActions.length;
+  summaryHtml += `<div class="pattern-item stats">📈 Spikes: ${totalSpikes} | 📉 Drops: ${totalDrops}</div>`;
+  
+  summaryHtml += '</div>';
+  
+  summaryContainer.innerHTML = summaryHtml;
+}
+
+// Update replay recommendations based on winning patterns
+function updateReplayRecommendations() {
+  let recsContainer = document.getElementById('replayRecommendations');
+  
+  if (!recsContainer) {
+    // Create container
+    const actionsCard = document.querySelector('.actions-card');
+    if (!actionsCard) return;
+    
+    recsContainer = document.createElement('div');
+    recsContainer.id = 'replayRecommendations';
+    recsContainer.className = 'replay-recommendations';
+    
+    // Insert before Top Actions grid
+    const actionsGrid = actionsCard.querySelector('.actions-grid');
+    if (actionsGrid) {
+      actionsGrid.parentNode.insertBefore(recsContainer, actionsGrid);
+    }
+  }
+  
+  // Only show if we have 3+ winning actions
+  if (winningActions.length < 3) {
+    recsContainer.style.display = 'none';
+    return;
+  }
+  
+  recsContainer.style.display = 'block';
+  
+  // Find recurring successful categories
+  const categoryFrequency = {};
+  winningActions.forEach(action => {
+    const baseLabel = action.label.replace(' talk', ''); // Remove "talk" suffix
+    categoryFrequency[baseLabel] = (categoryFrequency[baseLabel] || 0) + 1;
+  });
+  
+  // Find categories that spiked 2+ times
+  const recurring = Object.entries(categoryFrequency)
+    .filter(([cat, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2);
+  
+  if (recurring.length === 0) {
+    recsContainer.style.display = 'none';
+    return;
+  }
+  
+  let recsHtml = '<div class="recs-title">💡 RECOMMENDED ACTIONS (Based on your patterns)</div>';
+  recsHtml += '<div class="recs-list">';
+  
+  recurring.forEach(([category, count]) => {
+    // Calculate average spike for this category
+    const categoryActions = winningActions.filter(a => a.label.includes(category));
+    const avgDelta = categoryActions.length > 0
+      ? Math.round(categoryActions.reduce((sum, a) => sum + a.delta, 0) / categoryActions.length)
+      : 0;
+    
+    // Get an insight from one of these actions
+    const sampleAction = categoryActions[0];
+    const suggestedInsight = sampleAction.insightGiven || `Try more ${category} content`;
+    
+    recsHtml += `
+      <div class="rec-item">
+        <div class="rec-header">
+          <span class="rec-category">${escapeHtml(category)}</span>
+          <span class="rec-stats">worked ${count} times (+${avgDelta} avg)</span>
+        </div>
+        <div class="rec-suggestion">Try: "${escapeHtml(suggestedInsight)}"</div>
+      </div>
+    `;
+  });
+  
+  recsHtml += '</div>';
+  recsContainer.innerHTML = recsHtml;
 }
 
 // Utility: Truncate text
@@ -1075,7 +1787,7 @@ if (testInsightBtn) {
 
 // Helper function for screen-share audio fallback
 async function startAudioViaScreenShare() {
-  startAudioBtn.textContent = 'Select tab to share...';
+  setStartAudioButton('Select tab to share...', '🎤');
   try {
     // Fallback to getDisplayMedia
     console.log('[Spikely] getDisplayMedia fallback invoked');
@@ -1103,7 +1815,7 @@ async function startAudioViaScreenShare() {
       deviceId: settings.deviceId
     }));
     
-    startAudioBtn.textContent = 'Connecting...';
+    setStartAudioButton('Connecting...');
     
     // Fetch v3 token from secure relay
     console.log('🎙️ [ASSEMBLYAI v3] Step 1: Requesting temporary token...');
@@ -1160,8 +1872,7 @@ async function startAudioViaScreenShare() {
     console.log('🎙️ [ASSEMBLYAI v3] ✅ Ready to transcribe audio!');
     
     audioIsCapturing = true;
-    startAudioBtn.textContent = 'Stop';
-    startAudioBtn.classList.add('active');
+    updateAudioState(true);  // Use centralized state update
     startAudioBtn.disabled = false;
     if (testInsightBtn) testInsightBtn.style.display = 'inline-block';
     console.debug('[TEST:INSIGHT:UI] Button visible (fallback)');
@@ -1170,7 +1881,7 @@ async function startAudioViaScreenShare() {
   } catch (err) {
     console.error('[Spikely] Screen-share audio error:', err);
     alert(`Audio capture failed: ${err.message}\n\nPlease try again and make sure to check "Share tab audio".`);
-    startAudioBtn.textContent = 'Start';
+    updateAudioState(false);  // Use centralized state update
     startAudioBtn.disabled = false;
     isSystemStarted = false;
     throw err;
@@ -1181,56 +1892,116 @@ async function startAudioViaScreenShare() {
 if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
-      // Start entire system
-      console.debug('[AUDIO:SP:TX] START_AUDIO_CAPTURE');
+      console.log('[AUDIO:SP] ▶ START click');
+      
+      const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      console.log('[AUDIO:SP] ⏳ waiting response requestId=' + requestId);
+
+      pendingAudioRequestId = requestId;
+
       startAudioBtn.disabled = true;
-      startAudioBtn.textContent = 'Starting...';
-      
-      // Enable system
-      isSystemStarted = true;
-      
-      // Start viewer tracking
-      sendToActive('START_VIEWER_TRACKING');
-      
-      // Start audio capture
-      chrome.runtime.sendMessage({ type: 'START_AUDIO_CAPTURE' }, async (response) => {
-        console.debug('[AUDIO:SP:RX]', response);
-        
-        if (response?.success) {
-      audioIsCapturing = true;
-      startAudioBtn.textContent = 'Stop';
-      startAudioBtn.classList.add('active');
-      startAudioBtn.disabled = false;
-      console.log('[Spikely Side Panel] ✅ System started');
-      
-      // Show test button when system starts
-      if (testInsightBtn) {
-        testInsightBtn.style.display = 'inline-block';
+      setStartAudioButton('Processing…');
+
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
       }
-    } else {
-          const errMsg = response?.error || 'Unknown error';
-          console.warn('[AUDIO:SP:RX] Failed:', errMsg);
-          
-          // Check if fallback is appropriate
-          if (response?.requiresFallback) {
-            console.log('[AUDIO:SP:UI] Auto-falling back to screen share');
-            try {
-              await startAudioViaScreenShare();
-            } catch (fallbackErr) {
-              // Error already handled in helper
-            }
-          } else {
-            // Show friendly inline error (unrecoverable)
-            console.debug('[AUDIO:SP:UI] Showing inline error:', errMsg);
-            alert('⚠️ Audio Capture Not Available\n\n' + errMsg);
-            startAudioBtn.textContent = 'Start';
-            startAudioBtn.disabled = false;
-            isSystemStarted = false;
+
+      // 6s client-side watchdog
+      audioStartWatchdog = setTimeout(() => {
+        console.error('[AUDIO:SP] ❌ Client watchdog fired - cancelling processing state');
+        audioStartWatchdog = null;
+        pendingAudioRequestId = null;
+        updateAudioState(false);
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Try Again', '🎤');
+        isSystemStarted = false;
+
+        alert('⚠️ Audio Capture Timed Out\n\nTook longer than 6 seconds. Please:\n1. Make sure TikTok tab is focused\n2. Try "Try Again" button');
+      }, 6000);
+
+      // Send START_AUDIO directly to background
+      chrome.runtime.sendMessage({
+        type: 'START_AUDIO',
+        requestId: requestId,
+        gesture: true,
+        timestamp: Date.now()
+      }, (response) => {
+        if (audioStartWatchdog) {
+          clearTimeout(audioStartWatchdog);
+          audioStartWatchdog = null;
+        }
+
+        if (chrome.runtime.lastError) {
+          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Try Again', '🎤');
+          isSystemStarted = false;
+          pendingAudioRequestId = null;
+
+          alert('⚠️ Extension Error\n\n' + chrome.runtime.lastError.message);
+          return;
+        }
+
+        if (response?.ok && response?.status === 'pending') {
+          console.log('[AUDIO:SP] ⏳ Pending response received for requestId=' + requestId);
+          startAudioBtn.disabled = true;
+          setStartAudioButton('Awaiting Chrome prompt…');
+          return;
+        }
+
+        if (response?.ok) {
+          console.log('[AUDIO:SP] ✅ STARTED streamId=' + response.streamId);
+
+          isSystemStarted = true;
+          audioIsCapturing = true;
+          updateAudioState(true);
+          startAudioBtn.disabled = false;
+
+          if (testInsightBtn) {
+            testInsightBtn.style.display = 'inline-block';
           }
+
+          pendingAudioRequestId = null;
+
+        } else {
+          const errorCode = response?.code || 'UNKNOWN';
+          const errorMsg = response?.message || 'Unknown error';
+
+          console.error('[AUDIO:SP] ❌ FAILED code=' + errorCode + ' msg=' + errorMsg);
+          
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Focus & Retry', '🎤');
+          isSystemStarted = false;
+          
+          // Map error codes to user messages
+          let userMessage = '';
+          if (errorCode === 'AUDIO_ERR_NOT_ELIGIBLE') {
+            userMessage = 'Open a TikTok Live tab and try again.';
+          } else if (errorCode === 'AUDIO_ERR_NOT_INVOKED') {
+            userMessage = 'Click the TikTok tab once, then press Start.';
+          } else if (errorCode === 'AUDIO_ERR_TIMEOUT') {
+            userMessage = 'Chrome didn\'t grant capture in time.';
+          } else if (errorCode === 'AUDIO_ERR_CHROME_PAGE_BLOCKED') {
+            userMessage = 'Chrome pages can\'t be captured.';
+          } else {
+            userMessage = errorMsg;
+          }
+
+          alert('⚠️ Audio Capture Failed\n\n' + userMessage + '\n\nCode: ' + errorCode);
+          pendingAudioRequestId = null;
         }
       });
+
+      // Do not mark system started until capture begins
     } else {
       // Stop entire system
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
       console.debug('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
       isSystemStarted = false;
       
@@ -1243,8 +2014,7 @@ if (startAudioBtn) {
         audioProcessor.stop();
         audioProcessor = null;
         audioIsCapturing = false;
-        startAudioBtn.textContent = 'Start';
-        startAudioBtn.classList.remove('active');
+        updateAudioState(false);  // Use centralized state update
         console.log('[Spikely] ✅ System stopped');
         
         // Hide test button when system stops
@@ -1255,8 +2025,7 @@ if (startAudioBtn) {
         // Stop normal tabCapture audio
         chrome.runtime.sendMessage({ type: 'STOP_AUDIO_CAPTURE' }, (response) => {
           audioIsCapturing = false;
-          startAudioBtn.textContent = 'Start';
-          startAudioBtn.classList.remove('active');
+          updateAudioState(false);  // Use centralized state update
           console.log('[Spikely] ✅ System stopped');
           
           // Hide test button when system stops

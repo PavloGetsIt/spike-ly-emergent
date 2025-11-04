@@ -1,4 +1,10 @@
 // Correlation engine for matching viewer changes with transcript + tone
+// VERSION: 2.0.6-STABLE (ROLLBACK)
+// Restored stable functionality, removed experimental Phase 1 features
+
+console.log('🚨 CRITICAL TEST: This log MUST appear if correlationEngine.js loads');
+console.log('🚨 TIMESTAMP:', new Date().toISOString());
+console.log('🚨 If you do not see this, the file is not loading my changes');
 
 // ==================== DEBUG CONFIGURATION ====================
 // Import from background.js or set locally
@@ -6,8 +12,8 @@ const DEBUG_HUME = true;
 // =============================================================
 
 // Feature flag: disable extension AI calls (web app handles this)
-const ENABLE_EXTENSION_AI = false;
-const AI_MAX_LATENCY_MS = 900; // hard deadline for AI response
+const ENABLE_EXTENSION_AI = true;  // ENABLED for Claude Sonnet 4.5
+const AI_MAX_LATENCY_MS = 2500; // Balanced: 2.5s timeout (increased from 2000ms to reduce timeouts)
 
 class CorrelationEngine {
   constructor() {
@@ -18,7 +24,846 @@ class CorrelationEngine {
     this.minInsightInterval = 20000; // 20 seconds between insights
     this.analysisCache = new Map(); // Cache Hume AI results
     this.prosodyHistory = []; // Last 10 prosody samples
-    this.minDelta = 10; // Configurable trigger threshold
+    this.minDelta = 3; // Default trigger threshold (updated by slider)
+    this.autoInsightTimer = null; // 20-second auto-insight timer
+    this.winningActions = []; // Track high-performing actions for reminders
+    this.isSystemActive = false; // Track if system is running
+    
+    // NEW: Dynamic insights tracking
+    this.recentInsights = []; // Last 5 insights for anti-repetition
+    this.winningTopics = []; // Topics that caused +10 spikes
+    this.keywordLibrary = this.initializeKeywordLibrary();
+    
+    // CorrelationId tracking
+    this.insightSequence = 0; // Sequence counter for unique IDs
+    
+    // Template system for fallback
+    this.recentTemplates = []; // Track last 5 used template IDs
+    this.templateSelector = this.initializeTemplateSelector();
+    
+    // Niche personalization system (HARDCODED for tester)
+    this.currentNiche = 'justChatting';  // FORCED for dancing kitchen streamer
+    this.currentGoal = 'engagement';     // FORCED for interactive content
+    this.lastDetectedActivity = 'general';
+    
+    // Viewer DOM detection state
+    this.viewerDetectionState = {
+      isScanning: false,
+      lastFoundElement: null,
+      scanInterval: null,
+      retryCount: 0
+    };
+    
+    console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
+    console.log('[Correlation] 🎯 Dynamic insights mode enabled');
+    console.log('[Correlation] 🎯 Template fallback system loaded: 30 templates');
+    console.log('[Correlation] 🎯 FORCED NICHE: justChatting | GOAL: engagement');
+  }
+  
+  // ==================== ROBUST VIEWER DOM DETECTION ====================
+  
+  // Start self-healing viewer detection with MutationObserver
+  startViewerDetection() {
+    if (this.viewerDetectionState.isScanning) {
+      console.log('[Correlation] 👁️ Viewer detection already running');
+      return;
+    }
+    
+    console.log('[Correlation] 👁️ Starting robust viewer detection...');
+    this.viewerDetectionState.isScanning = true;
+    
+    // Try to find viewer element immediately
+    this.findViewerElement();
+    
+    // Start self-healing scan every 2 seconds
+    this.viewerDetectionState.scanInterval = setInterval(() => {
+      this.findViewerElement();
+    }, 2000);
+  }
+  
+  // Stop viewer detection
+  stopViewerDetection() {
+    console.log('[Correlation] 👁️ Stopping viewer detection');
+    this.viewerDetectionState.isScanning = false;
+    
+    if (this.viewerDetectionState.scanInterval) {
+      clearInterval(this.viewerDetectionState.scanInterval);
+      this.viewerDetectionState.scanInterval = null;
+    }
+  }
+  
+  // Multi-strategy viewer element detection
+  findViewerElement() {
+    console.log('[Correlation] 🔍 Scanning for viewer count...');
+    
+    // Check if cached element still valid
+    if (this.viewerDetectionState.lastFoundElement && 
+        document.contains(this.viewerDetectionState.lastFoundElement)) {
+      const text = this.viewerDetectionState.lastFoundElement.textContent?.trim();
+      const parsed = this.parseViewerText(text);
+      if (parsed > 0) {
+        console.log('[Correlation] ✅ Using cached element:', parsed);
+        return { element: this.viewerDetectionState.lastFoundElement, count: parsed };
+      }
+    }
+    
+    // Strategy 1: Primary selector - Look for "Viewers • X" pattern
+    const allElements = Array.from(document.querySelectorAll('*'));
+    
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+        const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
+        if (match) {
+          const parsed = this.parseViewerText(match[1]);
+          if (parsed > 0) {
+            console.log('[Correlation] ✅ Strategy 1 success:', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: Secondary selector - TikTok-specific attributes
+    const tiktokSelectors = [
+      '[data-e2e*="viewer"]',
+      '[data-testid*="viewer"]', 
+      'div[class*="viewer"] span',
+      'span[class*="count"]'
+    ];
+    
+    for (const selector of tiktokSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const parsed = this.parseViewerText(el.textContent);
+          if (parsed > 50) { // Filter small numbers
+            console.log('[Correlation] ✅ Strategy 2 success:', selector, parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    }
+    
+    // Strategy 3: Text-node proximity search
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
+        const parentText = el.parentElement?.textContent?.toLowerCase() || '';
+        
+        if (parentText.includes('viewer') || parentText.includes('live') || parentText.includes('watching')) {
+          const parsed = this.parseViewerText(text);
+          if (parsed > 50) {
+            console.log('[Correlation] ✅ Strategy 3 success (proximity):', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    console.log('[Correlation] ❌ No viewer element found, retry', ++this.viewerDetectionState.retryCount);
+    return null;
+  }
+  
+  // Parse viewer count text (handles K/M/B suffixes)
+  parseViewerText(text) {
+    if (!text) return 0;
+    
+    const cleaned = text.toLowerCase().replace(/[,\s]/g, '');
+    const match = cleaned.match(/^([\d.]+)([kmb])?$/);
+    if (!match) return 0;
+    
+    let num = parseFloat(match[1]);
+    const suffix = match[2];
+    
+    if (suffix === 'k') num *= 1000;
+    else if (suffix === 'm') num *= 1000000;
+    else if (suffix === 'b') num *= 1000000000;
+    
+    return Math.round(num);
+  }
+  
+  // Setup MutationObserver on found element
+  setupMutationObserver(element) {
+    // Remove existing observer
+    if (this.viewerObserver) {
+      this.viewerObserver.disconnect();
+    }
+    
+    const container = element.parentElement || element;
+    
+    this.viewerObserver = new MutationObserver((mutations) => {
+      console.log('[Correlation] 👁️ DOM mutation detected, rescanning...');
+      
+      // Re-scan after DOM changes
+      setTimeout(() => {
+        this.findViewerElement();
+      }, 100);
+    });
+    
+    this.viewerObserver.observe(container, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    
+    console.log('[Correlation] 👁️ MutationObserver setup on viewer container');
+  }
+  
+  // Update niche preferences from UI
+  updateNichePreferences(niche, goal) {
+    this.currentNiche = niche;
+    this.currentGoal = goal;
+    console.log('[Correlation] 🎯 Updated preferences:', niche, goal);
+    
+    // ALSO log to page console for easier debugging
+    if (typeof window !== 'undefined' && window.console) {
+      window.console.log('[Correlation] 🎯 NICHE UPDATED:', niche, goal);
+    }
+  }
+  
+  // Update detected activity for niche template selection
+  updateDetectedActivity(activity) {
+    this.lastDetectedActivity = activity;
+    console.log('[Correlation] 🎭 Activity updated:', activity);
+  }
+  
+  // Initialize template selector
+  initializeTemplateSelector() {
+    // Import template bank
+    const TEMPLATE_BANK = {
+      gaming: [
+        { id: "GAMING-001", emotionalLabel: "gaming chat works", nextMove: "Ask 'What's your main game?'. Poll top 3", triggerType: ["spike", "flatline"] },
+        { id: "GAMING-002", emotionalLabel: "setup interest high", nextMove: "Show your gaming setup. Point at monitor", triggerType: ["spike", "flatline"] },
+        { id: "GAMING-003", emotionalLabel: "input preference", nextMove: "Ask 'Controller or keyboard?'. Count hands", triggerType: ["flatline"] },
+        { id: "GAMING-004", emotionalLabel: "rank curiosity", nextMove: "Ask 'What rank are you?'. Read top answers", triggerType: ["spike", "flatline"] },
+        { id: "GAMING-005", emotionalLabel: "gameplay interest", nextMove: "Share your best play. Describe moment", triggerType: ["drop", "flatline"] }
+      ],
+      makeup: [
+        { id: "MAKEUP-001", emotionalLabel: "product interest", nextMove: "Hold product to camera. Show label closeup", triggerType: ["spike", "flatline"] },
+        { id: "MAKEUP-002", emotionalLabel: "finish preference", nextMove: "Ask 'Matte or shimmer?'. Poll chat", triggerType: ["flatline"] },
+        { id: "MAKEUP-003", emotionalLabel: "technique curiosity", nextMove: "Demonstrate blending. Go slow motion", triggerType: ["spike", "flatline"] },
+        { id: "MAKEUP-004", emotionalLabel: "budget question", nextMove: "Ask 'Drugstore or luxury?'. Count votes", triggerType: ["flatline"] },
+        { id: "MAKEUP-005", emotionalLabel: "shade comparison", nextMove: "Swatch two shades. Ask which wins", triggerType: ["spike", "flatline"] }
+      ],
+      cooking: [
+        { id: "COOKING-001", emotionalLabel: "recipe interest", nextMove: "Show ingredients lineup. Name each one", triggerType: ["spike", "flatline"] },
+        { id: "COOKING-002", emotionalLabel: "taste curiosity", nextMove: "Taste test on camera. React honestly", triggerType: ["spike", "flatline"] },
+        { id: "COOKING-003", emotionalLabel: "technique question", nextMove: "Demonstrate knife skill. Go slow", triggerType: ["spike"] },
+        { id: "COOKING-004", emotionalLabel: "preference poll", nextMove: "Ask 'Sweet or savory?'. Count responses", triggerType: ["flatline"] },
+        { id: "COOKING-005", emotionalLabel: "secret reveal", nextMove: "Share secret ingredient. Hold it up", triggerType: ["drop", "flatline"] }
+      ],
+      fitness: [
+        { id: "FITNESS-001", emotionalLabel: "form check interest", nextMove: "Demonstrate proper form. Side angle", triggerType: ["spike", "flatline"] },
+        { id: "FITNESS-002", emotionalLabel: "workout preference", nextMove: "Ask 'Cardio or weights?'. Poll chat", triggerType: ["flatline"] },
+        { id: "FITNESS-003", emotionalLabel: "rep count challenge", nextMove: "Count reps out loud. Race timer", triggerType: ["spike", "flatline"] },
+        { id: "FITNESS-004", emotionalLabel: "goal curiosity", nextMove: "Ask 'Bulk or cut?'. Read answers", triggerType: ["flatline"] },
+        { id: "FITNESS-005", emotionalLabel: "technique tips", nextMove: "Share your top 3 tips. Number them", triggerType: ["drop", "flatline"] }
+      ],
+      tech: [
+        { id: "TECH-001", emotionalLabel: "specs interest", nextMove: "Show specs screen. Read key numbers", triggerType: ["spike", "flatline"] },
+        { id: "TECH-002", emotionalLabel: "comparison curiosity", nextMove: "Compare two options. List 3 differences", triggerType: ["spike", "flatline"] },
+        { id: "TECH-003", emotionalLabel: "brand preference", nextMove: "Ask 'Apple or Android?'. Count votes", triggerType: ["flatline"] },
+        { id: "TECH-004", emotionalLabel: "feature demo", nextMove: "Test main feature live. Show results", triggerType: ["spike", "flatline"] },
+        { id: "TECH-005", emotionalLabel: "setup reveal", nextMove: "Show full setup. Pan camera slowly", triggerType: ["spike", "flatline"] }
+      ],
+      general: [
+        { id: "GENERAL-001", emotionalLabel: "viewer interaction", nextMove: "Call out top 3 usernames. Thank them", triggerType: ["flatline"] },
+        { id: "GENERAL-002", emotionalLabel: "location curiosity", nextMove: "Ask 'Where you from?'. Read top 5", triggerType: ["flatline"] },
+        { id: "GENERAL-003", emotionalLabel: "yes no poll", nextMove: "Start poll: Yes or No. Count votes", triggerType: ["drop", "flatline"] },
+        { id: "GENERAL-004", emotionalLabel: "question time", nextMove: "Ask viewers question. Read top 5 answers", triggerType: ["drop", "flatline"] },
+        { id: "GENERAL-005", emotionalLabel: "shoutout energy", nextMove: "Shoutout new followers. Wave at camera", triggerType: ["flatline"] }
+      ]
+    };
+    
+    return { bank: TEMPLATE_BANK, recentTemplates: [] };
+  }
+  
+  // Select template based on category and delta (ENHANCED with niche preferences)
+  selectTemplate(keywords, delta) {
+    console.log('[Template] 🔬 selectTemplate called | Keywords:', keywords, '| Delta:', delta);
+    console.log('[Template] 🎯 Current niche:', this.currentNiche, '| Goal:', this.currentGoal);
+    
+    // Try niche-specific templates first
+    if (this.currentNiche && this.currentNiche !== 'general') {
+      const nicheInsight = this.selectNicheTemplate(delta);
+      if (nicheInsight) {
+        console.log('[Template] ✅ Using NICHE template:', nicheInsight.nextMove.substring(0, 50));
+        return nicheInsight;
+      }
+    }
+    
+    // Fallback to original template system
+    const templates = this.templateSelector.bank;
+    console.log('[Template] 🔬 Template bank exists:', !!templates);
+    
+    if (!templates) {
+      console.error('[Template] ❌ Template bank is null/undefined!');
+      return null;
+    }
+    
+    // Determine category (original logic)
+    let category = 'general';
+    if (keywords.includes('gaming')) category = 'gaming';
+    else if (keywords.includes('makeup')) category = 'makeup';
+    else if (keywords.includes('cooking')) category = 'cooking';
+    else if (keywords.includes('fitness')) category = 'fitness';
+    else if (keywords.includes('tech') || keywords.includes('product')) category = 'tech';
+    
+    console.log('[Template] 🔬 Selected category:', category);
+    
+    // Determine trigger type
+    let triggerType;
+    if (delta > 10) triggerType = 'spike';
+    else if (delta < -10) triggerType = 'drop';
+    else triggerType = 'flatline';
+    
+    console.log('[Template] 🔬 Trigger type:', triggerType);
+    
+    // Get templates for category
+    const categoryTemplates = templates[category];
+    console.log('[Template] 🔬 Category templates found:', categoryTemplates?.length || 0);
+    
+    if (!categoryTemplates || categoryTemplates.length === 0) {
+      console.warn('[Template] ⚠️ No templates for category:', category, '| Falling back to general');
+      category = 'general';
+    }
+    
+    // Filter by trigger type
+    const filtered = templates[category].filter(t => t.triggerType.includes(triggerType));
+    console.log('[Template] 🔬 After trigger filter:', filtered.length, 'templates');
+    
+    // Exclude recently used
+    const available = filtered.filter(t => !this.recentTemplates.includes(t.id));
+    console.log('[Template] 🔬 After recency filter:', available.length, 'templates');
+    console.log('[Template] 🔬 Recently used:', this.recentTemplates);
+    
+    const pool = available.length > 0 ? available : filtered;
+    console.log('[Template] 🔬 Final pool size:', pool.length);
+    
+    if (pool.length === 0) {
+      console.error('[Template] ❌ No templates in pool! Category:', category, 'Trigger:', triggerType);
+      return null;
+    }
+    
+    // Select random
+    const selected = pool[Math.floor(Math.random() * pool.length)];
+    console.log('[Template] 🔬 Selected template:', selected);
+    
+    // Track usage
+    this.recentTemplates.push(selected.id);
+    if (this.recentTemplates.length > 5) {
+      this.recentTemplates.shift();
+    }
+    
+    console.log(`[Template] ✅ Selected ${selected.id} | Category: ${category} | Trigger: ${triggerType}`);
+    
+    return {
+      delta: delta,
+      emotionalLabel: selected.emotionalLabel,
+      nextMove: selected.nextMove,
+      text: '',
+      source: 'template',
+      templateId: selected.id
+    };
+  }
+  
+  // Select niche-specific template (ENHANCED with activity detection)
+  selectNicheTemplate(delta) {
+    console.log('[Template] 🎯 Selecting NICHE template | Niche:', this.currentNiche, '| Goal:', this.currentGoal);
+    
+    // Use external niche template banks if available
+    if (typeof window !== 'undefined' && window.NICHE_TEMPLATE_BANKS) {
+      const nicheBank = window.NICHE_TEMPLATE_BANKS[this.currentNiche];
+      if (nicheBank) {
+        
+        // For Just Chatting, try activity-specific templates first
+        if (this.currentNiche === 'justChatting') {
+          // Try dancing templates if recent activity suggests dancing
+          if (nicheBank.dancing && this.lastDetectedActivity === 'dancing') {
+            const templates = nicheBank.dancing;
+            const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+            console.log('[Template] 🕺 Selected DANCING template:', randomTemplate.substring(0, 50));
+            
+            return {
+              delta: delta,
+              emotionalLabel: 'dancing activity',
+              nextMove: randomTemplate,
+              source: 'niche-dancing-template',
+              niche: this.currentNiche
+            };
+          }
+          
+          // Try kitchen templates if in kitchen context
+          if (nicheBank.kitchen && this.lastDetectedActivity === 'cooking') {
+            const templates = nicheBank.kitchen;
+            const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+            console.log('[Template] 🍳 Selected KITCHEN template:', randomTemplate.substring(0, 50));
+            
+            return {
+              delta: delta,
+              emotionalLabel: 'kitchen activity',
+              nextMove: randomTemplate,
+              source: 'niche-kitchen-template',
+              niche: this.currentNiche
+            };
+          }
+        }
+        
+        // Use goal-based templates
+        if (nicheBank[this.currentGoal]) {
+          const templates = nicheBank[this.currentGoal];
+          const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+          console.log('[Template] 🎯 Selected NICHE template for goal:', this.currentGoal);
+          
+          return {
+            delta: delta,
+            emotionalLabel: this.currentNiche + ' ' + this.currentGoal,
+            nextMove: randomTemplate,
+            text: '',
+            source: 'niche-template',
+            niche: this.currentNiche,
+            goal: this.currentGoal
+          };
+        }
+      }
+    }
+    
+    console.log('[Template] ⚠️ No niche templates available, using fallback');
+    return null;
+  }
+  
+  // Initialize keyword library for topic detection
+  initializeKeywordLibrary() {
+    return {
+      gaming: ['game', 'gaming', 'play', 'playing', 'level', 'controller', 'setup', 'fps', 'strategy', 'rpg', 'mmorpg', 'valorant', 'fortnite', 'minecraft', 'cod', 'elden ring', 'boss', 'raid', 'quest', 'loot', 'rank', 'ranked', 'competitive', 'esports', 'pro', 'graphics card', 'gpu', 'cpu', 'pc', 'console', 'ps5', 'xbox'],
+      makeup: ['makeup', 'lipstick', 'foundation', 'contour', 'blend', 'blending', 'palette', 'eyeshadow', 'mascara', 'eyeliner', 'highlighter', 'bronzer', 'concealer', 'primer', 'beauty', 'cosmetic', 'glam', 'tutorial', 'brush', 'sponge', 'skincare', 'skin'],
+      cooking: ['cook', 'cooking', 'recipe', 'ingredient', 'taste', 'bake', 'baking', 'flavor', 'dish', 'meal', 'food', 'chef', 'kitchen', 'oven', 'stove', 'pan', 'sauce', 'spice', 'seasoning', 'pasta', 'chicken', 'beef', 'vegetable', 'dessert', 'dinner'],
+      personal: ['story', 'life', 'family', 'friend', 'relationship', 'feel', 'feeling', 'emotion', 'personal', 'experience', 'happened', 'childhood', 'growing up', 'parents', 'sibling', 'memory', 'remember', 'funny', 'crazy', 'wild', 'believe', 'true'],
+      tech: ['tech', 'technology', 'phone', 'computer', 'app', 'software', 'code', 'coding', 'programming', 'developer', 'iphone', 'android', 'laptop', 'tablet', 'gadget', 'device', 'camera', 'video', 'audio', 'review', 'specs', 'feature'],
+      fitness: ['workout', 'exercise', 'gym', 'muscle', 'cardio', 'reps', 'sets', 'lifting', 'weights', 'training', 'fitness', 'health', 'diet', 'protein', 'gains', 'shredded', 'bulk', 'cut', 'squat', 'bench', 'deadlift', 'yoga', 'running'],
+      interaction: ['chat', 'question', 'ask', 'asking', 'answer', 'comment', 'viewers', 'audience', 'everyone', 'guys', 'yall', 'community', 'follow', 'subscribe', 'like', 'share', 'giveaway', 'prize', 'winner', 'poll'],
+      product: ['product', 'brand', 'sponsored', 'link', 'buy', 'purchase', 'discount', 'code', 'promo', 'deal', 'unbox', 'unboxing', 'review', 'recommend', 'worth', 'price', 'cost', 'expensive', 'cheap', 'quality']
+    };
+  }
+  
+  // Filter filler words from transcript
+  filterFillerWords(text) {
+    const fillerWords = ['um', 'uh', 'like', 'you know', 'i mean', 'basically', 'literally', 'actually', 'honestly', 'yeah', 'yep', 'okay', 'ok', 'so', 'well', 'right'];
+    let filtered = text.toLowerCase();
+    
+    // Remove filler phrases first
+    fillerWords.forEach(filler => {
+      const regex = new RegExp(`\\b${filler}\\b`, 'gi');
+      filtered = filtered.replace(regex, ' ');
+    });
+    
+    // Clean up multiple spaces
+    filtered = filtered.replace(/\s+/g, ' ').trim();
+    
+    return filtered;
+  }
+  
+  // Extract keywords from transcript
+  extractKeywords(text) {
+    const textLower = text.toLowerCase();
+    const foundKeywords = new Set();
+    
+    // Check each category
+    for (const [category, keywords] of Object.entries(this.keywordLibrary)) {
+      for (const keyword of keywords) {
+        if (textLower.includes(keyword)) {
+          foundKeywords.add(category);
+          break; // One keyword per category is enough
+        }
+      }
+    }
+    
+    return Array.from(foundKeywords);
+  }
+  
+  // Extract specific 2-3 word noun phrases for better action labels
+  extractSpecificNouns(text) {
+    const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    const specificPhrases = [];
+    
+    // Generic phrases to skip
+    const skipPhrases = ['thank you', 'oh my', 'you guys', 'i mean', 'you know', 'right now', 
+                         'over here', 'like this', 'going to', 'want to', 'have to', 'need to',
+                         'i think', 'i feel', 'you see', 'let me', 'hold on'];
+    
+    // Filler words
+    const fillerWords = ['about', 'their', 'really', 'think', 'going', 'doing', 'saying', 
+                         'there', 'where', 'which', 'would', 'should', 'could', 'these', 
+                         'those', 'thank', 'thanks', 'please', 'just', 'very', 'much'];
+    
+    // Extract 2-word phrases that might be specific
+    for (let i = 0; i < words.length - 1; i++) {
+      const word1 = words[i];
+      const word2 = words[i + 1];
+      
+      // Both words should be substantial (>3 chars) and not filler
+      if (word1.length > 3 && word2.length > 3 && 
+          !fillerWords.includes(word1) && !fillerWords.includes(word2)) {
+        
+        const phrase = `${word1} ${word2}`;
+        
+        // Skip generic phrases
+        if (!skipPhrases.includes(phrase)) {
+          specificPhrases.push(phrase);
+        }
+      }
+    }
+    
+    // Also look for potential brand/product names (capitalized or with numbers)
+    const potentialNames = words.filter(w => {
+      // Look for words with numbers (rtx4090, iphone15, etc.)
+      if (/\d/.test(w)) return true;
+      // Look for longer unique words
+      if (w.length > 6 && !fillerWords.includes(w)) return true;
+      return false;
+    });
+    
+    // Combine and dedupe
+    const allNouns = [...specificPhrases, ...potentialNames].slice(0, 5);
+    
+    console.log('[Labels] Extracted specific nouns:', allNouns);
+    
+    return allNouns;
+  }
+  
+  // Calculate transcript quality metrics
+  analyzeTranscriptQuality(text) {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const wordCount = words.length;
+    
+    if (wordCount < 10) {
+      return { quality: 'LOW', uniqueWordRatio: 0, wordCount };
+    }
+    
+    // Calculate unique word ratio
+    const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+    const uniqueWordRatio = uniqueWords.size / wordCount;
+    
+    // Determine quality
+    let quality = 'LOW';
+    if (wordCount >= 30 && uniqueWordRatio > 0.5) {
+      quality = 'HIGH';
+    } else if (wordCount >= 20 || uniqueWordRatio > 0.4) {
+      quality = 'MEDIUM';
+    }
+    
+    return { quality, uniqueWordRatio, wordCount };
+  }
+  
+  // Calculate transcript score for routing decisions
+  calculateTranscriptScore(text, keywords) {
+    // Count potential nouns (words > 4 chars that aren't filler/common)
+    const fillerWords = ['about', 'their', 'really', 'think', 'going', 'doing', 'saying', 'there', 'where', 'which', 'would', 'should', 'could', 'these', 'those', 'thank', 'thanks'];
+    const words = text.toLowerCase().split(/\s+/);
+    const nouns = words.filter(w => 
+      w.length > 4 && 
+      !fillerWords.includes(w) &&
+      !/^(um|uh|like|yeah|okay|well)$/.test(w)
+    );
+    
+    const nounCount = nouns.length;
+    const keywordBonus = keywords.length * 2; // Keywords worth 2 nouns each
+    const score = nounCount + keywordBonus;
+    
+    // Determine quality tier (STABLE VERSION - no experimental chat features)
+    let tier;
+    if (score >= 6) {
+      tier = 'HIGH';    // Rich content with 6+ nouns/keywords
+    } else if (score >= 3) {
+      tier = 'MEDIUM';  // Some content with 3-5 nouns/keywords
+    } else {
+      tier = 'LOW';     // Pure filler with 0-2 nouns/keywords
+    }
+    
+    console.log(`[Routing] Transcript Score: ${tier} | Nouns: ${nounCount} | Keywords: ${keywords.length} | Total: ${score}`);
+    
+    return { tier, score, nounCount, keywordBonus };
+  }
+  
+  // Track insight for anti-repetition
+  trackInsight(insight) {
+    if (insight && insight.nextMove) {
+      this.recentInsights.push(insight.nextMove);
+      // Keep only last 5
+      if (this.recentInsights.length > 5) {
+        this.recentInsights.shift();
+      }
+      console.log('[Correlation] 📝 Tracked insight. Recent:', this.recentInsights.length);
+    }
+  }
+  
+  // Track winning topics
+  trackWinningTopic(topic, delta, keywords) {
+    if (delta >= 10 && keywords && keywords.length > 0) {
+      const topicStr = `${keywords[0]} ${delta >= 20 ? '+' + delta : 'works'}`;
+      this.winningTopics.push(topicStr);
+      // Keep only last 5
+      if (this.winningTopics.length > 5) {
+        this.winningTopics.shift();
+      }
+      console.log('[Correlation] ✅ Tracked winning topic:', topicStr);
+    }
+  }
+  
+  // MUSIC CONTAMINATION DETECTION (Fix A)
+  detectMusicContamination(text) {
+    const musicIndicators = [
+      'by all night', 'don\'t fly honey', 'wonderful i see', 'no matter',
+      // Common song lyric patterns
+      'na na na', 'oh oh oh', 'yeah yeah yeah', 'baby baby',
+      'la la la', 'love love love', 'tonight tonight',
+      // Repetitive phrases common in music
+      'all night long', 'feel the beat', 'turn it up',
+      // Disconnected word chains (typical of mixed audio)
+      'wonderful i don\'t fly', 'coming honey see'
+    ];
+    
+    let musicWords = 0;
+    const totalWords = text.split(' ').filter(w => w.length > 0).length;
+    
+    musicIndicators.forEach(indicator => {
+      if (text.toLowerCase().includes(indicator.toLowerCase())) {
+        musicWords += indicator.split(' ').length;
+      }
+    });
+    
+    const musicRatio = musicWords / totalWords;
+    const isContaminated = musicRatio > 0.25; // > 25% music lyrics
+    
+    console.log('[Transcript] 🎵 Music check:', isContaminated ? 'CONTAMINATED' : 'CLEAN', `(${(musicRatio * 100).toFixed(1)}% music)`);
+    
+    return isContaminated;
+  }
+  
+  // Clean transcript of music lyrics (Fix A)
+  cleanMusicFromTranscript(text) {
+    if (this.detectMusicContamination(text)) {
+      console.log('[Transcript] 🧹 Filtering music contamination...');
+      
+      // Extract only spoken phrases (first person, questions, reactions, dance-related)
+      const sentences = text.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 0);
+      const spokenSentences = [];
+      
+      sentences.forEach(sentence => {
+        const lower = sentence.toLowerCase();
+        
+        // Keep if it contains personal pronouns or dance/stream context
+        if (lower.includes('i ') || lower.includes('you ') || 
+            lower.includes('give me') || lower.includes('out of breath') ||
+            lower.includes('dance') || lower.includes('song') ||
+            lower.includes('break') || lower.includes('tired') ||
+            lower.includes('kitchen') || lower.includes('cooking') ||
+            lower.includes('?') || sentence.length < 20) {
+          spokenSentences.push(sentence);
+        }
+      });
+      
+      const cleaned = spokenSentences.join('. ').trim();
+      console.log('[Transcript] 🧹 Cleaned:', cleaned.substring(0, 100) + '...');
+      
+      return cleaned.length > 10 ? cleaned : text; // Fallback if over-filtered
+    }
+    
+    return text;
+  }
+  
+  // Detect current activity from transcript (Fix A support)
+  detectCurrentActivity(text) {
+    const lower = text.toLowerCase();
+    
+    // Dancing indicators
+    if (lower.includes('dance') || lower.includes('breath') || 
+        lower.includes('tired') || lower.includes('moves') ||
+        lower.includes('song') || lower.includes('music')) {
+      return 'dancing';
+    }
+    
+    // Cooking indicators  
+    if (lower.includes('cook') || lower.includes('kitchen') ||
+        lower.includes('food') || lower.includes('eat') ||
+        lower.includes('recipe') || lower.includes('ingredients')) {
+      return 'cooking';
+    }
+    
+    // Chatting/Q&A indicators
+    if (lower.includes('question') || lower.includes('tell me') ||
+        lower.includes('what do you') || lower.includes('chat') ||
+        lower.includes('ask me') || lower.includes('answer')) {
+      return 'chatting';
+    }
+    
+    return 'general';
+  }
+  
+  // Start auto-insight timer (generates insights every 20s)
+  startAutoInsightTimer() {
+    this.stopAutoInsightTimer(); // Clear any existing timer
+    this.isSystemActive = true;
+    
+    console.log('[Correlation] ⏰ Starting 20-second auto-insight timer');
+    console.log('[Correlation] ⏰ Timer will emit countdown and generate insights every 20s');
+    
+    // Emit initial countdown
+    this.emitCountdown(20);
+    
+    this.autoInsightTimer = setInterval(() => {
+      console.log('[Correlation] ⏰ 20-second timer triggered - generating auto-insight');
+      this.generateTimedInsight();
+    }, 20000); // 20 seconds
+    
+    console.log('[Correlation] ⏰ Timer started successfully, interval ID:', this.autoInsightTimer);
+  }
+  
+  // Stop auto-insight timer
+  stopAutoInsightTimer() {
+    if (this.autoInsightTimer) {
+      clearInterval(this.autoInsightTimer);
+      this.autoInsightTimer = null;
+      this.isSystemActive = false;
+      console.log('[Correlation] ⏰ Auto-insight timer stopped');
+    }
+  }
+  
+  // Reset countdown (called when new insight is generated)
+  resetCountdown() {
+    console.log('[Correlation] ⏰ Countdown reset to 20 seconds');
+    this.emitCountdown(20);
+  }
+  
+  // Emit countdown update
+  emitCountdown(seconds) {
+    console.log('[Correlation] ⏰ Emitting countdown update:', seconds + 's');
+    
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({
+        type: 'COUNTDOWN_UPDATE',
+        seconds: seconds,
+        timestamp: Date.now()
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[Correlation] ⏰ Countdown message error (side panel may not be open):', chrome.runtime.lastError.message);
+        } else {
+          console.log('[Correlation] ⏰ Countdown message sent successfully');
+        }
+      });
+    } else {
+      console.warn('[Correlation] ⏰ Chrome runtime not available for countdown');
+    }
+  }
+  
+  // Generate timed insight (called by 20s timer)
+  async generateTimedInsight() {
+    console.log('🔬 NUCLEAR: generateTimedInsight() ENTRY - Timer fired');
+    const now = Date.now();
+    
+    // Get most recent viewer data
+    const latestViewer = this.viewerBuffer[this.viewerBuffer.length - 1];
+    if (!latestViewer) {
+      console.log('🔬 NUCLEAR: No viewer data, skipping timed insight');
+      console.log('[Correlation] ⏰ No viewer data, skipping timed insight');
+      return;
+    }
+    
+    // Get transcript from last 40 seconds (increased from 20s for better context)
+    const segment = this.getRecentSegment(now, 40000);
+    
+    // If no meaningful data, send reminder of winning actions
+    if (!segment || segment.wordCount < 30) {
+      console.log('🔬 NUCLEAR: No transcript data, sending reminder');
+      console.log('[Correlation] ⏰ No recent transcript or too short (<30 words) - sending reminder');
+      this.sendReminderInsight(latestViewer.count, latestViewer.delta);
+      this.resetCountdown();
+      return;
+    }
+    
+    console.log('🔬 NUCLEAR: About to call generateInsight()');
+    
+    // Generate normal insight with delta = 0 (timer-triggered)
+    console.log('[Correlation] ⏰ Generating timed insight with data');
+    const tone = await this.analyzeTone(segment.text);
+    const insight = await this.generateInsight(0, latestViewer.count, segment, tone, true); // true = timed mode
+    
+    console.log('🔬 NUCLEAR: generateInsight() returned:', !!insight);
+    
+    // Handle case where Claude fails and returns null
+    if (!insight) {
+      console.log('🔬 NUCLEAR: Insight was null, sending reminder');
+      console.log('[Correlation] ⏰ Timed insight generation failed (Claude unavailable) - sending reminder');
+      this.sendReminderInsight(latestViewer.count, latestViewer.delta);
+      this.resetCountdown();
+      return;
+    }
+    
+    console.log('🔬 NUCLEAR: About to log timed insight generated');
+    console.log('[Correlation] 🎯 Timed insight generated:', {
+      emotionalLabel: insight.emotionalLabel,
+      nextMove: insight.nextMove
+    });
+    
+    // ADD CLEAR LOGGING FOR EASY FILTERING
+    console.log('🔬 NUCLEAR: About to send INSIGHT message');
+    console.log('✅ Claude Insight (Timer): ' + insight.nextMove.substring(0, 50));
+    
+    // Send insight
+    console.log('🔬 NUCLEAR: Calling chrome.runtime.sendMessage for INSIGHT');
+    chrome.runtime.sendMessage({
+      type: 'INSIGHT',
+      ...insight,
+      isTimedInsight: true
+    });
+    console.log('🔬 NUCLEAR: INSIGHT message sent');
+    
+    this.resetCountdown();
+    console.log('🔬 NUCLEAR: generateTimedInsight() EXIT');
+  }
+  
+  // Send reminder of winning actions
+  sendReminderInsight(count, delta) {
+    if (this.winningActions.length === 0) {
+      // No winning actions yet, send generic reminder
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        delta: 0,
+        emotionalLabel: 'Keep engaging',
+        nextMove: 'Ask viewers a question. Create buzz',
+        text: '',
+        isReminder: true,
+        source: 'reminder'
+      });
+      return;
+    }
+    
+    // Get top winning action
+    const topAction = this.winningActions[0];
+    
+    chrome.runtime.sendMessage({
+      type: 'INSIGHT',
+      delta: 0,
+      emotionalLabel: `${topAction.topic} worked`,
+      nextMove: `Try ${topAction.topic} again. ${topAction.tone}`,
+      text: topAction.text || '',
+      isReminder: true,
+      source: 'reminder',
+      originalDelta: topAction.delta
+    });
+    
+    console.log('[Correlation] 📌 Sent reminder of winning action:', topAction.topic);
   }
 
   // Update thresholds from settings
@@ -159,6 +1004,89 @@ class CorrelationEngine {
     }
   }
 
+  // Add chat stream data to buffer
+  addChatStream(comments, chatRate, timestamp) {
+    // Initialize chat buffer if not exists
+    if (!this.chatBuffer) {
+      this.chatBuffer = [];
+    }
+
+    const now = Date.now();
+
+    // Add comments to buffer
+    comments.forEach(comment => {
+      this.chatBuffer.push({
+        username: comment.username,
+        text: comment.text,
+        timestamp: comment.timestamp
+      });
+    });
+
+    // Keep only last 30 seconds
+    this.chatBuffer = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    // Store chat rate
+    this.lastChatRate = chatRate;
+    this.lastChatUpdate = now;
+
+    console.log(`[Correlation] Chat stream updated: ${comments.length} new comments, rate: ${chatRate}/min, buffer: ${this.chatBuffer.length}`);
+  }
+
+  // Get recent chat context for insights
+  getChatContext() {
+    if (!this.chatBuffer || this.chatBuffer.length === 0) {
+      return {
+        hasChat: false,
+        commentCount: 0,
+        chatRate: 0,
+        recentComments: []
+      };
+    }
+
+    const now = Date.now();
+    const recentComments = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    return {
+      hasChat: true,
+      commentCount: recentComments.length,
+      chatRate: this.lastChatRate || 0,
+      recentComments: recentComments.slice(-10).map(c => ({
+        username: c.username,
+        text: c.text
+      })),
+      topKeywords: this.extractChatKeywords(recentComments)
+    };
+  }
+
+  // Extract common keywords from chat
+  extractChatKeywords(comments) {
+    if (!comments || comments.length === 0) return [];
+
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being']);
+    const wordCounts = {};
+
+    comments.forEach(c => {
+      const words = c.text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w));
+
+      words.forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+    });
+
+    // Sort by frequency and return top 5
+    return Object.entries(wordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word, count]) => ({ word, count }));
+  }
+
   // Handle significant viewer change
   async handleSignificantChange(count, delta, timestamp) {
     const now = Date.now();
@@ -172,38 +1100,118 @@ class CorrelationEngine {
 
     console.log(`[Correlation] Significant change detected: ${delta > 0 ? '+' : ''}${delta}`);
 
-    // Get recent transcript segment (last 25 seconds)
-    const segment = this.getRecentSegment(timestamp, 25000);
+    // Get recent transcript segment (last 40 seconds for better context)
+    const segment = this.getRecentSegment(timestamp, 40000);
     
-    if (!segment || segment.wordCount < 5) {
-      console.log('[Correlation] Not enough transcript data for insight');
+    if (!segment || segment.wordCount < 30) {
+      console.log('[Correlation] Not enough transcript data for insight (<30 words)');
       this.emitEngineStatus('FAILED', { reason: 'Insufficient transcript' });
       return;
     }
 
     this.lastInsightTime = now;
 
-    // Analyze tone with Hume AI
-    const tone = await this.analyzeTone(segment.text);
-    
-    // Generate insight (now async)
-    const insight = await this.generateInsight(delta, count, segment, tone);
-    
-    // Send to background script
-    chrome.runtime.sendMessage({
-      type: 'INSIGHT',
-      ...insight
-    });
+    try {
+      // Analyze tone with Hume AI
+      console.log('[Correlation] 🔍 Step 1: Analyzing tone with Hume AI...');
+      const tone = await this.analyzeTone(segment.text);
+      console.log('[Correlation] 🔍 Step 2: Tone analysis complete:', tone?.emotion || 'none');
+      
+      // Generate insight (now async)
+      console.log('[Correlation] 🔍 Step 3: Generating insight...');
+      const insight = await this.generateInsight(delta, count, segment, tone);
+      
+      // Handle case where Claude fails and returns null
+      if (!insight) {
+        console.log('[Correlation] ❌ Insight generation failed (Claude unavailable) - skipping');
+        this.emitEngineStatus('FAILED', { reason: 'Claude API unavailable' });
+        return;
+      }
+      
+      console.log('[Correlation] 🔍 Step 4: Insight generated!');
+      
+      console.log('[Correlation] 🎯 Generated insight to send:', {
+        emotionalLabel: insight.emotionalLabel,
+        nextMove: insight.nextMove,
+        delta: insight.delta,
+        source: insight.source || 'unknown'
+      });
+      
+      // Track winning actions (delta >= +10)
+      if (delta >= 10) {
+        this.winningActions.push({
+          topic: segment.topic || 'unknown',
+          emotion: tone?.emotion || 'neutral',
+          text: segment.text.substring(0, 100),
+          delta: delta,
+          tone: this.getToneCue(tone),
+          timestamp: now
+        });
+        // Keep only top 10 winning actions
+        this.winningActions.sort((a, b) => b.delta - a.delta);
+        this.winningActions = this.winningActions.slice(0, 10);
+        console.log('[Correlation] 📈 Tracked winning action:', segment.topic, '+' + delta);
+      }
+      
+      // Send to background script
+      console.log('[Correlation] 🔍 Step 5: Sending to background script...');
+      
+      // ADD CLEAR LOGGING FOR EASY FILTERING
+      console.log('✅ Claude Insight (Delta): ' + insight.nextMove.substring(0, 50));
+      
+      chrome.runtime.sendMessage({
+        type: 'INSIGHT',
+        ...insight
+      });
+      console.log('[Correlation] 🔍 Step 6: Message sent successfully!');
+      
+      // Reset 20-second countdown
+      this.resetCountdown();
 
-    // Log as action
-    chrome.runtime.sendMessage({
-      type: 'ACTION',
-      label: tone.emotion || segment.topic || 'Speech',
-      delta: delta,
-      text: segment.text,
-      startTime: new Date(segment.startTime).toISOString(),
-      endTime: new Date(segment.endTime).toISOString()
-    });
+      // Log as action with SPECIFIC labeling
+      // Extract keywords AND specific nouns for better categorization
+      const actionKeywords = this.extractKeywords(segment.text);
+      const specificNouns = this.extractSpecificNouns(segment.text);
+      
+      // Build SPECIFIC label: Specific Nouns > Keywords > Topic (never generic)
+      let actionLabel = 'Chat'; // Default fallback
+      
+      if (specificNouns.length > 0) {
+        // Use first specific phrase (most specific)
+        actionLabel = specificNouns[0].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      } else if (actionKeywords.length > 0) {
+        // Use keyword category
+        actionLabel = actionKeywords[0].charAt(0).toUpperCase() + actionKeywords[0].slice(1) + ' talk';
+      } else if (segment.topic && segment.topic !== 'general' && segment.topic !== 'speech') {
+        // Use topic if not generic
+        actionLabel = segment.topic.charAt(0).toUpperCase() + segment.topic.slice(1);
+      } else if (tone?.emotion && tone.emotion.toLowerCase() !== 'neutral' && tone.emotion.toLowerCase() !== 'unknown') {
+        // Use emotion only if it's not "neutral" or "unknown"
+        actionLabel = tone.emotion.charAt(0).toUpperCase() + tone.emotion.slice(1) + ' talk';
+      }
+      
+      console.log('[Correlation] 📋 Action label:', actionLabel, '| Specific nouns:', specificNouns, '| Keywords:', actionKeywords, '| Emotion:', tone?.emotion);
+      
+      chrome.runtime.sendMessage({
+        type: 'ACTION',
+        label: actionLabel,
+        delta: delta,
+        text: segment.text,
+        startTime: new Date(segment.startTime).toISOString(),
+        endTime: new Date(segment.endTime).toISOString(),
+        keywords: actionKeywords, // Include keywords for reference
+        specificNouns: specificNouns // Include for debugging
+      });
+      
+    } catch (error) {
+      console.error('[Correlation] ❌ ERROR in generateCorrelation:', error);
+      console.error('[Correlation] ❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 200)
+      });
+      this.emitEngineStatus('FAILED', { reason: error.message });
+    }
   }
 
   // Get recent transcript segment
@@ -219,7 +1227,12 @@ class CorrelationEngine {
       return null;
     }
 
-    const text = relevantLines.map(l => l.text).join(' ');
+    // Join and filter filler words
+    const rawText = relevantLines.map(l => l.text).join(' ');
+    const filteredText = this.filterFillerWords(rawText);
+    
+    // Use filtered text for word count and analysis
+    const text = filteredText.length > 20 ? filteredText : rawText; // Fallback to raw if filtering removed too much
     const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
 
     return {
@@ -231,7 +1244,7 @@ class CorrelationEngine {
     };
   }
 
-  // Analyze tone with Hume AI
+  // Analyze tone with Hume AI (MIGRATED to FastAPI backend)
   async analyzeTone(text) {
     // Check cache
     const cacheKey = text.substring(0, 100);
@@ -241,18 +1254,20 @@ class CorrelationEngine {
     }
 
     try {
-      console.log('[Correlation] Analyzing tone with Hume AI...');
+      console.log('[Correlation] Analyzing tone with Hume AI via FastAPI...');
       
-      const response = await fetch('https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/hume-analyze-text', {
+      // Call FastAPI backend instead of Supabase
+      const response = await fetch('https://live-assistant-2.preview.emergentagent.com/api/analyze-emotion', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text: text }),
+        signal: AbortSignal.timeout(5000) // 5 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Hume AI error: ${response.status}`);
+        throw new Error(`FastAPI Hume error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -271,10 +1286,10 @@ class CorrelationEngine {
         this.analysisCache.delete(firstKey);
       }
 
-      console.log('[Correlation] Tone analysis:', result.emotion, result.confidence + '%');
+      console.log('[Correlation] Tone analysis (FastAPI):', result.emotion, result.confidence + '%');
       return result;
     } catch (error) {
-      console.error('[Correlation] Tone analysis failed:', error);
+      console.error('[Correlation] FastAPI tone analysis failed:', error);
       return { emotion: 'Unknown', score: 0.5, confidence: 0 };
     }
   }
@@ -387,10 +1402,55 @@ class CorrelationEngine {
   }
 
   // Generate insight based on delta, segment, and tone using AI
-  async generateInsight(delta, count, segment, tone) {
-    console.log('[CorrelationEngine] 🎯 Generating AI insight', { delta, count, segmentLength: segment?.text.length, tone });
+  async generateInsight(delta, count, segment, tone, isTimedMode = false) {
+    console.log('[CorrelationEngine] 🎯 Generating AI insight', { 
+      delta, 
+      count, 
+      segmentLength: segment?.text.length, 
+      tone,
+      isTimedMode 
+    });
     
     const action = this.extractAction(segment.text);
+    
+    // Prepare sanitized transcript for logging (available throughout function)
+    const words = segment.text.split(/\s+/);
+    const truncatedTranscript = words.slice(-100).join(' ');
+    
+    // MUSIC FILTERING (Fix A) - Clean transcript before processing
+    const cleanedTranscript = this.cleanMusicFromTranscript(segment.text);
+    
+    // FORCE dancing activity for tester (who is always dancing/kitchen content)
+    const detectedActivity = 'dancing';  // HARDCODED for dancing kitchen streamer
+    
+    console.log('[Transcript] 🎭 Activity FORCED to:', detectedActivity);
+    console.log('[Transcript] 🧹 Transcript cleaned:', cleanedTranscript !== segment.text ? 'FILTERED' : 'UNCHANGED');
+    
+    // Update activity for niche template selection
+    this.updateDetectedActivity(detectedActivity);
+    
+    // Use cleaned transcript for processing
+    const processedText = cleanedTranscript.length > 20 ? cleanedTranscript : segment.text;
+    
+    // ==================== ROUTING LOGIC: Calculate Transcript Score ====================
+    // Extract keywords from cleaned transcript
+    const keywords = this.extractKeywords(processedText);
+    const transcriptScore = this.calculateTranscriptScore(processedText, keywords);
+    
+    console.log(`[Routing] Decision Point | Score: ${transcriptScore.tier} (${transcriptScore.score}) | Delta: ${delta}`);
+    
+    // Route based on transcript quality
+    if (transcriptScore.tier === 'LOW') {
+      console.log('[Routing] ⏭️ SKIP - Transcript quality too low (score < 3) - No insight per preference');
+      return null;  // Skip insight for LOW quality (per "no insight" preference)
+    }
+    
+    // For HIGH and MEDIUM, attempt Claude first
+    const shouldUseClaude = transcriptScore.tier === 'HIGH' || transcriptScore.tier === 'MEDIUM';
+    const allowTemplateFallback = transcriptScore.tier === 'MEDIUM';
+    
+    console.log(`[Routing] Strategy: ${shouldUseClaude ? 'Claude' : 'Skip'} | Fallback: ${allowTemplateFallback ? 'Template' : 'None'}`);
+    const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
     
     // [ACTION:EXTRACTED] Diagnostic log to trace potential bleed sources
     console.log('[ACTION:EXTRACTED]', {
@@ -405,17 +1465,20 @@ class CorrelationEngine {
     
     let nextMove = '';
     let emotionalLabel = 'analyzing';
-    
-    // Only call AI for high-impact events (threshold gating)
-    const isHighImpact = delta >= 15 || delta <= -15;
+    // Call AI for any significant events (based on user's sensitivity setting)
+    // OR for timed insights (delta = 0 but isTimedMode = true)
+    const isHighImpact = Math.abs(delta) >= this.minDelta || isTimedMode;
     
     // [AI:GATE] diagnostic log with sanitized preview
     const transcriptPreview = segment.text.slice(0, 100).replace(/\n/g, ' ');
-    console.log('[AI:GATE]', {
+    console.log('[AI:GATE] 🎯 Checking AI call threshold:', {
       delta,
+      minDelta: this.minDelta,
+      absDelta: Math.abs(delta),
+      isTimedMode,
       isHighImpact,
       willCallAI: ENABLE_EXTENSION_AI && isHighImpact,
-      thresholds: { spike: 15, drop: -15 },
+      calculation: isTimedMode ? 'Timed mode - always call AI' : `|${delta}| >= ${this.minDelta} = ${isHighImpact}`,
       transcriptPreview,
       topic: segment.topic,
       emotion: tone?.emotion
@@ -426,12 +1489,18 @@ class CorrelationEngine {
       console.log('[Extension AI] Enabled and high-impact event, calling AI...');
       this.emitEngineStatus('AI_CALLING');
       try {
-        // Prepare payload for AI insight generation
-        // Truncate transcript to last 100 words to reduce payload
-        const words = segment.text.split(/\s+/);
-        const truncatedTranscript = words.slice(-100).join(' ');
-        const sanitizedTranscript = truncatedTranscript.slice(0, 100).replace(/\n/g, ' ');
+        // Generate unique correlationId for this insight
+        const correlationId = `${Date.now()}-${String(++this.insightSequence).padStart(4, '0')}`;
+        console.log(`📊 CORRELATION_ID: ${correlationId}`);
         
+        // Extract keywords and analyze transcript quality
+        const keywords = this.extractKeywords(segment.text);
+        const transcriptAnalysis = this.analyzeTranscriptQuality(segment.text);
+        
+        // Get chat context
+        const chatContext = this.getChatContext();
+        
+        // Prepare payload for AI insight generation with ENHANCED CONTEXT
         const payload = {
           transcript: truncatedTranscript,
           viewerDelta: delta,
@@ -451,21 +1520,29 @@ class CorrelationEngine {
         recentHistory: this.prosodyHistory.slice(-7).map((h, i) => ({
           delta: this.viewerBuffer[this.viewerBuffer.length - 7 + i]?.delta || 0,
           emotion: h.top_emotion
-        }))
+        })),
+        // NEW FIELDS for dynamic insights
+        keywordsSaid: keywords,
+        recentInsights: this.recentInsights,
+        winningTopics: this.winningTopics,
+        transcriptQuality: transcriptAnalysis.quality,
+        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio,
+        // CHAT CONTEXT
+        chatData: chatContext.hasChat ? {
+          commentCount: chatContext.commentCount,
+          chatRate: chatContext.chatRate,
+          topKeywords: chatContext.topKeywords.map(k => k.word),
+          recentComments: chatContext.recentComments.map(c => 
+            `${c.username}: ${c.text.substring(0, 50)}`
+          ).slice(-5) // Last 5 comments
+        } : undefined
       };
 
-        console.log('🤖 ==========================================');
-        console.log('🤖 CALLING CLAUDE API FOR INSIGHT (Extension)');
-        console.log('🤖 URL: https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight');
-        console.log('🤖 Viewer Delta:', payload.viewerDelta);
-        console.log('🤖 Transcript:', payload.transcript.substring(0, 100) + '...');
-        console.log('🤖 Top Emotion:', payload.prosody?.topEmotion || 'none');
-        console.log('🤖 Signal Quality:', payload.quality);
-        console.log('🤖 ==========================================');
+        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none', '| Chat:', chatContext.hasChat ? `${chatContext.commentCount} comments` : 'no chat');
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
-          url: 'https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight',
+          url: 'https://live-assistant-2.preview.emergentagent.com/api/generate-insight',
           payloadSize: JSON.stringify(payload).length,
           transcriptPreview: sanitizedTranscript,
           delta: payload.viewerDelta,
@@ -481,7 +1558,8 @@ class CorrelationEngine {
         }, AI_MAX_LATENCY_MS);
 
         const aiStartTime = performance.now();
-        const response = await fetch('https://hnvdovyiapkkjrxcxbrv.supabase.co/functions/v1/generate-insight', {
+        const backendUrl = 'https://live-assistant-2.preview.emergentagent.com/api/generate-insight';
+        const response = await fetch(backendUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -496,14 +1574,26 @@ class CorrelationEngine {
           const aiInsight = await response.json();
           console.log('✅ ==========================================');
           console.log('✅ CLAUDE INSIGHT RECEIVED (Extension)');
+          console.log('✅ CORRELATION_ID:', correlationId);
           console.log('✅ Response Time:', Math.round(aiDuration), 'ms');
           console.log('✅ Emotional Label:', aiInsight.emotionalLabel);
           console.log('✅ Next Move:', aiInsight.nextMove);
+          console.log('✅ Source:', aiInsight.source);
+          console.log('✅ Backend CorrelationId:', aiInsight.correlationId || 'not returned');
           console.log('✅ ==========================================');
           
           if (aiInsight.emotionalLabel && aiInsight.nextMove) {
             emotionalLabel = aiInsight.emotionalLabel;
             nextMove = aiInsight.nextMove;
+            console.log('✅ Claude insight | CID:', correlationId, '| Move:', nextMove.substring(0, 50));
+            
+            // Track this insight for anti-repetition
+            this.trackInsight(aiInsight);
+            
+            // Track as winning topic if it's a spike
+            if (delta >= 10 && keywords.length > 0) {
+              this.trackWinningTopic(segment.topic, delta, keywords);
+            }
           } else {
             throw new Error('Invalid AI response format');
           }
@@ -571,156 +1661,73 @@ class CorrelationEngine {
       this.emitEngineStatus('AI_FALLBACK', { reason: 'AI disabled or low-impact' });
     }
 
-    // Fallback logic (runs if AI disabled, low-impact, or error)
+    // Claude Quality Check - NO FALLBACK LOGIC
+    console.log('[Correlation] 🔍 Quality Check - emotionalLabel:', emotionalLabel, 'nextMove:', nextMove ? nextMove.substring(0, 50) : 'null');
+    
     if (!nextMove) {
       console.warn('⚠️ ==========================================');
-      console.warn('⚠️ AI INSIGHT FAILED OR DISABLED - USING FALLBACK');
-      console.warn('⚠️ Falling back to template system');
+      console.warn('⚠️ CLAUDE INSIGHT FAILED');
+      console.warn('⚠️ Transcript Score:', transcriptScore.tier, '| Allow Fallback:', allowTemplateFallback);
       console.warn('⚠️ ==========================================');
       
-      // Fallback to prosody or tone-based feedback
-      const isDrop = delta < 0;
-      const isDump = delta < -30;
-      const isSpike = delta > 20;
+      // 🔬 DIAGNOSTIC: Check exact values before template decision
+      console.log('🔬 DEBUG: Template Fallback Decision Point');
+      console.log('🔬 transcriptScore.tier:', transcriptScore.tier);
+      console.log('🔬 transcriptScore.tier type:', typeof transcriptScore.tier);
+      console.log('🔬 Exact comparison MEDIUM:', transcriptScore.tier === 'MEDIUM');
+      console.log('🔬 Exact comparison HIGH:', transcriptScore.tier === 'HIGH');
+      console.log('🔬 Keywords available:', keywords);
+      console.log('🔬 Keywords length:', keywords.length);
+      console.log('🔬 Delta value:', delta);
+      console.log('🔬 templateSelector exists:', !!this.templateSelector);
+      console.log('🔬 templateSelector.bank exists:', !!this.templateSelector?.bank);
       
-      // Use prosody if quality is GOOD or better
-      if (prosody && (prosody.correlationQuality === 'EXCELLENT' || prosody.correlationQuality === 'GOOD')) {
-        console.log(`[Correlation] Using ${prosody.correlationQuality} quality prosody signal`);
+      // Use template fallback for MEDIUM or HIGH (better than skipping)
+      // Only skip for LOW quality
+      const shouldUseTemplate = transcriptScore.tier === 'MEDIUM' || transcriptScore.tier === 'HIGH';
+      console.log('🔬 Should use template?:', shouldUseTemplate);
+      
+      if (shouldUseTemplate) {
+        console.log('[Routing] 🔄', transcriptScore.tier, 'quality + Claude failed → Using template fallback');
+        console.log('[Template] Attempting selectTemplate with keywords:', keywords, 'delta:', delta);
         
-        if (isSpike) {
-          nextMove = this.generateSpikeFeedback(action, delta, prosody);
-        } else if (isDump) {
-          nextMove = this.generateDumpFeedback(action, delta);
-        } else if (isDrop) {
-          nextMove = this.generateDropFeedback(action, delta, prosody, tone);
-        }
-        emotionalLabel = prosody.top_emotion || 'unknown';
-      }
-      
-      // Try FAIR quality for significant drops
-      if (!nextMove && prosody && prosody.correlationQuality === 'FAIR' && delta < -20) {
-        console.log('[Correlation] Using FAIR quality prosody for drop');
-        nextMove = this.generateDropFeedback(action, delta, prosody, tone);
-        emotionalLabel = prosody.top_emotion || 'unknown';
-      }
-      
-      // Fallback to transcript-based insights
-      if (!nextMove) {
-        if (isDump) {
-          nextMove = this.generateDumpFeedback(action, delta);
-        } else if (isDrop) {
-          nextMove = this.generateDropFeedback(action, delta, null, tone);
-        } else if (isSpike) {
-          nextMove = this.generateSpikeFeedback(action, delta, null);
-        } else {
-          // NEVER use raw transcript - use safe defaults instead
-          nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-        }
-        emotionalLabel = tone?.emotion || segment.topic || 'general';
-      }
-      
-      // [FALLBACK:GENERATED] diagnostic log
-      console.log('[FALLBACK:GENERATED]', {
-        emotionalLabel: (emotionalLabel || '').slice(0, 50),
-        nextMove: (nextMove || '').slice(0, 50),
-        emotion: tone?.emotion,
-        delta
-      });
-      
-      // Defensive validation: ensure non-empty strings
-      if (!emotionalLabel || typeof emotionalLabel !== 'string' || emotionalLabel.trim() === '') {
-        emotionalLabel = delta > 0 ? 'content spike' : 'content drop';
-        console.warn('[FALLBACK:INVALID] emotionalLabel was invalid, using default');
-      }
-      if (!nextMove || typeof nextMove !== 'string' || nextMove.trim() === '') {
-        nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-        console.warn('[FALLBACK:INVALID] nextMove was invalid, using default');
-      }
-      
-      // Truncate to safe length (max 200 chars)
-      emotionalLabel = emotionalLabel.slice(0, 200);
-      nextMove = nextMove.slice(0, 200);
-      
-      // [FALLBACK:BLEED_DETECTED] Check for transcript bleed (2+ consecutive words OR >40% word overlap)
-      const detectBleed = (output, source) => {
-        const outputWords = output.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-        const sourceWords = source.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-        const sourceText = sourceWords.join(' ');
-        
-        // Check for 2+ consecutive matching words (stricter than 3+)
-        for (let i = 0; i < outputWords.length - 1; i++) {
-          const pair = outputWords.slice(i, i + 2).join(' ');
-          if (pair.length > 4 && sourceText.includes(pair)) {
-            console.warn('[BLEED:DETECTED:2WORDS]', { pair, output: output.slice(0, 50) });
-            return true;
+        try {
+          const templateInsight = this.selectTemplate(keywords, delta);
+          console.log('[Template] selectTemplate returned:', templateInsight ? 'SUCCESS' : 'NULL');
+          
+          if (templateInsight) {
+            console.log('[Template] ✅ Using template:', templateInsight.templateId, '| Move:', templateInsight.nextMove);
+            emotionalLabel = templateInsight.emotionalLabel;
+            nextMove = templateInsight.nextMove;
+          } else {
+            console.warn('[Template] ❌ selectTemplate returned null - skipping insight');
+            console.warn('[Template] ❌ Possible reasons: No templates in category or filter failed');
+            return null;
           }
+        } catch (error) {
+          console.error('[Template] ❌ ERROR in selectTemplate:', error);
+          console.error('[Template] ❌ Error details:', error.message, error.stack?.substring(0, 200));
+          return null;
         }
-        
-        // Check for word frequency: if >40% of output words appear in source
-        const matchingWords = outputWords.filter(word => 
-          word.length > 3 && sourceWords.includes(word)
-        );
-        const overlapPercent = (matchingWords.length / outputWords.length) * 100;
-        
-        if (overlapPercent > 40) {
-          console.warn('[BLEED:DETECTED:WORDFREQ]', { 
-            overlapPercent: overlapPercent.toFixed(1),
-            matchingWords: matchingWords.slice(0, 5).join(', '),
-            output: output.slice(0, 50)
-          });
-          return true;
-        }
-        
-        return false;
-      };
-      
-      if (detectBleed(emotionalLabel, segment.text)) {
-        console.warn('[FALLBACK:BLEED_DETECTED] emotionalLabel contains transcript, replacing');
-        emotionalLabel = delta > 0 ? 'content spike' : 'content drop';
+      } else {
+        // LOW quality - skip insight (per "no insight" preference)
+        console.warn('⚠️ LOW quality transcript and Claude failed - skipping (no template for low quality)');
+        console.warn('🔬 DEBUG: Tier was:', transcriptScore.tier, '(expected LOW)');
+        return null;
       }
-      if (detectBleed(nextMove, segment.text)) {
-        console.warn('[FALLBACK:BLEED_DETECTED] nextMove contains transcript, replacing');
-        nextMove = delta > 0 ? 'Keep doing this' : 'Try something different';
-      }
-      
-      // Apply urgency styling
-      nextMove = this.applyUrgency(nextMove, urgency);
     }
-
-    // Final sanitization pass before emit (catches any remaining bleed)
-    const sanitizeAgainstTranscript = (output, source) => {
-      if (!output || !source) return output;
-      
-      const outputWords = output.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      const sourceWords = source.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      const sourceText = sourceWords.join(' ');
-      
-      // Check for 2+ consecutive word matches
-      for (let i = 0; i < outputWords.length - 1; i++) {
-        const pair = outputWords.slice(i, i + 2).join(' ');
-        if (pair.length > 4 && sourceText.includes(pair)) {
-          console.warn('[SANITIZE:BLEED]', { pair, output: output.slice(0, 50) });
-          return delta > 0 ? 'Keep this momentum' : 'Pivot to engaging content';
-        }
-      }
-      
-      // Check word frequency
-      const matchingWords = outputWords.filter(word => 
-        word.length > 3 && sourceWords.includes(word)
-      );
-      const overlapPercent = (matchingWords.length / outputWords.length) * 100;
-      
-      if (overlapPercent > 40) {
-        console.warn('[SANITIZE:WORDFREQ]', { overlapPercent: overlapPercent.toFixed(1) });
-        return delta > 0 ? 'Keep this momentum' : 'Pivot to engaging content';
-      }
-      
-      return output;
-    };
     
-    // Apply final sanitization
-    emotionalLabel = sanitizeAgainstTranscript(emotionalLabel, segment.text);
-    nextMove = sanitizeAgainstTranscript(nextMove, segment.text);
+    // If we reach here, we have an insight (from Claude or template)
+    const insightSource = emotionalLabel.includes('template') || nextMove.includes('template') ? 'template' : 'Claude';
+    console.log('✅ ==========================================');
+    console.log('✅ USING INSIGHT | Source:', insightSource);
+    console.log('✅ Label:', emotionalLabel);
+    console.log('✅ Move:', nextMove);
+    console.log('✅ ==========================================');
+
+    // Trust Claude insights - NO sanitization that could replace them
+    // Backend already handles transcript bleed detection
+    console.log('[Correlation] ✅ Trusting Claude insight as-is (no frontend sanitization)');
 
     // [EMIT:PRE] Final validation diagnostic before emit
     const sanitizedEmotionalLabel = typeof emotionalLabel === 'string' 
@@ -800,6 +1807,24 @@ class CorrelationEngine {
       }
     });
   }
+  
+  // Helper to get tone cue from emotion
+  getToneCue(tone) {
+    const toneCues = {
+      'joy': 'Stay hyped',
+      'excitement': 'Keep energy high',
+      'admiration': 'Be authentic',
+      'amusement': 'Stay playful',
+      'love': 'Be vulnerable',
+      'interest': 'Stay curious',
+      'determination': 'Stay focused',
+      'concentration': 'Be direct',
+      'calmness': 'Stay present',
+      'default': 'Build excitement'
+    };
+    
+    return toneCues[tone?.emotion] || toneCues.default;
+  }
 
   reset() {
     this.transcriptBuffer = [];
@@ -808,6 +1833,8 @@ class CorrelationEngine {
     this.lastInsightTime = 0;
     this.analysisCache.clear();
     this.prosodyHistory = [];
+    this.winningActions = [];
+    this.stopAutoInsightTimer();
     this.emitStatus('IDLE');
     console.log('[Correlation] Engine reset');
   }
