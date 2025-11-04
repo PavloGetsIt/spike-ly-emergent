@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 import json
 import re
 import time
@@ -382,8 +382,8 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         # Call Claude API directly
         logger.info("🤖 Calling Claude Sonnet 4.5 with your API key...")
         
-        client = Anthropic(api_key=api_key)
-        response = client.messages.create(
+        client = AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=150,
             system=system_prompt,
