@@ -3,7 +3,7 @@
   "name": "Spikely",
   "version": "2.9.1",
   "description": "Real-time Live Stream Artificial Intelligence",
-  "permissions": ["storage", "activeTab", "tabs", "sidePanel", "scripting", "webNavigation", "contextMenus", "tabCapture", "offscreen"],
+  "permissions": ["storage", "activeTab", "tabs", "sidePanel", "scripting", "webNavigation", "contextMenus", "tabCapture", "offscreen", "alarms"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
