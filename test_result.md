@@ -291,17 +291,17 @@ frontend:
         agent: "main"
         comment: "CSS already contains comprehensive alignment fixes for threshold controls, audio controls, viewer row, and consistent button heights (36px). All elements properly aligned."
 
-  - task: "Critical DOM Viewer Count Detection Fix"
+  - task: "Live Viewer Tracking (LVT) Pipeline Fix"
     implemented: true
     working: false
-    file: "/app/frontend/extension/background.js"
+    file: "/app/frontend/extension/content.js, background.js, sidepanel.js, offscreen.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: false
         agent: "main"
-        comment: "CRITICAL BUG FIXED: background.js only handled 'VIEWER_COUNT_UPDATE' but content.js sends instant initial count as 'VIEWER_COUNT'. Modified handler to accept both message types. This should fix viewer count staying at 0 instead of showing actual count (2.1K). NEEDS TESTING."
+        comment: "MAJOR PIPELINE FIX: Fixed broken Live Viewer Tracking with 5 comprehensive improvements: 1) Enhanced TikTok DOM detection with modern selectors and 3-tier fallback strategy, 2) Added persistent port management with retry logic, 3) Fixed DOM timing issues in side panel with exponential backoff, 4) Added Hume/offscreen port reconnection logic, 5) Added Chrome API context guards for tabCapture. New logging chain: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP]. NEEDS TESTING on actual TikTok Live streams."
 
 metadata:
   created_by: "main_agent"
