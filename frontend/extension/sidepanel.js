@@ -1945,8 +1945,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Initialize UI features with retry logic
-console.log('[UI:INIT] Starting UI initialization...');
-initializeUIFeatures();
+// Wait for DOM to be ready before initializing
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[VIEWER:SP] 🎯 DOMContentLoaded - starting initialization');
+    setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
+  });
+} else {
+  console.log('[VIEWER:SP] 🎯 DOM already ready - starting initialization');
+  setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
+}
 
 connectToWebSocket();
