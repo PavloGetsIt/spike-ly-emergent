@@ -398,6 +398,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   } else if (message.type === 'GET_LATEST_VIEWER') {
     sendResponse({ last: lastViewer });
+  } else if (message.type === 'GET_LATEST_VIEWER') {
+    // Provide latest viewer data to newly opened side panel
+    sendResponse({ 
+      viewer: lastViewer,
+      success: true 
+    });
+    return true;
   } else if (message.type === 'GET_CONNECTION_STATUS') {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
