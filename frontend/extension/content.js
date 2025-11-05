@@ -668,9 +668,12 @@ function emitViewerCount(count, delta) {
 }
 
 // ============================================================================
-// Targeted MutationObserver (with debounce)
+// Enhanced MutationObserver with retry attachment
 // ============================================================================
 let mutationDebounceTimer = null;
+let mutationRetryCount = 0;
+const MAX_MUTATION_RETRIES = 10;
+let mutationRetryTimer = null;
 
 function setupMutationObserver() {
   if (domObserver) {
@@ -678,30 +681,65 @@ function setupMutationObserver() {
   }
   
   if (!cachedContainer) {
-    console.debug('[TT:MUT] No container to observe');
+    console.log('[VIEWER:PAGE] No container found, retrying mutation setup...');
+    
+    // Retry attachment every 500ms until found (max 10 attempts)
+    if (mutationRetryCount < MAX_MUTATION_RETRIES) {
+      mutationRetryCount++;
+      if (mutationRetryTimer) clearTimeout(mutationRetryTimer);
+      mutationRetryTimer = setTimeout(() => {
+        const node = queryViewerNode();
+        if (node && cachedContainer) {
+          mutationRetryCount = 0; // Reset on success
+          setupMutationObserver();
+        } else {
+          setupMutationObserver(); // Retry
+        }
+      }, 500);
+    } else {
+      console.log('[VIEWER:PAGE] Max mutation retry attempts reached');
+      mutationRetryCount = 0;
+    }
     return;
   }
   
   try {
     domObserver = new MutationObserver((mutations) => {
-      console.debug(`[TT:MUT] Tick #${warmupMutationTicks + 1}, ${mutations.length} mutations`);
+      // Fire on textContent OR aria changes
+      let shouldUpdate = false;
       
-      // Debounce handler
-      if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
-      mutationDebounceTimer = setTimeout(() => {
-        handleMutation();
-      }, TT_CONFIG.MUTATION_DEBOUNCE_MS);
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' || 
+            mutation.type === 'characterData' ||
+            (mutation.type === 'attributes' && 
+             (mutation.attributeName === 'aria-label' || mutation.attributeName === 'data-count'))) {
+          shouldUpdate = true;
+          break;
+        }
+      }
+      
+      if (shouldUpdate) {
+        // Debounce handler
+        if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
+        mutationDebounceTimer = setTimeout(() => {
+          handleMutation();
+        }, TT_CONFIG.MUTATION_DEBOUNCE_MS);
+      }
     });
     
+    // Observe the smallest stable container
     domObserver.observe(cachedContainer, {
       childList: true,
       characterData: true,
-      subtree: true
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'data-count']
     });
     
-    console.debug('[TT:MUT] Observer armed on container');
+    console.log('[VIEWER:PAGE] MutationObserver attached to container');
+    mutationRetryCount = 0; // Reset retry count on success
   } catch (e) {
-    console.debug('[TT:MUT] Failed to setup observer:', e);
+    console.log('[VIEWER:PAGE] Failed to setup MutationObserver:', e.message);
   }
 }
 
