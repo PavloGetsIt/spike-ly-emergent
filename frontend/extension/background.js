@@ -459,6 +459,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             console.debug('[AUDIO:BG:CAPTURE] Attempt #' + attempt);
             
+            // CONTEXT GUARD: Only call tabCapture in background script
+            if (typeof chrome.tabCapture === 'undefined') {
+              throw new Error('tabCapture API not available in this context');
+            }
+            
             stream = await chrome.tabCapture.capture({
               audio: true,
               video: false
