@@ -798,37 +798,32 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      console.log('[VIEWER:SP] VIEWER_COUNT_UPDATE received:', { count: message.count, delta: message.delta });
+      console.log(`[VIEWER:SP] rendered=${message.count} (UPDATE)`);
       // Fall through to VIEWER_COUNT handler
     case 'VIEWER_COUNT':
-      console.log('[VIEWER:SP] VIEWER_COUNT received:', { count: message.count, delta: message.delta, source: message.source });
+      console.log(`[VIEWER:SP] rendered=${message.count} (${message.source || 'direct'})`);
       
       // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
-      if (message.source === 'initial_instant') {
-        console.log('[VIEWER:SP] ⚡ Initial count received INSTANTLY:', message.count);
+      if (message.source === 'initial_instant' || message.source === 'cached_on_connect') {
+        console.log(`[VIEWER:SP] rendered=${message.count} (INSTANT: ${message.source})`);
         firstCountReceived = true;
         isInWarmup = false;
-        updateEngineStatus('IDLE', {});
+        updateEngineStatus('TRACKING', {});
         updateViewerCount(message.count, 0);
         break;
       }
       
       // Handle warm-up phase UI (for subsequent updates)
       if (isSystemStarted && message.count === 0 && !firstCountReceived) {
-        // During warm-up: show "Collecting..."
-        updateEngineStatus('COLLECTING', {});
-        isInWarmup = true;
-      } else if (isSystemStarted && message.count > 0 && !firstCountReceived) {
-        // First valid count: transition to IDLE
+        updateEngineStatus('COLLECTING', { reason: 'Waiting for viewer changes...' });
+      } else {
+        // Normal viewer count update
         firstCountReceived = true;
         isInWarmup = false;
-        updateEngineStatus('IDLE', {});
+        updateEngineStatus('TRACKING', {});
       }
       
       updateViewerCount(message.count, message.delta || 0);
-      
-      // Update status to TRACKING when we receive viewer data
-      updateEngineStatus('TRACKING', {});
       
       break;
     case 'TRANSCRIPT':
