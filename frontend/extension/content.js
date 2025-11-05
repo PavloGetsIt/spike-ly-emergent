@@ -651,11 +651,10 @@ function emitViewerCount(count, delta) {
 }
 
 // ============================================================================
-// Enhanced MutationObserver with retry attachment
+// Enhanced MutationObserver that rebinds on node disappearance
 // ============================================================================
 let mutationDebounceTimer = null;
 let mutationRetryCount = 0;
-const MAX_MUTATION_RETRIES = 10;
 let mutationRetryTimer = null;
 
 function setupMutationObserver() {
@@ -664,45 +663,49 @@ function setupMutationObserver() {
   }
   
   if (!cachedContainer) {
-    console.log('[VIEWER:PAGE] No container found, retrying mutation setup...');
-    
-    // Retry attachment every 500ms until found (max 10 attempts)
-    if (mutationRetryCount < MAX_MUTATION_RETRIES) {
+    // Retry with reduced attempts to avoid infinite loops
+    if (mutationRetryCount < 5) {
       mutationRetryCount++;
       if (mutationRetryTimer) clearTimeout(mutationRetryTimer);
       mutationRetryTimer = setTimeout(() => {
         const node = queryViewerNode();
         if (node && cachedContainer) {
-          mutationRetryCount = 0; // Reset on success
+          mutationRetryCount = 0;
           setupMutationObserver();
-        } else {
-          setupMutationObserver(); // Retry
         }
-      }, 500);
-    } else {
-      console.log('[VIEWER:PAGE] Max mutation retry attempts reached');
-      mutationRetryCount = 0;
+      }, 1000);
     }
     return;
   }
   
   try {
     domObserver = new MutationObserver((mutations) => {
-      // Fire on textContent OR aria changes
-      let shouldUpdate = false;
+      // Check if cached node still exists, rebind if disappeared
+      if (cachedViewerEl && !document.contains(cachedViewerEl)) {
+        console.log('[VIEWER:PAGE] node disappeared, rebinding observer');
+        const node = queryViewerNode();
+        if (node && cachedContainer) {
+          setupMutationObserver(); // Rebind to new container
+        }
+        return;
+      }
       
+      // Detect numeric changes via text OR aria-label regex
+      let shouldUpdate = false;
       for (const mutation of mutations) {
-        if (mutation.type === 'childList' || 
-            mutation.type === 'characterData' ||
-            (mutation.type === 'attributes' && 
-             (mutation.attributeName === 'aria-label' || mutation.attributeName === 'data-count'))) {
+        if (mutation.type === 'childList' || mutation.type === 'characterData') {
           shouldUpdate = true;
           break;
+        } else if (mutation.type === 'attributes' && mutation.attributeName === 'aria-label') {
+          const newAriaLabel = mutation.target.getAttribute('aria-label');
+          if (newAriaLabel && /[0-9,\.KM]+/.test(newAriaLabel)) {
+            shouldUpdate = true;
+            break;
+          }
         }
       }
       
       if (shouldUpdate) {
-        // Debounce handler
         if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
         mutationDebounceTimer = setTimeout(() => {
           handleMutation();
@@ -710,37 +713,30 @@ function setupMutationObserver() {
       }
     });
     
-    // Observe the smallest stable container
+    // Observe only the widget container (not document.body)
     domObserver.observe(cachedContainer, {
       childList: true,
       characterData: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['aria-label', 'data-count']
+      attributeFilter: ['aria-label']
     });
     
-    console.log('[VIEWER:PAGE] MutationObserver attached to container');
-    mutationRetryCount = 0; // Reset retry count on success
+    console.log('[VIEWER:PAGE] observer bound to widget container');
+    mutationRetryCount = 0;
   } catch (e) {
-    console.log('[VIEWER:PAGE] Failed to setup MutationObserver:', e.message);
+    console.log('[VIEWER:PAGE] observer setup failed:', e.message);
   }
 }
 
 function handleMutation() {
-  // Check if node still attached
-  if (!cachedViewerEl || !document.contains(cachedViewerEl)) {
-    console.debug('[TT:MUT] Node detached, re-querying...');
-    cachedViewerEl = null;
-    cachedContainer = null;
-    const node = queryViewerNode();
-    if (node) setupMutationObserver();
-    return;
-  }
-  
-  // Parse current value
-  const parsed = normalizeAndParse(cachedViewerEl);
-  if (parsed !== null) {
-    processValidatedSample(parsed);
+  // Always re-query the node on mutation (dynamic DOM changes)
+  const node = queryViewerNode();
+  if (node) {
+    const parsed = normalizeAndParse(node);
+    if (parsed !== null) {
+      processValidatedSample(parsed);
+    }
   }
 }
 
