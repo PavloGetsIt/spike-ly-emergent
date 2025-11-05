@@ -989,12 +989,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 2.0.6-ROLLBACK (Stable)');
+console.log('[VIEWER:PAGE] Content script loaded - Version 2.1.0-LVT-FIX');
 
 // Run parser validation tests
 validateParserFix();
 
+// Initialize port connection (but don't start tracking yet)
+initializeViewerCountPort();
+
 // Stop timers cleanly on navigation to avoid context errors
-window.addEventListener('pagehide', () => { try { stopTracking(); } catch (_) {} });
-window.addEventListener('beforeunload', () => { try { stopTracking(); } catch (_) {} });
+window.addEventListener('pagehide', () => { 
+  try { 
+    stopTracking();
+    if (viewerCountPort) {
+      viewerCountPort.disconnect();
+      viewerCountPort = null;
+    }
+  } catch (_) {} 
+});
+window.addEventListener('beforeunload', () => { 
+  try { 
+    stopTracking();
+    if (viewerCountPort) {
+      viewerCountPort.disconnect();
+      viewerCountPort = null;
+    }
+  } catch (_) {} 
+});
 })();
