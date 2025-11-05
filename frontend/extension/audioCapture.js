@@ -32,7 +32,7 @@ class AudioCaptureManager {
       if (!offscreenDocument) {
         console.log('[Audio Capture] Creating offscreen document...');
         await chrome.offscreen.createDocument({
-          url: 'offscreen.html',
+          url: chrome.runtime.getURL('offscreen.html'),
           reasons: ['USER_MEDIA'],
           justification: 'Audio capture for transcription'
         });
