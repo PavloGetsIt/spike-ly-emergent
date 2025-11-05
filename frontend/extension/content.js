@@ -360,183 +360,13 @@ function safeSendMessage(payload) {
 }
 
 // ============================================================================
-// Statistical Helpers (Median, MAD, Outlier Detection)
+// SIMPLIFIED VIEWER COUNT EMISSION (removed complex warmup logic)
 // ============================================================================
-function calculateMedian(arr) {
-  if (!arr || arr.length === 0) return 0;
-  const sorted = arr.slice().sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-function calculateMAD(arr, median) {
-  if (!arr || arr.length === 0) return 0;
-  const deviations = arr.map(x => Math.abs(x - median));
-  return calculateMedian(deviations);
-}
-
-function isOutlier(value, median, mad, sigma = TT_CONFIG.OUTLIER_SIGMA) {
-  if (mad === 0) return false; // All samples identical
-  return Math.abs(value - median) > sigma * mad;
-}
-
-// ============================================================================
-// Warm-Up Phase Logic
-// ============================================================================
-function startWarmup() {
-  console.debug('[TT:WARMUP] Starting warm-up phase...');
-  warmupSamples = [];
-  warmupStartTime = Date.now();
-  warmupMutationTicks = 0;
-  isWarmupComplete = false;
-  
-  // Arm re-select timer (if no samples after 2.5s, re-run selector)
-  if (warmupReselectTimer) clearTimeout(warmupReselectTimer);
-  warmupReselectTimer = setTimeout(() => {
-    if (!isWarmupComplete && warmupSamples.length === 0) {
-      console.debug('[TT:WARMUP] No samples after 2.5s, re-running selector...');
-      cachedViewerEl = null;
-      cachedContainer = null;
-      const node = queryViewerNode();
-      if (node) setupMutationObserver();
-    }
-  }, TT_CONFIG.NODE_RESELECT_TIMEOUT_MS);
-  
-  // Arm stuck warning timer (after 5s, emit OBSERVING status)
-  if (warmupStuckTimer) clearTimeout(warmupStuckTimer);
-  warmupStuckTimer = setTimeout(() => {
-    if (!isWarmupComplete) {
-      console.debug('[TT:WARMUP] Still stuck after 5s, emitting OBSERVING status');
-      safeSendMessage({
-        type: 'SYSTEM_STATUS',
-        status: 'OBSERVING',
-        debug: '[TikTok] Waiting for viewer node…'
-      });
-    }
-  }, TT_CONFIG.STUCK_WARNING_TIMEOUT_MS);
-}
-
-function addWarmupSample(count) {
-  const elapsed = Date.now() - warmupStartTime;
-  warmupSamples.push(count);
-  warmupMutationTicks++;
-  
-  console.debug(`[TT:WARMUP] Sample #${warmupSamples.length}: ${count} (${elapsed}ms)`);
-  
-  // Check completion criteria
-  const timeOk = elapsed >= TT_CONFIG.WARMUP_MS;
-  const ticksOk = warmupMutationTicks >= TT_CONFIG.WARMUP_MIN_TICKS;
-  const samplesOk = warmupSamples.length >= 2;
-  
-  if (timeOk && ticksOk && samplesOk) {
-    completeWarmup();
-  }
-}
-
-function completeWarmup() {
-  if (isWarmupComplete) return;
-  isWarmupComplete = true;
-  
-  // Clear timers
-  if (warmupReselectTimer) clearTimeout(warmupReselectTimer);
-  if (warmupStuckTimer) clearTimeout(warmupStuckTimer);
-  
-  // Calculate stats
-  warmupMedian = calculateMedian(warmupSamples);
-  warmupMAD = calculateMAD(warmupSamples, warmupMedian);
-  
-  console.debug(`[TT:WARMUP] Complete: ${warmupSamples.length} samples, median=${warmupMedian}, MAD=${warmupMAD}`);
-  
-  // Emit first valid sample
-  if (warmupMedian > 0) {
-    emitViewerCount(warmupMedian, 0);
-  }
-}
-
-// ============================================================================
-// Post-Warm-Up Validation & Rate-Limited Emission
-// ============================================================================
-function processValidatedSample(count) {
-  if (!isWarmupComplete) {
-    // Still in warm-up, collect sample
-    addWarmupSample(count);
-    return;
-  }
-  
-  const now = Date.now();
-  
-  // Zero-gate: Don't emit 0 as first value unless 2 consecutive over 1s
-  if (count === 0) {
-    if (lastEmittedCount === 0) {
-      consecutiveZeros++;
-      if (consecutiveZeros >= TT_CONFIG.ZERO_GATE_CONSECUTIVE && 
-          now - lastZeroAt >= TT_CONFIG.ZERO_GATE_DURATION_MS) {
-        console.debug('[TT:GUARD] ✓ Accepted: zero (consecutive gate passed)');
-        emitViewerCount(0, -lastEmittedCount);
-      } else {
-        console.debug('[TT:GUARD] ✗ Rejected: zero-gate');
-      }
-    } else {
-      lastZeroAt = now;
-      consecutiveZeros = 1;
-      console.debug('[TT:GUARD] ✗ Rejected: zero-gate (first zero)');
-    }
-    return;
-  }
-  consecutiveZeros = 0;
-  
-  // Range guard: 1 <= count <= MAX_REASONABLE_VIEWERS
-  if (count < 1 || count > TT_CONFIG.MAX_REASONABLE_VIEWERS) {
-    console.debug(`[TT:GUARD] ✗ Rejected: range (${count} outside bounds)`);
-    return;
-  }
-  
-  // Outlier guard with 2-consecutive override
-  if (isOutlier(count, warmupMedian, warmupMAD)) {
-    lastValidSamples.push(count);
-    if (lastValidSamples.length > 3) lastValidSamples.shift();
-    
-    // Check if last 2 samples agree (within tolerance)
-    if (lastValidSamples.length >= TT_CONFIG.CONSECUTIVE_OVERRIDE) {
-      const recent = lastValidSamples.slice(-TT_CONFIG.CONSECUTIVE_OVERRIDE);
-      const allClose = recent.every((v, i, arr) => 
-        i === 0 || Math.abs(v - arr[i - 1]) <= TT_CONFIG.CONSECUTIVE_TOLERANCE
-      );
-      
-      if (allClose) {
-        console.debug(`[TT:GUARD] ✓ Accepted: outlier override (${TT_CONFIG.CONSECUTIVE_OVERRIDE} consecutive)`);
-        // Update median/MAD to new level
-        warmupMedian = count;
-        warmupMAD = calculateMAD(lastValidSamples, warmupMedian);
-        emitViewerCount(count, count - lastEmittedCount);
-        return;
-      }
-    }
-    
-    console.debug(`[TT:GUARD] ✗ Rejected: outlier (${count}, median=${warmupMedian}, MAD=${warmupMAD})`);
-    return;
-  }
-  
-  // Rate limiting: max 2Hz
-  if (now - lastEmittedAt < TT_CONFIG.EMIT_MIN_INTERVAL_MS) {
-    console.debug('[TT:GUARD] ⏱ Throttled');
-    return;
-  }
-  
-  // Accept & emit
-  console.debug(`[TT:GUARD] ✓ Accepted: ${count}`);
-  lastValidSamples.push(count);
-  if (lastValidSamples.length > 3) lastValidSamples.shift();
-  emitViewerCount(count, count - lastEmittedCount);
-}
-
 function emitViewerCount(count, delta) {
   const now = Date.now();
-  lastEmittedCount = count;
-  lastEmittedAt = now;
   currentViewerCount = count;
+  lastSentCount = count;
+  lastSentAt = now;
   
   const payload = {
     type: 'VIEWER_COUNT_UPDATE',
@@ -548,7 +378,7 @@ function emitViewerCount(count, delta) {
   };
   
   safeSendMessage(payload);
-  console.log(`[VIEWER:PAGE] ${platform} viewer count: ${count} (${delta >= 0 ? '+' : ''}${delta})`);
+  console.log(`[VIEWER:PAGE] value=${count}`);
 }
 
 // ============================================================================
