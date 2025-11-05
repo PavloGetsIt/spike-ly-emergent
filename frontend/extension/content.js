@@ -381,13 +381,13 @@ function parseViewerCount(textOrElement) {
   return result !== null ? result : 0;
 }
 
-// Persistent port with hardened MV3 reconnection
+// Hardened MV3 port lifecycle with auto-reconnect
 let viewerCountPort = null;
 let portRetryAttempts = 0;
 let portReconnectTimer = null;
 const MAX_PORT_RETRIES = 5;
 
-// Initialize persistent port connection with auto-reconnect
+// Initialize persistent port connection with enhanced lifecycle management
 function initializeViewerCountPort() {
   try {
     if (viewerCountPort) {
@@ -401,32 +401,35 @@ function initializeViewerCountPort() {
     viewerCountPort = chrome.runtime.connect({ name: 'viewer-count-port' });
     portRetryAttempts = 0;
     
+    // All ports must register port.onDisconnect with auto-reconnect
     viewerCountPort.onDisconnect.addListener(() => {
-      console.log('[VIEWER:PAGE] Port disconnected, auto-reconnecting...');
+      console.log('[VIEWER:PAGE] port disconnected, reconnecting...');
       viewerCountPort = null;
       
-      // Auto-reconnect with exponential backoff
+      // Auto-reconnect with exponential backoff (max 5 attempts)
       if (portRetryAttempts < MAX_PORT_RETRIES) {
         portRetryAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, portRetryAttempts - 1), 5000);
+        const delay = Math.min(1000 * Math.pow(2, portRetryAttempts - 1), 8000);
         
         if (portReconnectTimer) clearTimeout(portReconnectTimer);
         portReconnectTimer = setTimeout(() => {
           initializeViewerCountPort();
         }, delay);
       } else {
-        console.log('[VIEWER:PAGE] Max port retries reached, using fallback messaging');
+        console.log('[VIEWER:PAGE] port max retries reached, fallback mode');
+        portRetryAttempts = 0; // Reset for future attempts
       }
     });
     
-    console.log('[VIEWER:PAGE] Port connected successfully');
+    console.log('[VIEWER:PAGE] port connected');
   } catch (error) {
-    console.log('[VIEWER:PAGE] Port connection failed:', error.message);
+    // Never throw raw errors on disconnect
+    console.log('[VIEWER:PAGE] port connection failed:', error.message);
     viewerCountPort = null;
   }
 }
 
-// Enhanced safe message sender with persistent port + fallback
+// Enhanced safe message sender - never throws raw errors
 function safeSendMessage(payload) {
   try {
     // Try persistent port first
@@ -435,7 +438,10 @@ function safeSendMessage(payload) {
         viewerCountPort.postMessage(payload);
         return;
       } catch (error) {
-        console.log('[VIEWER:PAGE] Port send failed, falling back:', error.message);
+        // Don't log expected disconnection errors
+        if (!error.message.includes('disconnected') && !error.message.includes('closed')) {
+          console.log('[VIEWER:PAGE] port send failed:', error.message);
+        }
         viewerCountPort = null;
       }
     }
@@ -444,17 +450,18 @@ function safeSendMessage(payload) {
     if (chrome?.runtime?.id) {
       chrome.runtime.sendMessage(payload, (response) => {
         if (chrome.runtime.lastError) {
-          // Don't log expected errors during reload/context invalidation
           const errorMsg = chrome.runtime.lastError.message;
+          // Only log unexpected errors
           if (!errorMsg.includes('Extension context invalidated') && 
-              !errorMsg.includes('Could not establish connection')) {
-            console.log('[VIEWER:PAGE] Runtime message error:', errorMsg);
+              !errorMsg.includes('Could not establish connection') &&
+              !errorMsg.includes('disconnected')) {
+            console.log('[VIEWER:PAGE] runtime message error:', errorMsg);
           }
         }
       });
     }
   } catch (error) {
-    // Silent fail for context invalidation during page reload
+    // Silent fail for context invalidation
   }
 }
 
