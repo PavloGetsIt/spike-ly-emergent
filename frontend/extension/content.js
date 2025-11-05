@@ -35,19 +35,27 @@ function detectPlatform() {
   return 'unknown';
 }
 
-// Platform-specific selectors (SIMPLIFIED - back to working basics)
+// Platform-specific selectors (ENHANCED - comprehensive fallback chain)
 const PLATFORM_SELECTORS = {
   tiktok: [
-    // Target the "Viewers • 2.1K" format specifically
-    '*:has-text("Viewers")',
-    '[class*="viewer"]',
+    // Modern TikTok Live selectors (2025)
+    '[data-e2e="live-audience-count"]',
     '[data-e2e*="viewer"]',
-    '.P4-Regular.text-UIText3', // Original working selector
-    'div:has(> span.inline-flex.justify-center)', // Original working selector
+    '[data-e2e*="audience"]',
+    '[class*="LiveAudience"]',
+    '[class*="AudienceCount"]',
+    '[class*="ViewerCount"]',
     
-    // Generic fallbacks
-    'span:has-text(/^\d+\.?\d*[KM]?$/)',
-    'div:has-text(/^\d+\.?\d*[KM]?$/)'
+    // Legacy selectors
+    '.P4-Regular.text-UIText3',
+    'div:has(> span.inline-flex.justify-center)',
+    '[class*="viewer"]',
+    
+    // Generic fallbacks by text content
+    'span:contains("viewers")',
+    'div:contains("viewers")',
+    '[aria-label*="viewer"]',
+    '[aria-label*="watching"]'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
