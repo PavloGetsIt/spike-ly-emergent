@@ -821,15 +821,14 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      console.debug('[VC:SP:RX] VIEWER_COUNT_UPDATE', { count: message.count, delta: message.delta });
+      console.log('[VIEWER:SP] VIEWER_COUNT_UPDATE received:', { count: message.count, delta: message.delta });
       // Fall through to VIEWER_COUNT handler
     case 'VIEWER_COUNT':
-      console.debug('[VC:SP:RX] VIEWER_COUNT', { count: message.count, delta: message.delta });
-      console.log('[Spikely Side Panel] VIEWER_COUNT payload:', { count: message.count, delta: message.delta });
+      console.log('[VIEWER:SP] VIEWER_COUNT received:', { count: message.count, delta: message.delta, source: message.source });
       
       // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
       if (message.source === 'initial_instant') {
-        console.log('[SIDEPANEL] ⚡ Initial count received INSTANTLY:', message.count);
+        console.log('[VIEWER:SP] ⚡ Initial count received INSTANTLY:', message.count);
         firstCountReceived = true;
         isInWarmup = false;
         updateEngineStatus('IDLE', {});
