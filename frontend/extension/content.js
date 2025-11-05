@@ -988,7 +988,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       startTracking();
     }
-    console.debug('[VC:CT:ACK] STARTED', { platform, isTracking: true });
+    console.log('[VIEWER:PAGE] ✅ START_TRACKING received', { platform, isTracking: true });
     sendResponse({ type: 'ACK_START', platform, isTracking: true });
   } else if (message.type === 'STOP_TRACKING') {
     stopTracking();
@@ -999,7 +999,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'GET_STATUS') {
     sendResponse({ isTracking, platform, currentCount: currentViewerCount });
   } else if (message.type === 'PING') {
-    console.debug('[VC:CT:ACK] PONG', { platform });
+    console.log('[VIEWER:PAGE] PING received', { platform });
     sendResponse({ type: 'PONG', platform, isReady: true });
   }
   // All responses above are synchronous; no need to return true.
