@@ -103,7 +103,7 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Spikely Chrome Extension - Priority One UI/UX Fixes
+  Spikely Chrome Extension - Priority One UI/UX Fixes + Backend API Testing
   
   The user requested completion of all Priority One UI/UX fixes for the Spikely Chrome extension side panel.
   These fixes address critical visual and clarity issues identified in the UI verification report:
@@ -115,8 +115,16 @@ user_problem_statement: |
   5. Minor Alignment Issues - Vertical misalignments in control panel
   6. Top Actions Timestamps - "(0s)" format unusual, need relative time
   
+  Backend API Testing Request:
+  Test the FastAPI backend server and verify:
+  1. Basic server health (GET /api/)
+  2. Claude integration (POST /api/generate-insight)
+  3. CORS configuration for Chrome extensions
+  4. MongoDB connectivity
+  5. API key validation (ANTHROPIC_API_KEY)
+  
   Priority: HIGH - Complete UI/UX fixes before correlation engine work
-  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, CSS
+  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, CSS, FastAPI, MongoDB
 
 frontend:
   - task: "CSS Cache Busting + Inline Critical Animations"
