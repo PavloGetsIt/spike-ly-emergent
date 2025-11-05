@@ -123,7 +123,7 @@ try {
 
 console.log(`[Spikely] Detected platform: ${platform}`);
 
-// Enhanced TikTok viewer node detection with comprehensive fallback chain
+// Enhanced TikTok viewer node detection with 2025 selectors
 function queryViewerNode() {
   // Reuse if still in DOM
   if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
@@ -133,28 +133,41 @@ function queryViewerNode() {
   
   if (platform === 'tiktok') {
     
-    // ENHANCED STRATEGY 1: Modern data-e2e selectors first
-    console.log('[VIEWER:PAGE] 🎯 Strategy 1: Modern data-e2e selectors...');
+    // STRATEGY 1: Modern TikTok 2025 selectors
+    console.log('[VIEWER:PAGE] 🎯 Strategy 1: Modern TikTok selectors...');
     
     const modernSelectors = [
+      // TikTok Live 2025 selectors
       '[data-e2e="live-audience-count"]',
       '[data-e2e*="viewer"]',
       '[data-e2e*="audience"]',
       '[class*="LiveAudience"]',
       '[class*="AudienceCount"]',
-      '[class*="ViewerCount"]'
+      '[class*="ViewerCount"]',
+      '[class*="live-audience"]',
+      
+      // Alternative modern patterns
+      'span[class*="viewer"]:not([class*="avatar"])',
+      'div[class*="viewer"]:not([class*="avatar"])',
+      '[aria-label*="viewer"]',
+      '[aria-label*="watching"]'
     ];
     
     for (const selector of modernSelectors) {
       try {
         const elements = document.querySelectorAll(selector);
+        console.log(`[VIEWER:PAGE] Testing selector "${selector}" - found ${elements.length} elements`);
+        
         for (const element of elements) {
-          const parsed = normalizeAndParse(element);
-          if (parsed !== null && parsed > 0) {
-            console.log('[VIEWER:PAGE] ✅ SUCCESS: Modern selector:', selector, '→', parsed);
-            cachedViewerEl = element;
-            cachedContainer = element.closest('div, section, header') || element.parentElement;
-            return element;
+          const text = element.textContent?.trim();
+          if (text && /^\d+(\.\d+)?[KkMm]?$/.test(text)) {
+            const parsed = normalizeAndParse(element);
+            if (parsed !== null && parsed > 0) {
+              console.log('[VIEWER:PAGE] ✅ SUCCESS: Modern selector:', selector, '→', text, '→', parsed);
+              cachedViewerEl = element;
+              cachedContainer = element.closest('div, section, header') || element.parentElement;
+              return element;
+            }
           }
         }
       } catch (e) {
@@ -162,58 +175,62 @@ function queryViewerNode() {
       }
     }
     
-    // ENHANCED STRATEGY 2: "Viewers • X.XK" pattern matching
-    console.log('[VIEWER:PAGE] 🎯 Strategy 2: "Viewers •" pattern matching...');
+    // STRATEGY 2: Text pattern matching for "Viewers • X.XK"
+    console.log('[VIEWER:PAGE] 🎯 Strategy 2: Text pattern matching...');
     
-    const textElements = Array.from(document.querySelectorAll('span, div, p, strong'));
+    const textElements = Array.from(document.querySelectorAll('span, div, p, strong, label'));
     for (const element of textElements) {
       const text = element.textContent?.trim() || '';
       
-      // Look for "Viewers • 2.1K" or similar patterns
-      if ((text.includes('Viewers') && text.includes('•')) || 
-          (text.includes('viewers') && text.match(/\d/))) {
-        console.log('[VIEWER:PAGE] 🎯 Found viewer text element:', text);
+      // Pattern 1: "Viewers • 2.1K" or "viewers • 150"
+      if (/viewers?\s*[•·]\s*[\d\.,]+[KkMm]?/i.test(text)) {
+        console.log('[VIEWER:PAGE] 🎯 Found "Viewers •" pattern:', text);
         
-        // Extract the number part
-        const match = text.match(/(?:viewers?|watching)[^\d]*([0-9]+(?:\.[0-9]+)?[KkMm]?)/i);
+        const match = text.match(/viewers?\s*[•·]\s*([\d\.,]+[KkMm]?)/i);
         if (match) {
-          const countText = match[1];
+          const countText = match[1].replace(/,/g, '');
           const parsed = normalizeAndParse(countText);
           
-          console.log('[VIEWER:PAGE] ✅ SUCCESS: Pattern match:', countText, '→', parsed);
+          if (parsed > 0) {
+            console.log('[VIEWER:PAGE] ✅ SUCCESS: Text pattern match:', countText, '→', parsed);
+            cachedViewerEl = element;
+            cachedContainer = element.closest('div, section, header') || element.parentElement;
+            return element;
+          }
+        }
+      }
+      
+      // Pattern 2: "X watching" or "X viewers"
+      if (/^\d+[\.,\d]*[KkMm]?\s+(watching|viewers?)$/i.test(text)) {
+        const match = text.match(/^([\d\.,]+[KkMm]?)\s+(watching|viewers?)$/i);
+        if (match) {
+          const countText = match[1].replace(/,/g, '');
+          const parsed = normalizeAndParse(countText);
           
           if (parsed > 0) {
-            // Create a virtual element wrapper for text-based matches
-            const virtualElement = { 
-              textContent: countText,
-              innerHTML: countText,
-              classList: { contains: () => false },
-              parentElement: element.parentElement,
-              closest: (sel) => element.closest(sel)
-            };
-            
-            cachedViewerEl = virtualElement;
+            console.log('[VIEWER:PAGE] ✅ SUCCESS: "X watching" pattern:', countText, '→', parsed);
+            cachedViewerEl = element;
             cachedContainer = element.closest('div, section, header') || element.parentElement;
-            return virtualElement;
+            return element;
           }
         }
       }
     }
     
-    // ENHANCED STRATEGY 3: Contextual number scanning
+    // STRATEGY 3: Contextual number scanning (last resort)
     console.log('[VIEWER:PAGE] 🎯 Strategy 3: Contextual number scanning...');
     
     const numberElements = Array.from(document.querySelectorAll('span, div')).filter(el => {
       const text = el.textContent?.trim() || '';
-      return /^\d+\.?\d*[KkMm]?$/.test(text) && text.length <= 8;
+      return /^\d+[\.,\d]*[KkMm]?$/.test(text) && text.length <= 8;
     });
     
     for (const element of numberElements) {
-      const text = element.textContent.trim();
+      const text = element.textContent.trim().replace(/,/g, '');
       const parsed = normalizeAndParse(text);
       
       if (parsed > 100) { // Only consider numbers > 100 as potential viewer counts
-        // Check parent/sibling context for viewer-related keywords
+        // Check surrounding context for viewer-related keywords
         const context = [
           element.parentElement?.textContent?.toLowerCase() || '',
           element.previousElementSibling?.textContent?.toLowerCase() || '',
@@ -221,10 +238,10 @@ function queryViewerNode() {
           element.closest('div')?.textContent?.toLowerCase() || ''
         ].join(' ');
         
-        if (context.includes('viewer') || context.includes('watching') || 
-            context.includes('live') || context.includes('audience')) {
-          
-          console.log('[VIEWER:PAGE] ✅ SUCCESS: Contextual match:', text, '→', parsed);
+        const hasViewerContext = /\b(viewer|watching|live|audience|online|count)\b/.test(context);
+        
+        if (hasViewerContext) {
+          console.log('[VIEWER:PAGE] ✅ SUCCESS: Contextual number match:', text, '→', parsed);
           console.log('[VIEWER:PAGE] Context:', context.substring(0, 100));
           
           cachedViewerEl = element;
