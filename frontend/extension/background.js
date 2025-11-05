@@ -163,46 +163,47 @@ async function stopTrackingOnAllTabs() {
   }
 }
 
-// Listen for persistent port connections from content scripts
+// Enhanced port connection handler with cached value flushing
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'viewer-count-port') {
-    console.log('[VIEWER:BG] Content script connected via port');
+    console.log('[VIEWER:BG] port connected');
     
-    // Flush cached viewer value on new connection
+    // Flush cached last viewer value on reconnect
     if (lastViewer && lastViewer.count !== undefined) {
-      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (cached on connect)`);
+      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (cached flush)`);
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT',
         platform: lastViewer.platform,
         count: lastViewer.count,
         delta: lastViewer.delta,
         timestamp: Date.now(),
-        source: 'cached_on_connect'
+        source: 'cached_flush'
       }, () => { 
         if (chrome.runtime.lastError) {
-          console.log('[VIEWER:BG] Side panel not open for cached value');
+          // Side panel may not be open
         }
       });
     }
+    
+    // All ports must register port.onDisconnect
+    port.onDisconnect.addListener(() => {
+      console.log('[VIEWER:BG] port disconnected');
+      // No action needed - content script will auto-reconnect
+    });
     
     port.onMessage.addListener((message) => {
       // Handle port messages same as runtime messages
       handleViewerCountMessage(message, { tab: port.sender?.tab }, () => {});
     });
-    
-    port.onDisconnect.addListener(() => {
-      console.log('[VIEWER:BG] Content script port disconnected');
-    });
   }
 });
 
-// Enhanced viewer count message handler with caching and forwarding
+// Streamlined viewer count message handler
 function handleViewerCountMessage(message, sender, sendResponse) {
-  // Handle both instant VIEWER_COUNT and regular VIEWER_COUNT_UPDATE messages
   if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
-    console.log(`[VIEWER:BG] forwarded=${message.count} (${message.type})`);
+    console.log(`[VIEWER:BG] forwarded=${message.count}`);
     
-    // Cache last viewer stats
+    // Cache last viewer value for reconnections
     lastViewer = {
       platform: message.platform,
       count: message.count,
@@ -211,7 +212,6 @@ function handleViewerCountMessage(message, sender, sendResponse) {
       tabId: sender.tab?.id || null,
     };
     
-    // Remember the last livestream tab id for audio capture
     if (sender.tab?.id) {
       lastLiveTabId = sender.tab.id;
     }
@@ -233,7 +233,7 @@ function handleViewerCountMessage(message, sender, sendResponse) {
       }));
     }
 
-    // Forward to extension pages (e.g., side panel)
+    // Forward to sidepanel
     chrome.runtime.sendMessage({
       type: 'VIEWER_COUNT',
       platform: message.platform,
@@ -243,7 +243,7 @@ function handleViewerCountMessage(message, sender, sendResponse) {
       source: message.source
     }, () => { 
       if (chrome.runtime.lastError) {
-        // Don't log - side panel may not be open
+        // Side panel may not be open
       }
     });
 
