@@ -624,87 +624,53 @@ function updateSystemStatus(status) {
   }
 }
 
-// Update engine status - Enhanced with better DOM checking
-function updateEngineStatus(status, meta = {}) {
-  console.debug('[VIEWER:SP] updateEngineStatus called:', status, meta);
+// Fixed updateEngineStatus to use correct DOM elements from HTML
+function updateEngineStatus(status, data = {}) {
+  // Use the actual DOM elements that exist in the HTML
+  const systemStatusBadge = document.getElementById('systemStatusBadge');
+  const insightContent = document.getElementById('insightContent');
   
-  // Wait for DOM if not ready
-  const engineStatus = document.getElementById('engineStatus');
-  const engineStatusText = document.getElementById('engineStatusText');
-  const statusLatency = document.getElementById('statusLatency');
-  const statusSource = document.getElementById('statusSource');
-  const statusReason = document.getElementById('statusReason');
-  const statusSpinner = document.querySelector('.status-spinner');
-  
-  console.debug('[VIEWER:SP] DOM elements:', {
-    engineStatus: !!engineStatus,
-    engineStatusText: !!engineStatusText,
-    statusLatency: !!statusLatency,
-    statusSource: !!statusSource,
-    statusReason: !!statusReason,
-    statusSpinner: !!statusSpinner
+  console.log('[VIEWER:SP] updateEngineStatus called:', status, {
+    systemStatusBadge: !!systemStatusBadge,
+    insightContent: !!insightContent
   });
   
-  if (!engineStatus || !engineStatusText) {
-    console.warn('[VIEWER:SP] Required DOM elements not found for updateEngineStatus!');
-    // Retry after a short delay if DOM not ready
-    setTimeout(() => {
-      updateEngineStatus(status, meta);
-    }, 100);
+  if (!systemStatusBadge) {
+    console.warn('[VIEWER:SP] systemStatusBadge element not found for updateEngineStatus!');
     return;
   }
   
+  // Update system status badge in header
   if (status === 'IDLE') {
-    engineStatus.style.display = 'none';
-    return;
+    systemStatusBadge.textContent = '🔴 IDLE';
+    systemStatusBadge.className = 'system-status status-idle';
+  } else if (status === 'TRACKING' || status === 'COLLECTING') {
+    systemStatusBadge.textContent = '🟡 TRACKING';
+    systemStatusBadge.className = 'system-status status-tracking';
+  } else if (status === 'ANALYZING') {
+    systemStatusBadge.textContent = '🟠 ANALYZING';
+    systemStatusBadge.className = 'system-status status-analyzing';
+  } else if (status === 'ERROR') {
+    systemStatusBadge.textContent = '🔴 ERROR';
+    systemStatusBadge.className = 'system-status status-error';
   }
   
-  engineStatus.style.display = 'block';
-  
-  const statusMap = {
-    COLLECTING: { text: 'Collecting...', showSpinner: true },
-    CORRELATING: { text: 'Correlating...', showSpinner: true },
-    AI_CALLING: { text: 'AI Analyzing...', showSpinner: true },
-    AI_FALLBACK: { text: 'Using Fallback...', showSpinner: true },
-    SUCCESS: { text: 'Complete', showSpinner: false },
-    FAILED: { text: 'Failed', showSpinner: false }
-  };
-  
-  const config = statusMap[status];
-  if (config) {
-    engineStatusText.textContent = config.text;
-    if (statusSpinner) {
-      statusSpinner.style.display = config.showSpinner ? 'block' : 'none';
-    }
+  // Update insight content if status affects it
+  if (insightContent && status === 'COLLECTING' && data.reason) {
+    const collectingHtml = `
+      <div class="insight-empty">
+        <svg class="empty-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.3-4.3"></path>
+        </svg>
+        <p class="empty-title">Collecting data...</p>
+        <p class="empty-subtitle">${data.reason || 'Waiting for viewer changes'}</p>
+      </div>
+    `;
+    insightContent.innerHTML = collectingHtml;
   }
   
-  if (meta.latencyMs && statusLatency) {
-    statusLatency.textContent = `${meta.latencyMs}ms`;
-    statusLatency.style.display = 'inline-block';
-  } else if (statusLatency) {
-    statusLatency.style.display = 'none';
-  }
-  
-  if (meta.source && statusSource) {
-    statusSource.textContent = meta.source;
-    statusSource.className = `source-badge source-${meta.source.toLowerCase()}`;
-    statusSource.style.display = 'inline-block';
-  } else if (statusSource) {
-    statusSource.style.display = 'none';
-  }
-  
-  if (status === 'FAILED' && meta.reason && statusReason) {
-    statusReason.textContent = meta.reason;
-    statusReason.style.display = 'block';
-  } else if (statusReason) {
-    statusReason.style.display = 'none';
-  }
-  
-  if (status === 'SUCCESS') {
-    setTimeout(() => {
-      if (engineStatus) engineStatus.style.display = 'none';
-    }, 3000);
-  }
+  console.log('[VIEWER:SP] Status updated to:', status);
 }
 
 // Start cooldown timer
