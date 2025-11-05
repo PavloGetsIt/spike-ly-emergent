@@ -109,14 +109,18 @@ def test_2_cors_configuration():
         print_info(f"Allow-Methods: {cors_headers['access-control-allow-methods']}")
         print_info(f"Allow-Headers: {cors_headers['access-control-allow-headers']}")
         
-        if cors_headers["access-control-allow-origin"] == "*":
-            print_success("CORS is configured to allow all origins (including Chrome extensions)")
+        # Check if CORS allows the Chrome extension origin
+        # Server can respond with either "*" or echo the requesting origin
+        allow_origin = cors_headers.get("access-control-allow-origin", "")
+        
+        if allow_origin == "*" or "chrome-extension://" in allow_origin:
+            print_success("CORS is configured to allow Chrome extension origins")
             test_results["passed"].append("CORS Configuration")
             return True
         else:
-            print_warning("CORS may not allow Chrome extension origins")
-            test_results["warnings"].append("CORS Configuration - May not allow Chrome extensions")
-            return True
+            print_error("CORS does not allow Chrome extension origins")
+            test_results["failed"].append("CORS Configuration - Chrome extensions blocked")
+            return False
             
     except requests.exceptions.RequestException as e:
         print_error(f"CORS test failed: {str(e)}")
