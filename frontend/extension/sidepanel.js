@@ -618,10 +618,11 @@ function updateSystemStatus(status) {
   }
 }
 
-// Update engine status
+// Update engine status - Enhanced with better DOM checking
 function updateEngineStatus(status, meta = {}) {
-  console.debug('[SIDEPANEL] updateEngineStatus called:', status, meta);
+  console.debug('[VIEWER:SP] updateEngineStatus called:', status, meta);
   
+  // Wait for DOM if not ready
   const engineStatus = document.getElementById('engineStatus');
   const engineStatusText = document.getElementById('engineStatusText');
   const statusLatency = document.getElementById('statusLatency');
@@ -629,7 +630,7 @@ function updateEngineStatus(status, meta = {}) {
   const statusReason = document.getElementById('statusReason');
   const statusSpinner = document.querySelector('.status-spinner');
   
-  console.debug('[SIDEPANEL] DOM elements:', {
+  console.debug('[VIEWER:SP] DOM elements:', {
     engineStatus: !!engineStatus,
     engineStatusText: !!engineStatusText,
     statusLatency: !!statusLatency,
@@ -639,7 +640,11 @@ function updateEngineStatus(status, meta = {}) {
   });
   
   if (!engineStatus || !engineStatusText) {
-    console.warn('[SIDEPANEL] Required DOM elements not found!');
+    console.warn('[VIEWER:SP] Required DOM elements not found for updateEngineStatus!');
+    // Retry after a short delay if DOM not ready
+    setTimeout(() => {
+      updateEngineStatus(status, meta);
+    }, 100);
     return;
   }
   
