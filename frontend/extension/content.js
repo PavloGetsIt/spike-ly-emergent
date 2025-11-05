@@ -1033,8 +1033,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // All responses above are synchronous; no need to return true.
 });
 
-// Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[VIEWER:PAGE] Content script loaded - Version 2.1.0-LVT-FIX');
+// Content script loaded - initialize port and wait for START_TRACKING
+console.log('[VIEWER:PAGE] Content script loaded - Version 2.1.1-LVT-HARDENED');
 
 // Run parser validation tests
 validateParserFix();
@@ -1042,23 +1042,26 @@ validateParserFix();
 // Initialize port connection (but don't start tracking yet)
 initializeViewerCountPort();
 
-// Stop timers cleanly on navigation to avoid context errors
-window.addEventListener('pagehide', () => { 
-  try { 
+// Enhanced cleanup on navigation to prevent port leaks
+function cleanup() {
+  try {
     stopTracking();
     if (viewerCountPort) {
       viewerCountPort.disconnect();
       viewerCountPort = null;
     }
-  } catch (_) {} 
-});
-window.addEventListener('beforeunload', () => { 
-  try { 
-    stopTracking();
-    if (viewerCountPort) {
-      viewerCountPort.disconnect();
-      viewerCountPort = null;
+    if (portReconnectTimer) {
+      clearTimeout(portReconnectTimer);
+      portReconnectTimer = null;
     }
-  } catch (_) {} 
-});
+    if (mutationRetryTimer) {
+      clearTimeout(mutationRetryTimer);
+      mutationRetryTimer = null;
+    }
+  } catch (_) {}
+}
+
+window.addEventListener('pagehide', cleanup);
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('unload', cleanup);
 })();
