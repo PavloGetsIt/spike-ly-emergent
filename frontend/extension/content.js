@@ -472,41 +472,7 @@ function handleMutation() {
 }
 
 // ============================================================================
-// SPA Navigation Detection & Recovery
-// ============================================================================
-function detectNavigation() {
-  const currentPathname = window.location.pathname;
-  if (currentPathname !== lastPathname) {
-    console.debug(`[TT:NAV] Route change detected: ${lastPathname} → ${currentPathname}`);
-    lastPathname = currentPathname;
-    
-    // Tear down observer
-    if (domObserver) {
-      try { domObserver.disconnect(); } catch (_) {}
-      domObserver = null;
-    }
-    
-    // Clear cached nodes
-    cachedViewerEl = null;
-    cachedContainer = null;
-    
-    // Restart warm-up after brief delay
-    setTimeout(() => {
-      if (isTracking) {
-        startWarmup();
-        const node = queryViewerNode();
-        if (node) setupMutationObserver();
-      }
-    }, 500);
-  }
-}
-
-
-// ============================================================================
-// Start Tracking (Initialize Warm-Up + Observer)
-// ============================================================================
-// ============================================================================
-// SIMPLIFIED TRACKING SYSTEM (removed complex warm-up logic)
+// SIMPLIFIED TRACKING SYSTEM
 // ============================================================================
 function startTracking() {
   if (isTracking) {
@@ -603,48 +569,34 @@ function detectViewerCount() {
   return null;
 }
 
-// Listen for commands from background script
+// ============================================================================
+// MESSAGE LISTENERS
+// ============================================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_TRACKING') {
     if (message?.reset) {
-      resetTracking();
-    } else {
-      startTracking();
+      stopTracking();
     }
-    console.log('[VIEWER:PAGE] ✅ START_TRACKING received', { platform, isTracking: true });
+    startTracking();
     sendResponse({ type: 'ACK_START', platform, isTracking: true });
   } else if (message.type === 'STOP_TRACKING') {
     stopTracking();
     sendResponse({ success: true });
-  } else if (message.type === 'RESET_TRACKING') {
-    resetTracking();
-    sendResponse({ success: true, platform });
-  } else if (message.type === 'GET_STATUS') {
-    sendResponse({ isTracking, platform, currentCount: currentViewerCount });
   } else if (message.type === 'PING') {
-    console.log('[VIEWER:PAGE] PING received', { platform });
+    console.log('[VIEWER:PAGE] ping received');
     sendResponse({ type: 'PONG', platform, isReady: true });
   }
-  // All responses above are synchronous; no need to return true.
 });
 
-// Content script loaded - initialize port and wait for START_TRACKING
-console.log('[VIEWER:PAGE] Content script loaded - Version 2.1.1-LVT-HARDENED');
+// ============================================================================
+// INITIALIZATION & CLEANUP
+// ============================================================================
+console.log('[VIEWER:PAGE] content script loaded - v2.2.0-CLEAN');
 
-// Run parser validation tests
-validateParserFix();
-
-// Initialize port connection (but don't start tracking yet)
-initializeViewerCountPort();
-
-// Enhanced cleanup on navigation to prevent port leaks
+// Enhanced cleanup on navigation
 function cleanup() {
   try {
     stopTracking();
-    if (viewerCountPort) {
-      viewerCountPort.disconnect();
-      viewerCountPort = null;
-    }
     if (portReconnectTimer) {
       clearTimeout(portReconnectTimer);
       portReconnectTimer = null;
@@ -659,4 +611,5 @@ function cleanup() {
 window.addEventListener('pagehide', cleanup);
 window.addEventListener('beforeunload', cleanup);
 window.addEventListener('unload', cleanup);
+
 })();
