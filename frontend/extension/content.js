@@ -760,13 +760,16 @@ function detectNavigation() {
 // ============================================================================
 function startTracking() {
   if (isTracking) {
-    console.debug('[VC:INIT] Already tracking, ignoring duplicate START');
+    console.debug('[VIEWER:PAGE] Already tracking, ignoring duplicate START');
     return;
   }
   
   isTracking = true;
-  console.debug('[VC:INIT] startTracking() invoked', { platform, isTracking: true });
-  console.log('[Spikely] Starting viewer count tracking...');
+  console.debug('[VIEWER:PAGE] startTracking() invoked', { platform, isTracking: true });
+  console.log('[VIEWER:PAGE] Starting viewer count tracking...');
+  
+  // Initialize persistent port for reliable messaging
+  initializeViewerCountPort();
   
   // TikTok: Use warm-up + observer with retry loop for node discovery
   if (platform === 'tiktok') {
@@ -779,7 +782,7 @@ function startTracking() {
       if (node) {
         const testParse = normalizeAndParse(node);
         if (testParse !== null) {
-          console.debug('[VC:READY] Viewer node found', { 
+          console.debug('[VIEWER:PAGE] ✅ Viewer node found', { 
             cached: !!cachedViewerEl, 
             retries: retryCount,
             initialValue: testParse 
@@ -794,7 +797,7 @@ function startTracking() {
               timestamp: Date.now(),
               source: 'initial_instant'
             });
-            console.log(`[VC:INSTANT] ⚡ Sent initial count immediately: ${testParse} (no warm-up wait)`);
+            console.log(`[VIEWER:PAGE] ⚡ Sent initial count immediately: ${testParse} (no warm-up wait)`);
           }
           
           // Setup observer first
