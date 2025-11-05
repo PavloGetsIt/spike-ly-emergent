@@ -343,6 +343,8 @@ async function sendToHumeAI(audioSamples) {
         console.log('[Offscreen] ✅ Hume analysis accepted');
       }
     });
+    
+    attemptHumeMessage(); // Start the attempt chain
   } catch (error) {
     console.error('[Offscreen] ❌ Hume preparation error:', error);
     humeCooldownUntil = Date.now() + 5000;
