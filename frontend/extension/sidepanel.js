@@ -826,6 +826,10 @@ function handleMessage(message) {
       }
       
       updateViewerCount(message.count, message.delta || 0);
+      
+      // Update status to TRACKING when we receive viewer data
+      updateEngineStatus('TRACKING', {});
+      
       break;
     case 'TRANSCRIPT':
       // Forward transcript through WebSocket to webapp
