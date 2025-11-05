@@ -527,6 +527,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
           }
           
+          // CONTEXT GUARD: Only call tabCapture in background script
+          if (typeof chrome.tabCapture === 'undefined') {
+            throw new Error('tabCapture API not available in this context');
+          }
+          
           // Get stream ID for offscreen
           const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
           
