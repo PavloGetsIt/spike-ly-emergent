@@ -802,14 +802,16 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      console.log(`[VIEWER:SP] rendered=${message.count} (UPDATE)`);
+      console.log(`[VIEWER:SP] rendered=${message.count}`);
       // Fall through to VIEWER_COUNT handler
     case 'VIEWER_COUNT':
-      console.log(`[VIEWER:SP] rendered=${message.count} (${message.source || 'direct'})`);
+      console.log(`[VIEWER:SP] rendered=${message.count}`);
       
-      // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
-      if (message.source === 'initial_instant' || message.source === 'cached_on_connect') {
-        console.log(`[VIEWER:SP] rendered=${message.count} (INSTANT: ${message.source})`);
+      // Handle instant modes (initial, cached flush, etc)
+      if (message.source === 'initial_instant' || 
+          message.source === 'cached_flush' || 
+          message.source === 'cached_on_connect') {
+        console.log(`[VIEWER:SP] rendered=${message.count} (instant: ${message.source})`);
         firstCountReceived = true;
         isInWarmup = false;
         updateEngineStatus('TRACKING', {});
@@ -817,18 +819,16 @@ function handleMessage(message) {
         break;
       }
       
-      // Handle warm-up phase UI (for subsequent updates)
+      // Handle normal updates
       if (isSystemStarted && message.count === 0 && !firstCountReceived) {
         updateEngineStatus('COLLECTING', { reason: 'Waiting for viewer changes...' });
       } else {
-        // Normal viewer count update
         firstCountReceived = true;
         isInWarmup = false;
         updateEngineStatus('TRACKING', {});
       }
       
       updateViewerCount(message.count, message.delta || 0);
-      
       break;
     case 'TRANSCRIPT':
       // Forward transcript through WebSocket to webapp
