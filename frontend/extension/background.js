@@ -478,15 +478,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             console.debug('[AUDIO:BG:CAPTURE] Attempt #' + attempt);
             
-            // CONTEXT GUARD: Only call tabCapture in background script
+            // Enhanced MV3 audio capture with proper fallback
             if (typeof chrome.tabCapture === 'undefined') {
-              throw new Error('tabCapture API not available in this context');
+              throw new Error('tabCapture API not available - use getDisplayMedia fallback');
             }
             
-            stream = await chrome.tabCapture.capture({
-              audio: true,
-              video: false
-            });
+            // Try modern captureOffscreenTab if available
+            if (chrome.tabCapture.captureOffscreenTab) {
+              stream = await chrome.tabCapture.captureOffscreenTab(tabId, {
+                audio: true,
+                video: false
+              });
+            } else {
+              // Fallback to legacy capture
+              stream = await chrome.tabCapture.capture({
+                audio: true,
+                video: false
+              });
+            }
             
             if (stream && stream.getAudioTracks().length > 0) {
               console.debug('[AUDIO:BG:READY] Audio stream active', { 
