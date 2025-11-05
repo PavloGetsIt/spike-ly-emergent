@@ -324,25 +324,27 @@ function startTimestampUpdater() {
  * Ensures DOM is ready before initializing tooltips and animations
  */
 function initializeUIFeatures() {
-  const MAX_RETRIES = 5;
-  const RETRY_DELAY = 200; // ms
+  const MAX_RETRIES = 10;
   let retryCount = 0;
   
   function attemptInit() {
-    console.log(`[UI:INIT] Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+    console.log(`[VIEWER:SP] DOM initialization attempt ${retryCount + 1}/${MAX_RETRIES}`);
     
     // Check if critical DOM elements are present
     const requiredElements = [
       document.getElementById('viewerDelta'),
       document.getElementById('viewerCount'),
       document.getElementById('thresholdBadgeGray'),
-      document.getElementById('startAudioBtn')
+      document.getElementById('startAudioBtn'),
+      document.getElementById('engineStatus'),
+      document.getElementById('engineStatusText')
     ];
     
-    const allPresent = requiredElements.every(el => el !== null);
+    const missing = requiredElements.map((el, i) => el ? null : ['viewerDelta', 'viewerCount', 'thresholdBadgeGray', 'startAudioBtn', 'engineStatus', 'engineStatusText'][i]).filter(Boolean);
+    const allPresent = missing.length === 0;
     
     if (allPresent) {
-      console.log('[UI:INIT] All required DOM elements found');
+      console.log('[VIEWER:SP] ✅ All required DOM elements found');
       
       // Setup tooltips
       setupTooltips();
@@ -357,22 +359,56 @@ function initializeUIFeatures() {
       // Start timestamp updater
       startTimestampUpdater();
       
-      console.log('[UI:INIT] ✅ Initialization complete');
+      // Try to get latest viewer data from background
+      requestLatestViewerData();
+      
+      console.log('[VIEWER:SP] ✅ UI initialization complete');
       return true;
     } else {
-      console.warn('[UI:INIT] Some DOM elements not ready yet');
-      retryCount++;
+      console.log(`[VIEWER:SP] ❌ Missing DOM elements: ${missing.join(', ')}`);
       
+      retryCount++;
       if (retryCount < MAX_RETRIES) {
-        setTimeout(attemptInit, RETRY_DELAY);
+        const delay = Math.min(200 * retryCount, 2000); // Exponential backoff, max 2s
+        console.log(`[VIEWER:SP] Retrying in ${delay}ms...`);
+        setTimeout(attemptInit, delay);
       } else {
-        console.error('[UI:INIT] ❌ Failed after maximum retries');
+        console.error('[VIEWER:SP] ❌ Failed to initialize after max retries - DOM elements not found!');
+        
+        // Show error in UI if possible
+        try {
+          const errorDiv = document.createElement('div');
+          errorDiv.style.cssText = 'color: red; padding: 10px; text-align: center; font-size: 12px;';
+          errorDiv.textContent = 'UI initialization failed - required elements not found';
+          document.body.appendChild(errorDiv);
+        } catch (e) {
+          console.error('[VIEWER:SP] Cannot even show error message');
+        }
       }
       return false;
     }
   }
   
   attemptInit();
+}
+
+// Request latest viewer data from background on side panel open
+function requestLatestViewerData() {
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_LATEST_VIEWER' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.debug('[VIEWER:SP] Could not get latest viewer data:', chrome.runtime.lastError.message);
+        return;
+      }
+      
+      if (response?.viewer) {
+        console.log('[VIEWER:SP] Received latest viewer data:', response.viewer);
+        updateViewerCount(response.viewer.count, response.viewer.delta);
+      }
+    });
+  } catch (error) {
+    console.debug('[VIEWER:SP] Failed to request latest viewer data:', error);
+  }
 }
 
 // =============================================================
