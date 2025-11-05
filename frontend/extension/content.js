@@ -665,7 +665,7 @@ function emitViewerCount(count, delta) {
   };
   
   safeSendMessage(payload);
-  console.log(`[Spikely] ${platform} viewer count: ${count} (${delta >= 0 ? '+' : ''}${delta})`);
+  console.log(`[VIEWER:PAGE] ${platform} viewer count: ${count} (${delta >= 0 ? '+' : ''}${delta})`);
 }
 
 // ============================================================================
