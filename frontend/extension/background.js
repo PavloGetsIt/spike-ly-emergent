@@ -339,62 +339,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }, () => { void chrome.runtime.lastError; });
       }
     });
-  } else if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
-    // Handle both instant VIEWER_COUNT and regular VIEWER_COUNT_UPDATE messages
-    const messageTypeName = message.type;
-    
-    // Log synthetic test messages
-    if (message.source === 'test_trigger') {
-      console.log('[TEST:INSIGHT:BG:RX]', { count: message.count, delta: message.delta, source: message.source });
-    }
-    
-    console.debug(`[VC:BG:RX] ${messageTypeName}`, { 
-      count: message.count, 
-      delta: message.delta, 
-      platform: message.platform,
-      source: message.source 
-    });
-    
-    // Remember last viewer stats for late-opened side panels
-    lastViewer = {
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.timestamp,
-      tabId: sender.tab?.id || null,
-    };
-    // Remember the last livestream tab id to use for audio capture
-    if (sender.tab?.id) {
-      lastLiveTabId = sender.tab.id;
-    }
-
-    // Add to correlation engine
-    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.timestamp);
-
-    // Forward to web app via WebSocket
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'VIEWER_COUNT',
-        platform: message.platform,
-        count: message.count,
-        delta: message.delta ?? 0,
-        timestamp: message.timestamp,
-        rawText: message.rawText,
-        confidence: message.confidence,
-        tabId: sender.tab?.id
-      }));
-    }
-
-    // Also broadcast to extension pages (e.g., side panel)
-    console.debug('[VC:BG:TX] VIEWER_COUNT', { count: message.count, delta: message.delta ?? 0 });
-    chrome.runtime.sendMessage({
-      type: 'VIEWER_COUNT',
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.timestamp
-    }, () => { void chrome.runtime.lastError; });
-
   } else if (message.type === 'START_TRACKING_ACTIVE_TAB' || message.type === 'STOP_TRACKING_ACTIVE_TAB' || message.type === 'RESET_TRACKING_ACTIVE_TAB') {
     (async () => {
       try {
