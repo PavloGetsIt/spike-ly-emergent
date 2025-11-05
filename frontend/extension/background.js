@@ -249,13 +249,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }, () => { void chrome.runtime.lastError; });
       }
     });
-  } else if (message.type === 'VIEWER_COUNT_UPDATE') {
+  } else if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
+    // Handle both instant VIEWER_COUNT and regular VIEWER_COUNT_UPDATE messages
+    const messageTypeName = message.type;
+    
     // Log synthetic test messages
     if (message.source === 'test_trigger') {
       console.log('[TEST:INSIGHT:BG:RX]', { count: message.count, delta: message.delta, source: message.source });
     }
     
-    console.debug('[VC:BG:RX] VIEWER_COUNT_UPDATE', { count: message.count, delta: message.delta, platform: message.platform });
+    console.debug(`[VC:BG:RX] ${messageTypeName}`, { 
+      count: message.count, 
+      delta: message.delta, 
+      platform: message.platform,
+      source: message.source 
+    });
     
     // Remember last viewer stats for late-opened side panels
     lastViewer = {
