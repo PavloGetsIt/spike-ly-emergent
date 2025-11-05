@@ -8,21 +8,27 @@
   } catch (_) {}
 
 // ============================================================================
-// TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
+// SPIKELY CONTENT SCRIPT - CLEAN MODULAR VIEWER DETECTION  
 // ============================================================================
-const TT_CONFIG = {
-  WARMUP_MS: 500,                     // Warm-up duration (REDUCED from 1500ms for instant display)
-  WARMUP_MIN_TICKS: 1,                // Minimum mutation ticks (REDUCED from 3 for speed)
-  EMIT_MIN_INTERVAL_MS: 500,          // Rate limit: emit at most every 500ms (2Hz)
-  MAX_REASONABLE_VIEWERS: 500000,     // Range guard upper bound
-  OUTLIER_SIGMA: 5,                   // Outlier detection: median ± 5*MAD
-  MUTATION_DEBOUNCE_MS: 100,          // Debounce mutation observer (REDUCED from 200ms)
-  NODE_RESELECT_TIMEOUT_MS: 2500,     // Re-run selector if no samples after 2.5s
-  STUCK_WARNING_TIMEOUT_MS: 3000,     // Emit "OBSERVING" status if stuck (REDUCED from 5000ms)
-  ZERO_GATE_CONSECUTIVE: 2,           // Require 2 consecutive zeros
-  ZERO_GATE_DURATION_MS: 1000,        // Over at least 1s duration
-  CONSECUTIVE_OVERRIDE: 2,            // Accept outlier if 2 consecutive samples agree
-  CONSECUTIVE_TOLERANCE: 50           // Within 50 viewers
+
+(function(){
+  try {
+    if (window.__SPIKELY_CONTENT_ACTIVE__) {
+      console.log('[Spikely] Content script already initialized - skipping reinjection');
+      return;
+    }
+    window.__SPIKELY_CONTENT_ACTIVE__ = true;
+  } catch (_) {}
+
+// Configuration
+const CONFIG = {
+  POLL_INTERVAL_MS: 800,
+  HEARTBEAT_INTERVAL_MS: 5000, 
+  MUTATION_DEBOUNCE_MS: 100,
+  PORT_RETRY_MAX: 5,
+  PORT_RETRY_DELAY_BASE: 1000,
+  LOG_THROTTLE_MS: 15000,
+  VIEWER_MIN_THRESHOLD: 100
 };
 
 // Platform detection
@@ -30,81 +36,62 @@ function detectPlatform() {
   const hostname = window.location.hostname;
   if (hostname.includes('tiktok.com')) return 'tiktok';
   if (hostname.includes('twitch.tv')) return 'twitch';
-  if (hostname.includes('kick.com')) return 'kick';
+  if (hostname.includes('kick.com')) return 'kick';  
   if (hostname.includes('youtube.com')) return 'youtube';
   return 'unknown';
 }
 
-// Platform-specific selectors (ENHANCED - comprehensive fallback chain)
+const platform = detectPlatform();
+
+// Platform-specific selectors
 const PLATFORM_SELECTORS = {
   tiktok: [
-    // Modern TikTok Live selectors (2025)
-    '[data-e2e="live-audience-count"]',
-    '[data-e2e*="viewer"]',
-    '[data-e2e*="audience"]',
-    '[class*="LiveAudience"]',
+    '[data-e2e="live-room-viewers"]',
+    '[data-testid="live-room-viewers"]',
+    '[data-e2e*="live-audience"]', 
+    '[data-e2e*="viewer-count"]',
+    '[data-testid*="viewer"]',
+    '[class*="LiveViewerCount"]',
     '[class*="AudienceCount"]',
-    '[class*="ViewerCount"]',
-    
-    // Legacy selectors
     '.P4-Regular.text-UIText3',
     'div:has(> span.inline-flex.justify-center)',
-    '[class*="viewer"]',
-    
-    // Generic fallbacks by text content
-    'span:contains("viewers")',
-    'div:contains("viewers")',
-    '[aria-label*="viewer"]',
-    '[aria-label*="watching"]'
+    '[class*="viewer"]'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
     '.live-indicator-container span',
-    'p[data-test-selector="viewer-count"]',
+    'p[data-test-selector="viewer-count"]'
   ],
   kick: [
     '[class*="viewer-count"]',
     '[class*="ViewerCount"]',
-    'div[class*="stats"] span:first-child',
+    'div[class*="stats"] span:first-child'
   ],
   youtube: [
     'span.ytp-live-badge + span',
-    '.ytp-live .ytp-time-current',
-    'ytd-video-primary-info-renderer #count',
+    '.ytp-live .ytp-time-current', 
+    'ytd-video-primary-info-renderer #count'
   ]
 };
 
+// State variables
 let currentViewerCount = 0;
 let detectionInterval = null;
 let isTracking = false;
 let lastSentCount = 0;
 let lastSentAt = 0;
-const platform = detectPlatform();
-
-// Cached element + DOM observer to survive SPA/DOM changes
 let cachedViewerEl = null;
 let cachedContainer = null;
 let domObserver = null;
+let lastNotFoundLog = 0;
 
-// Warm-up state
-let warmupSamples = [];
-let warmupStartTime = 0;
-let warmupMutationTicks = 0;
-let isWarmupComplete = false;
-let warmupReselectTimer = null;
-let warmupStuckTimer = null;
-
-// Post-warm-up validation state
-let warmupMedian = 0;
-let warmupMAD = 0;
-let lastValidSamples = [];
-let lastEmittedCount = 0;
-let lastEmittedAt = 0;
-let lastZeroAt = 0;
-let consecutiveZeros = 0;
-
-// Navigation tracking
-let lastPathname = window.location.pathname;
+// Port management
+let viewerCountPort = null;
+let portRetryAttempts = 0;
+let portReconnectTimer = null;
+let mutationRetryCount = 0;
+let mutationRetryTimer = null;
+let mutationDebounceTimer = null;
 
 // Silence noisy unhandled rejections when extension reloads
 try {
