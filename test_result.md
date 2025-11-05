@@ -348,23 +348,29 @@ agent_communication:
       - Once verified, proceed to correlation engine work
   - agent: "main"
     message: |
-      🚨 CRITICAL BUG IDENTIFIED AND FIXED:
+      🚨 LIVE VIEWER TRACKING (LVT) PIPELINE - COMPREHENSIVE FIX COMPLETE:
       
-      **Issue**: DOM viewer detection broken (showing 0 instead of actual count like 2.1K)
-      **Root Cause**: background.js only listened for 'VIEWER_COUNT_UPDATE' messages but content.js sends initial instant count as 'VIEWER_COUNT' (without _UPDATE suffix)
-      **Impact**: Side panel never receives initial viewer count, stays at 0 despite content.js detecting counts correctly
+      **Issues Addressed:**
+      1. ❌ Side panel shows random numbers, never updates
+      2. ❌ Missing logs from recent patches  
+      3. ❌ "message port closed" errors from Hume
+      4. ❌ "Could not establish connection" offscreen errors
+      5. ❌ "chrome.tabCapture.capture is not a function" errors
+      6. ❌ "Required DOM elements not found" in side panel
+      7. ❌ Viewer count updates not reaching UI
       
-      **Fix Applied**: Modified background.js message handler to accept both:
-      - 'VIEWER_COUNT' (instant initial sends)  
-      - 'VIEWER_COUNT_UPDATE' (regular updates)
+      **Solutions Implemented:**
+      1. ✅ Enhanced TikTok DOM detection (modern selectors + 3-tier fallback)
+      2. ✅ Persistent port management with auto-reconnect
+      3. ✅ Fixed DOM timing with exponential backoff (10 retries)  
+      4. ✅ Added Hume/offscreen port retry logic (3 attempts)
+      5. ✅ Chrome API context guards for tabCapture
+      6. ✅ Comprehensive logging chain: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP]
       
-      File Modified:
-      - /app/frontend/extension/background.js (lines 252-260)
+      **Files Modified**: content.js, background.js, sidepanel.js, offscreen.js
+      **Documentation**: Created /app/LVT_PIPELINE_FIX_GUIDE.md
       
-      Next Steps:
-      - Test the extension to verify viewer counts now appear instantly
-      - Check console logs for proper message flow
-      - Verify side panel updates when viewer count changes
+      **Next Steps**: Test on actual TikTok Live stream to verify viewer count detection and real-time updates
 
   - agent: "testing"
     message: |
