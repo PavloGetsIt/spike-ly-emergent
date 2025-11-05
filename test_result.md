@@ -215,6 +215,18 @@ frontend:
         agent: "main"
         comment: "CSS already contains comprehensive alignment fixes for threshold controls, audio controls, viewer row, and consistent button heights (36px). All elements properly aligned."
 
+  - task: "Critical DOM Viewer Count Detection Fix"
+    implemented: true
+    working: false
+    file: "/app/frontend/extension/background.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "main"
+        comment: "CRITICAL BUG FIXED: background.js only handled 'VIEWER_COUNT_UPDATE' but content.js sends instant initial count as 'VIEWER_COUNT'. Modified handler to accept both message types. This should fix viewer count staying at 0 instead of showing actual count (2.1K). NEEDS TESTING."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
