@@ -324,23 +324,24 @@ function startTimestampUpdater() {
  * Ensures DOM is ready before initializing tooltips and animations
  */
 function initializeUIFeatures() {
-  const MAX_RETRIES = 10;
+  const MAX_RETRIES = 5; // Reduced from 10 to prevent infinite loops
   let retryCount = 0;
   
   function attemptInit() {
     console.log(`[VIEWER:SP] DOM initialization attempt ${retryCount + 1}/${MAX_RETRIES}`);
     
-    // Check if critical DOM elements are present
+    // Check if critical DOM elements are present - USING CORRECT IDs FROM HTML
     const requiredElements = [
       document.getElementById('viewerDelta'),
       document.getElementById('viewerCount'),
       document.getElementById('thresholdBadgeGray'),
       document.getElementById('startAudioBtn'),
-      document.getElementById('engineStatus'),
-      document.getElementById('engineStatusText')
+      document.getElementById('systemStatusBadge'), // This exists in HTML
+      document.getElementById('insightContent') // This exists in HTML
     ];
     
-    const missing = requiredElements.map((el, i) => el ? null : ['viewerDelta', 'viewerCount', 'thresholdBadgeGray', 'startAudioBtn', 'engineStatus', 'engineStatusText'][i]).filter(Boolean);
+    const elementNames = ['viewerDelta', 'viewerCount', 'thresholdBadgeGray', 'startAudioBtn', 'systemStatusBadge', 'insightContent'];
+    const missing = requiredElements.map((el, i) => el ? null : elementNames[i]).filter(Boolean);
     const allPresent = missing.length === 0;
     
     if (allPresent) {
@@ -369,20 +370,25 @@ function initializeUIFeatures() {
       
       retryCount++;
       if (retryCount < MAX_RETRIES) {
-        const delay = Math.min(200 * retryCount, 2000); // Exponential backoff, max 2s
+        const delay = Math.min(200 * retryCount, 1000); // Exponential backoff, max 1s
         console.log(`[VIEWER:SP] Retrying in ${delay}ms...`);
         setTimeout(attemptInit, delay);
       } else {
-        console.error('[VIEWER:SP] ❌ Failed to initialize after max retries - DOM elements not found!');
+        console.error('[VIEWER:SP] ❌ Failed to initialize after max retries - some DOM elements missing');
+        console.error(`[VIEWER:SP] Missing elements: ${missing.join(', ')}`);
         
-        // Show error in UI if possible
+        // Initialize with available elements only - don't block the whole UI
+        console.log('[VIEWER:SP] Proceeding with partial initialization...');
         try {
-          const errorDiv = document.createElement('div');
-          errorDiv.style.cssText = 'color: red; padding: 10px; text-align: center; font-size: 12px;';
-          errorDiv.textContent = 'UI initialization failed - required elements not found';
-          document.body.appendChild(errorDiv);
+          if (document.getElementById('viewerDelta') && document.getElementById('viewerCount')) {
+            setupTooltips();
+          }
+          if (document.getElementById('systemStatusBadge')) {
+            console.log('[VIEWER:SP] Status badge available for updates');
+          }
+          requestLatestViewerData();
         } catch (e) {
-          console.error('[VIEWER:SP] Cannot even show error message');
+          console.error('[VIEWER:SP] Partial initialization failed:', e);
         }
       }
       return false;
