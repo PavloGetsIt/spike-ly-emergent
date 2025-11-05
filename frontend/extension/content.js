@@ -123,21 +123,20 @@ try {
 
 console.log(`[Spikely] Detected platform: ${platform}`);
 
-// Multi-tier TikTok viewer detection with 2025 selectors
+// Enhanced TikTok viewer detection with dynamic node re-querying
 function queryViewerNode() {
-  // Reuse if still in DOM
-  if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
+  // Always re-query the node (do not store static reference for ephemeral DOM)
+  cachedViewerEl = null;
 
-  console.log('[VIEWER:PAGE] 🔍 Starting TikTok viewer detection...');
-  
   if (platform === 'tiktok') {
     
-    // TIER 1: Modern TikTok Live 2025 selectors
+    // TIER 1: Enhanced 2025 TikTok selectors
     const tier1Selectors = [
       '[data-e2e="live-room-viewers"]',
-      '[data-testid="live-viewers-count"]',
+      '[data-testid="live-room-viewers"]',
       '[data-e2e*="live-audience"]',
       '[data-e2e*="viewer-count"]',
+      '[data-testid*="viewer"]',
       '[class*="LiveViewerCount"]',
       '[class*="AudienceCount"]'
     ];
@@ -147,50 +146,49 @@ function queryViewerNode() {
       for (const element of elements) {
         const parsed = normalizeAndParse(element);
         if (parsed !== null && parsed > 0) {
-          console.log(`[VIEWER:PAGE] value=${parsed} (tier1: ${selector})`);
+          console.log(`[VIEWER:PAGE] value=${parsed}`);
           cachedViewerEl = element;
-          cachedContainer = element.closest('div[data-e2e*="live"], section, header') || element.parentElement;
+          cachedContainer = element.closest('div[data-e2e*="live"], section, [class*="live"]') || element.parentElement;
           return element;
         }
       }
     }
     
-    // TIER 2: Aria-label regex search
-    const ariaElements = document.querySelectorAll('[aria-label*="viewer"], [aria-label*="watching"], [aria-label*="audience"]');
+    // TIER 2: Aria-label with enhanced regex
+    const ariaElements = document.querySelectorAll('[aria-label*="view"], [aria-label*="watching"], [aria-label*="audience"]');
     for (const element of ariaElements) {
       const ariaLabel = element.getAttribute('aria-label');
       if (ariaLabel) {
-        // Extract number from aria-label like "2.1K viewers watching"
-        const match = ariaLabel.match(/([\d,]+(?:\.[\d]+)?[KkMm]?)\s*(?:viewer|watching|audience)/i);
+        // Extract number with enhanced regex: [0-9,\.KM]+
+        const match = ariaLabel.match(/([0-9,]+(?:\.[0-9]+)?[KkMm]?)/);
         if (match) {
           const countText = match[1].replace(/,/g, '');
           const parsed = normalizeAndParse(countText);
           if (parsed !== null && parsed > 0) {
-            console.log(`[VIEWER:PAGE] value=${parsed} (aria-label: ${ariaLabel})`);
+            console.log(`[VIEWER:PAGE] value=${parsed}`);
             cachedViewerEl = element;
-            cachedContainer = element.closest('div[data-e2e*="live"], section, header') || element.parentElement;
+            cachedContainer = element.closest('div[data-e2e*="live"], section, [class*="live"]') || element.parentElement;
             return element;
           }
         }
       }
     }
     
-    // TIER 3: Container traversal for numeric text
-    const containers = document.querySelectorAll('div[data-e2e*="live"], section[class*="live"], header[class*="live"]');
-    for (const container of containers) {
+    // TIER 3: Widget container traversal (find smallest container)
+    const widgetContainers = document.querySelectorAll('div[data-e2e*="live"], section[class*="live"], [class*="viewer-info"]');
+    for (const container of widgetContainers) {
       const numberSpans = container.querySelectorAll('span, div, strong');
       for (const span of numberSpans) {
         const text = span.textContent?.trim();
-        if (text && /^\d+(\.\d+)?[KkMm]?$/.test(text)) {
-          // Check if this number is in viewer context
+        if (text && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(text)) {
           const containerText = container.textContent.toLowerCase();
           if (containerText.includes('viewer') || containerText.includes('watching') || 
               containerText.includes('audience') || containerText.includes('live')) {
             const parsed = normalizeAndParse(text);
-            if (parsed !== null && parsed > 100) { // Must be > 100 for viewer count
-              console.log(`[VIEWER:PAGE] value=${parsed} (container traversal)`);
+            if (parsed !== null && parsed > 100) {
+              console.log(`[VIEWER:PAGE] value=${parsed}`);
               cachedViewerEl = span;
-              cachedContainer = container;
+              cachedContainer = container; // Use widget container for observation
               return span;
             }
           }
@@ -198,33 +196,10 @@ function queryViewerNode() {
       }
     }
     
-    // TIER 4: Shadow root / mount container fallback
-    const shadowHosts = document.querySelectorAll('*');
-    for (const host of shadowHosts) {
-      if (host.shadowRoot) {
-        const shadowElements = host.shadowRoot.querySelectorAll('[aria-label*="viewer"], span, div');
-        for (const element of shadowElements) {
-          const text = element.textContent?.trim() || element.getAttribute('aria-label');
-          if (text) {
-            const match = text.match(/([\d,]+(?:\.[\d]+)?[KkMm]?)/);
-            if (match) {
-              const parsed = normalizeAndParse(match[1].replace(/,/g, ''));
-              if (parsed !== null && parsed > 100) {
-                console.log(`[VIEWER:PAGE] value=${parsed} (shadow-root)`);
-                cachedViewerEl = element;
-                cachedContainer = host;
-                return element;
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    // Throttled "not found" logging (max 1 per 10s)
+    // Throttled "not found" logging (max 1 per 15s)
     const now = Date.now();
-    if (now - lastNotFoundLog > 10000) {
-      console.log('[VIEWER:PAGE] value=0 (no elements found)');
+    if (now - lastNotFoundLog > 15000) {
+      console.log('[VIEWER:PAGE] node missing (throttled warning)');
       lastNotFoundLog = now;
     }
     
