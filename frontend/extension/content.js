@@ -252,61 +252,24 @@ let lastNotFoundLog = 0;
   return null;
 }
 
-// Legacy alias for non-TikTok platforms
-function findViewerElement() {
-  return queryViewerNode();
-}
-
-
 // ============================================================================
-// Robust Text Normalization & Parsing (with K/M suffix support)
+// ROBUST TEXT NORMALIZATION & PARSING
 // ============================================================================
 function normalizeAndParse(textOrElement) {
   if (!textOrElement) return null;
   
-  // Handle Element objects (TikTok split-digit format)
-  if (textOrElement instanceof Element) {
-    const el = textOrElement;
-
-    // Try split-digit parsing first (TikTok renders each digit separately)
-    let best = null;
-    const digitSpans = el.querySelectorAll('span.inline-flex.justify-center');
-    if (digitSpans.length > 0) {
-      const digits = Array.from(digitSpans)
-        .map(span => span.textContent.trim())
-        .join('')
-        .replace(/[·\s,]/g, '');
-
-      const suffixMatch = (el.textContent || '').toLowerCase().match(/([km])/);
-      // FIX: Use parseFloat instead of parseInt to preserve decimals (1.2K → 1200, not 1000)
-      let parsed = parseFloat(digits);
-      if (!isNaN(parsed) && parsed > 0) {
-        if (suffixMatch?.[1] === 'k') parsed *= 1000;
-        if (suffixMatch?.[1] === 'm') parsed *= 1000000;
-        // Round to nearest integer for final count
-        best = Math.round(parsed);
-        console.debug(`[TT:PARSE] Split-digit: "${digits}" + suffix "${suffixMatch?.[1] || 'none'}" → ${best}`);
-      }
-    }
-
-    // Also try full text parse
-    const fullText = (el.textContent || '').trim().toLowerCase();
-    const fullParsed = parseTextToCount(fullText);
-    
-    return best !== null ? best : fullParsed;
-  }
-  
-  // Handle string text
-  return parseTextToCount(String(textOrElement));
-}
-
-function parseTextToCount(text) {
-  const cleaned = text.toLowerCase().replace(/[\s,·]/g, '');
-  const match = cleaned.match(/([\d.]+)([km])?/);
-  if (!match) {
-    console.debug(`[TT:PARSE] ✗ No match: "${text}"`);
+  let text;
+  if (typeof textOrElement === 'string') {
+    text = textOrElement;
+  } else if (textOrElement.textContent) {
+    text = textOrElement.textContent.trim();
+  } else {
     return null;
   }
+  
+  const cleaned = text.toLowerCase().replace(/[\s,]/g, '');
+  const match = cleaned.match(/([\d.]+)([km])?/);
+  if (!match) return null;
   
   let num = parseFloat(match[1]);
   const suffix = match[2];
@@ -314,65 +277,9 @@ function parseTextToCount(text) {
   if (suffix === 'k') num *= 1000;
   if (suffix === 'm') num *= 1000000;
   
-  // Use Math.round for better accuracy (1.2K → 1200, not 1000)
   const result = Math.round(num);
-  
-  if (!isFinite(result) || isNaN(result) || result < 0) {
-    console.debug(`[TT:PARSE] ✗ Invalid: "${text}" → NaN/Inf/negative`);
-    return null;
-  }
-  
-  console.debug(`[TT:PARSE] ✓ "${text}" → ${result}`);
-  return result;
+  return isFinite(result) && result >= 0 ? result : null;
 }
-
-// Run parser validation tests on load
-function validateParserFix() {
-  const tests = [
-    { input: "953", expected: 953 },
-    { input: "1K", expected: 1000 },
-    { input: "1.0K", expected: 1000 },
-    { input: "1.2K", expected: 1200 },
-    { input: "1.5K", expected: 1500 },
-    { input: "1.9K", expected: 1900 },
-    { input: "15K", expected: 15000 },
-    { input: "15.3K", expected: 15300 },
-    { input: "1M", expected: 1000000 },
-    { input: "1.5M", expected: 1500000 },
-    { input: "1.2m", expected: 1200000 },
-    { input: "2.5k", expected: 2500 }
-  ];
-  
-  console.log('[TT:PARSE] 🧪 Running parser validation tests...');
-  let passed = 0;
-  let failed = 0;
-  
-  tests.forEach(({ input, expected }) => {
-    const result = parseTextToCount(input);
-    if (result === expected) {
-      console.log(`[TT:PARSE] ✅ "${input}" → ${result} (expected ${expected})`);
-      passed++;
-    } else {
-      console.error(`[TT:PARSE] ❌ "${input}" → ${result} (expected ${expected})`);
-      failed++;
-    }
-  });
-  
-  console.log(`[TT:PARSE] 🧪 Test Results: ${passed}/${tests.length} passed, ${failed} failed`);
-  return failed === 0;
-}
-
-// Legacy alias for backward compatibility
-function parseViewerCount(textOrElement) {
-  const result = normalizeAndParse(textOrElement);
-  return result !== null ? result : 0;
-}
-
-// Hardened MV3 port lifecycle with auto-reconnect
-let viewerCountPort = null;
-let portRetryAttempts = 0;
-let portReconnectTimer = null;
-const MAX_PORT_RETRIES = 5;
 
 // Initialize persistent port connection with enhanced lifecycle management
 function initializeViewerCountPort() {
