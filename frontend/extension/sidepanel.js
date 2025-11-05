@@ -1902,46 +1902,6 @@ console.log('[Spikely Side Panel] Initializing...');
 // Don't auto-request viewer data or start polling - wait for user to click Start
 // Everything stays at zero until "Start" is clicked
 
-// Test harness for ENGINE_STATUS rendering
-window.__spikelyTestEngineStatus = function(sequence = ['COLLECTING', 'CORRELATING', 'AI_CALLING', 'SUCCESS', 'IDLE']) {
-  console.log('[TEST] Running ENGINE_STATUS test sequence:', sequence);
-  return new Promise((resolve) => {
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index >= sequence.length) {
-        clearInterval(interval);
-        console.log('[TEST] ENGINE_STATUS test complete');
-        resolve();
-        return;
-      }
-      
-      const status = sequence[index];
-      let meta = {};
-      
-      // Add appropriate meta for each status
-      if (status === 'AI_FALLBACK') {
-        meta = { reason: 'Test fallback' };
-      } else if (status === 'SUCCESS') {
-        meta = { source: 'Test' };
-      } else if (status === 'FAILED') {
-        meta = { reason: 'Test failure' };
-      }
-      
-      console.debug('[TEST:ENGINE_STATUS]', status, meta);
-      updateEngineStatus(status, meta);
-      index++;
-    }, 600);
-  });
-};
-
-// Keyboard shortcut: Alt+E triggers test
-document.addEventListener('keydown', (e) => {
-  if (e.altKey && e.key === 'e') {
-    console.log('[TEST] Alt+E pressed, running engine status test');
-    window.__spikelyTestEngineStatus();
-  }
-});
-
 // Wait for DOM to be ready before initializing
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
