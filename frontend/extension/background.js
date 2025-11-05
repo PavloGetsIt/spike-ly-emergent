@@ -809,19 +809,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
           }
           
-          // Send to offscreen document for Hume AI processing
+          // Send to offscreen document for Hume AI processing with retry logic
           const resp = await new Promise((resolve) => {
-            chrome.runtime.sendMessage({
-              type: 'HUME_ANALYZE_FETCH',
-              audioBase64: message.audioBase64
-            }, (r) => {
-              if (chrome.runtime.lastError) {
-                console.error('[Background] Hume message error:', chrome.runtime.lastError.message);
-                resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
-              } else {
-                resolve(r);
-              }
-            });
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            function attemptSend() {
+              chrome.runtime.sendMessage({
+                type: 'HUME_ANALYZE_FETCH',
+                audioBase64: message.audioBase64
+              }, (r) => {
+                if (chrome.runtime.lastError) {
+                  console.error('[Background] Hume message error (attempt', retryCount + 1, '):', chrome.runtime.lastError.message);
+                  
+                  // Check if it's a "port closed" error and retry
+                  if (chrome.runtime.lastError.message.includes('message port closed') || 
+                      chrome.runtime.lastError.message.includes('Could not establish connection')) {
+                    
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      console.log(`[Background] Retrying Hume message (${retryCount}/${maxRetries}) in 500ms...`);
+                      setTimeout(attemptSend, 500 * retryCount); // Exponential backoff
+                      return;
+                    }
+                  }
+                  
+                  resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
+                } else {
+                  resolve(r);
+                }
+              });
+            }
+            
+            attemptSend();
           });
           
           if (DEBUG_HUME && resp) {
