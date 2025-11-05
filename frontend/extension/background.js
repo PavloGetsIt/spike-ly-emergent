@@ -404,10 +404,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ last: lastViewer });
   } else if (message.type === 'GET_LATEST_VIEWER') {
     // Provide latest viewer data to newly opened side panel
-    sendResponse({ 
-      viewer: lastViewer,
-      success: true 
-    });
+    if (lastViewer && lastViewer.count !== undefined) {
+      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (GET_LATEST_VIEWER)`);
+      sendResponse({ 
+        viewer: lastViewer,
+        success: true 
+      });
+    } else {
+      sendResponse({ 
+        viewer: null,
+        success: false 
+      });
+    }
     return true;
   } else if (message.type === 'GET_CONNECTION_STATUS') {
     sendResponse({ 
