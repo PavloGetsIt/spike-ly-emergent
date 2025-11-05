@@ -163,8 +163,98 @@ async function stopTrackingOnAllTabs() {
   }
 }
 
+// Listen for persistent port connections from content scripts
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'viewer-count-port') {
+    console.log('[VIEWER:BG] Content script connected via port');
+    
+    port.onMessage.addListener((message) => {
+      // Handle port messages same as runtime messages
+      handleViewerCountMessage(message, { tab: port.sender?.tab }, () => {});
+    });
+    
+    port.onDisconnect.addListener(() => {
+      console.log('[VIEWER:BG] Content script port disconnected');
+    });
+  }
+});
+
+// Enhanced viewer count message handler
+function handleViewerCountMessage(message, sender, sendResponse) {
+  // Handle both instant VIEWER_COUNT and regular VIEWER_COUNT_UPDATE messages
+  if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
+    const messageTypeName = message.type;
+    
+    // Log synthetic test messages
+    if (message.source === 'test_trigger') {
+      console.log('[TEST:INSIGHT:BG:RX]', { count: message.count, delta: message.delta, source: message.source });
+    }
+    
+    console.log(`[VIEWER:BG] Received ${messageTypeName}:`, { 
+      count: message.count, 
+      delta: message.delta, 
+      platform: message.platform,
+      source: message.source 
+    });
+    
+    // Remember last viewer stats for late-opened side panels
+    lastViewer = {
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.timestamp,
+      tabId: sender.tab?.id || null,
+    };
+    
+    // Remember the last livestream tab id to use for audio capture
+    if (sender.tab?.id) {
+      lastLiveTabId = sender.tab.id;
+    }
+
+    // Add to correlation engine
+    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.timestamp);
+
+    // Forward to web app via WebSocket
+    if (wsConnection?.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({
+        type: 'VIEWER_COUNT',
+        platform: message.platform,
+        count: message.count,
+        delta: message.delta ?? 0,
+        timestamp: message.timestamp,
+        rawText: message.rawText,
+        confidence: message.confidence,
+        tabId: sender.tab?.id
+      }));
+    }
+
+    // Forward to extension pages (e.g., side panel)
+    console.log('[VIEWER:BG] Forwarding to side panel:', { count: message.count, delta: message.delta ?? 0 });
+    chrome.runtime.sendMessage({
+      type: 'VIEWER_COUNT',
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.timestamp,
+      source: message.source
+    }, () => { 
+      if (chrome.runtime.lastError) {
+        console.debug('[VIEWER:BG] Side panel may not be open:', chrome.runtime.lastError.message);
+      }
+    });
+
+    sendResponse?.({ success: true });
+    return true;
+  }
+}
+
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle viewer count messages
+  if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
+    return handleViewerCountMessage(message, sender, sendResponse);
+  }
+  
   if (message.type === 'POPUP_ACTIVATED') {
     // Track that popup was opened on this tab (grants activeTab permission)
     (async () => {
