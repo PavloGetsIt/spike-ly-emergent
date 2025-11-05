@@ -403,17 +403,21 @@ function requestLatestViewerData() {
   try {
     chrome.runtime.sendMessage({ type: 'GET_LATEST_VIEWER' }, (response) => {
       if (chrome.runtime.lastError) {
-        console.debug('[VIEWER:SP] Could not get latest viewer data:', chrome.runtime.lastError.message);
+        console.log('[VIEWER:SP] Could not get latest viewer data:', chrome.runtime.lastError.message);
         return;
       }
       
-      if (response?.viewer) {
-        console.log('[VIEWER:SP] Received latest viewer data:', response.viewer);
-        updateViewerCount(response.viewer.count, response.viewer.delta);
+      if (response?.success && response.viewer?.count !== undefined) {
+        console.log(`[VIEWER:SP] rendered=${response.viewer.count} (requested on open)`);
+        updateViewerCount(response.viewer.count, response.viewer.delta || 0);
+        updateEngineStatus('TRACKING', {});
+        firstCountReceived = true;
+      } else {
+        console.log('[VIEWER:SP] No cached viewer data available');
       }
     });
   } catch (error) {
-    console.debug('[VIEWER:SP] Failed to request latest viewer data:', error);
+    console.log('[VIEWER:SP] Failed to request latest viewer data:', error.message);
   }
 }
 
