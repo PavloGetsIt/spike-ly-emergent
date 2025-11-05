@@ -407,15 +407,72 @@ function parseViewerCount(textOrElement) {
   return result !== null ? result : 0;
 }
 
-// Utility: safe message sender to avoid "Extension context invalidated"
+// Persistent port for reliable message passing
+let viewerCountPort = null;
+let portRetryAttempts = 0;
+const MAX_PORT_RETRIES = 3;
+
+// Initialize persistent port connection
+function initializeViewerCountPort() {
+  try {
+    if (viewerCountPort) {
+      try {
+        viewerCountPort.disconnect();
+      } catch (e) {
+        // Port already disconnected
+      }
+    }
+    
+    viewerCountPort = chrome.runtime.connect({ name: 'viewer-count-port' });
+    portRetryAttempts = 0;
+    
+    viewerCountPort.onDisconnect.addListener(() => {
+      console.log('[VIEWER:PAGE] Port disconnected, attempting to reconnect...');
+      viewerCountPort = null;
+      
+      if (portRetryAttempts < MAX_PORT_RETRIES) {
+        portRetryAttempts++;
+        setTimeout(() => {
+          initializeViewerCountPort();
+        }, 1000 * portRetryAttempts); // Exponential backoff
+      } else {
+        console.warn('[VIEWER:PAGE] Max port retry attempts reached, falling back to sendMessage');
+      }
+    });
+    
+    console.log('[VIEWER:PAGE] Port initialized successfully');
+  } catch (error) {
+    console.error('[VIEWER:PAGE] Failed to initialize port:', error);
+    viewerCountPort = null;
+  }
+}
+
+// Enhanced safe message sender with port fallback
 function safeSendMessage(payload) {
   try {
+    // First try persistent port
+    if (viewerCountPort) {
+      try {
+        viewerCountPort.postMessage(payload);
+        console.log('[VIEWER:PAGE] Sent via port:', payload.type, payload.count);
+        return;
+      } catch (error) {
+        console.warn('[VIEWER:PAGE] Port send failed, falling back to runtime message:', error);
+        viewerCountPort = null;
+      }
+    }
+    
+    // Fallback to runtime sendMessage
     if (!chrome?.runtime?.id) return;
-    chrome.runtime.sendMessage(payload, () => {
-      void chrome.runtime.lastError; // consume without throwing
+    chrome.runtime.sendMessage(payload, (response) => {
+      if (chrome.runtime.lastError) {
+        console.debug('[VIEWER:PAGE] Runtime message error (expected during reload):', chrome.runtime.lastError.message);
+      } else {
+        console.log('[VIEWER:PAGE] Sent via runtime:', payload.type, payload.count);
+      }
     });
-  } catch (_e) {
-    // ignore context invalidation
+  } catch (error) {
+    console.debug('[VIEWER:PAGE] All message sending failed (extension context may be invalid):', error.message);
   }
 }
 
