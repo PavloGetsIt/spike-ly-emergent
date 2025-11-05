@@ -123,137 +123,119 @@ try {
 
 console.log(`[Spikely] Detected platform: ${platform}`);
 
-// Enhanced TikTok viewer node detection with 2025 selectors
+// Multi-tier TikTok viewer detection with 2025 selectors
 function queryViewerNode() {
   // Reuse if still in DOM
   if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
 
-  console.log('[VIEWER:PAGE] 🔍 Starting TikTok viewer count search...');
-  console.log('[VIEWER:PAGE] 🌐 Current URL:', window.location.href);
+  console.log('[VIEWER:PAGE] 🔍 Starting TikTok viewer detection...');
   
   if (platform === 'tiktok') {
     
-    // STRATEGY 1: Modern TikTok 2025 selectors
-    console.log('[VIEWER:PAGE] 🎯 Strategy 1: Modern TikTok selectors...');
-    
-    const modernSelectors = [
-      // TikTok Live 2025 selectors
-      '[data-e2e="live-audience-count"]',
-      '[data-e2e*="viewer"]',
-      '[data-e2e*="audience"]',
-      '[class*="LiveAudience"]',
-      '[class*="AudienceCount"]',
-      '[class*="ViewerCount"]',
-      '[class*="live-audience"]',
-      
-      // Alternative modern patterns
-      'span[class*="viewer"]:not([class*="avatar"])',
-      'div[class*="viewer"]:not([class*="avatar"])',
-      '[aria-label*="viewer"]',
-      '[aria-label*="watching"]'
+    // TIER 1: Modern TikTok Live 2025 selectors
+    const tier1Selectors = [
+      '[data-e2e="live-room-viewers"]',
+      '[data-testid="live-viewers-count"]',
+      '[data-e2e*="live-audience"]',
+      '[data-e2e*="viewer-count"]',
+      '[class*="LiveViewerCount"]',
+      '[class*="AudienceCount"]'
     ];
     
-    for (const selector of modernSelectors) {
-      try {
-        const elements = document.querySelectorAll(selector);
-        console.log(`[VIEWER:PAGE] Testing selector "${selector}" - found ${elements.length} elements`);
-        
-        for (const element of elements) {
-          const text = element.textContent?.trim();
-          if (text && /^\d+(\.\d+)?[KkMm]?$/.test(text)) {
-            const parsed = normalizeAndParse(element);
-            if (parsed !== null && parsed > 0) {
-              console.log('[VIEWER:PAGE] ✅ SUCCESS: Modern selector:', selector, '→', text, '→', parsed);
-              cachedViewerEl = element;
-              cachedContainer = element.closest('div, section, header') || element.parentElement;
-              return element;
-            }
-          }
-        }
-      } catch (e) {
-        console.debug('[VIEWER:PAGE] Selector failed:', selector, e.message);
-      }
-    }
-    
-    // STRATEGY 2: Text pattern matching for "Viewers • X.XK"
-    console.log('[VIEWER:PAGE] 🎯 Strategy 2: Text pattern matching...');
-    
-    const textElements = Array.from(document.querySelectorAll('span, div, p, strong, label'));
-    for (const element of textElements) {
-      const text = element.textContent?.trim() || '';
-      
-      // Pattern 1: "Viewers • 2.1K" or "viewers • 150"
-      if (/viewers?\s*[•·]\s*[\d\.,]+[KkMm]?/i.test(text)) {
-        console.log('[VIEWER:PAGE] 🎯 Found "Viewers •" pattern:', text);
-        
-        const match = text.match(/viewers?\s*[•·]\s*([\d\.,]+[KkMm]?)/i);
-        if (match) {
-          const countText = match[1].replace(/,/g, '');
-          const parsed = normalizeAndParse(countText);
-          
-          if (parsed > 0) {
-            console.log('[VIEWER:PAGE] ✅ SUCCESS: Text pattern match:', countText, '→', parsed);
-            cachedViewerEl = element;
-            cachedContainer = element.closest('div, section, header') || element.parentElement;
-            return element;
-          }
-        }
-      }
-      
-      // Pattern 2: "X watching" or "X viewers"
-      if (/^\d+[\.,\d]*[KkMm]?\s+(watching|viewers?)$/i.test(text)) {
-        const match = text.match(/^([\d\.,]+[KkMm]?)\s+(watching|viewers?)$/i);
-        if (match) {
-          const countText = match[1].replace(/,/g, '');
-          const parsed = normalizeAndParse(countText);
-          
-          if (parsed > 0) {
-            console.log('[VIEWER:PAGE] ✅ SUCCESS: "X watching" pattern:', countText, '→', parsed);
-            cachedViewerEl = element;
-            cachedContainer = element.closest('div, section, header') || element.parentElement;
-            return element;
-          }
-        }
-      }
-    }
-    
-    // STRATEGY 3: Contextual number scanning (last resort)
-    console.log('[VIEWER:PAGE] 🎯 Strategy 3: Contextual number scanning...');
-    
-    const numberElements = Array.from(document.querySelectorAll('span, div')).filter(el => {
-      const text = el.textContent?.trim() || '';
-      return /^\d+[\.,\d]*[KkMm]?$/.test(text) && text.length <= 8;
-    });
-    
-    for (const element of numberElements) {
-      const text = element.textContent.trim().replace(/,/g, '');
-      const parsed = normalizeAndParse(text);
-      
-      if (parsed > 100) { // Only consider numbers > 100 as potential viewer counts
-        // Check surrounding context for viewer-related keywords
-        const context = [
-          element.parentElement?.textContent?.toLowerCase() || '',
-          element.previousElementSibling?.textContent?.toLowerCase() || '',
-          element.nextElementSibling?.textContent?.toLowerCase() || '',
-          element.closest('div')?.textContent?.toLowerCase() || ''
-        ].join(' ');
-        
-        const hasViewerContext = /\b(viewer|watching|live|audience|online|count)\b/.test(context);
-        
-        if (hasViewerContext) {
-          console.log('[VIEWER:PAGE] ✅ SUCCESS: Contextual number match:', text, '→', parsed);
-          console.log('[VIEWER:PAGE] Context:', context.substring(0, 100));
-          
+    for (const selector of tier1Selectors) {
+      const elements = document.querySelectorAll(selector);
+      for (const element of elements) {
+        const parsed = normalizeAndParse(element);
+        if (parsed !== null && parsed > 0) {
+          console.log(`[VIEWER:PAGE] value=${parsed} (tier1: ${selector})`);
           cachedViewerEl = element;
-          cachedContainer = element.closest('div, section, header') || element.parentElement;
+          cachedContainer = element.closest('div[data-e2e*="live"], section, header') || element.parentElement;
           return element;
         }
       }
     }
     
-    console.log('[VIEWER:PAGE] ❌ All strategies failed - no viewer count found');
+    // TIER 2: Aria-label regex search
+    const ariaElements = document.querySelectorAll('[aria-label*="viewer"], [aria-label*="watching"], [aria-label*="audience"]');
+    for (const element of ariaElements) {
+      const ariaLabel = element.getAttribute('aria-label');
+      if (ariaLabel) {
+        // Extract number from aria-label like "2.1K viewers watching"
+        const match = ariaLabel.match(/([\d,]+(?:\.[\d]+)?[KkMm]?)\s*(?:viewer|watching|audience)/i);
+        if (match) {
+          const countText = match[1].replace(/,/g, '');
+          const parsed = normalizeAndParse(countText);
+          if (parsed !== null && parsed > 0) {
+            console.log(`[VIEWER:PAGE] value=${parsed} (aria-label: ${ariaLabel})`);
+            cachedViewerEl = element;
+            cachedContainer = element.closest('div[data-e2e*="live"], section, header') || element.parentElement;
+            return element;
+          }
+        }
+      }
+    }
+    
+    // TIER 3: Container traversal for numeric text
+    const containers = document.querySelectorAll('div[data-e2e*="live"], section[class*="live"], header[class*="live"]');
+    for (const container of containers) {
+      const numberSpans = container.querySelectorAll('span, div, strong');
+      for (const span of numberSpans) {
+        const text = span.textContent?.trim();
+        if (text && /^\d+(\.\d+)?[KkMm]?$/.test(text)) {
+          // Check if this number is in viewer context
+          const containerText = container.textContent.toLowerCase();
+          if (containerText.includes('viewer') || containerText.includes('watching') || 
+              containerText.includes('audience') || containerText.includes('live')) {
+            const parsed = normalizeAndParse(text);
+            if (parsed !== null && parsed > 100) { // Must be > 100 for viewer count
+              console.log(`[VIEWER:PAGE] value=${parsed} (container traversal)`);
+              cachedViewerEl = span;
+              cachedContainer = container;
+              return span;
+            }
+          }
+        }
+      }
+    }
+    
+    // TIER 4: Shadow root / mount container fallback
+    const shadowHosts = document.querySelectorAll('*');
+    for (const host of shadowHosts) {
+      if (host.shadowRoot) {
+        const shadowElements = host.shadowRoot.querySelectorAll('[aria-label*="viewer"], span, div');
+        for (const element of shadowElements) {
+          const text = element.textContent?.trim() || element.getAttribute('aria-label');
+          if (text) {
+            const match = text.match(/([\d,]+(?:\.[\d]+)?[KkMm]?)/);
+            if (match) {
+              const parsed = normalizeAndParse(match[1].replace(/,/g, ''));
+              if (parsed !== null && parsed > 100) {
+                console.log(`[VIEWER:PAGE] value=${parsed} (shadow-root)`);
+                cachedViewerEl = element;
+                cachedContainer = host;
+                return element;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Throttled "not found" logging (max 1 per 10s)
+    const now = Date.now();
+    if (now - lastNotFoundLog > 10000) {
+      console.log('[VIEWER:PAGE] value=0 (no elements found)');
+      lastNotFoundLog = now;
+    }
+    
     return null;
   }
+
+  return null;
+}
+
+// Add throttling for "not found" logs
+let lastNotFoundLog = 0;
         }
       }
     }
