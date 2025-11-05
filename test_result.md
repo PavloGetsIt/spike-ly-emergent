@@ -257,3 +257,22 @@ agent_communication:
       - Check console logs for initialization
       - Test tooltips, animations, and timestamps
       - Once verified, proceed to correlation engine work
+  - agent: "main"
+    message: |
+      🚨 CRITICAL BUG IDENTIFIED AND FIXED:
+      
+      **Issue**: DOM viewer detection broken (showing 0 instead of actual count like 2.1K)
+      **Root Cause**: background.js only listened for 'VIEWER_COUNT_UPDATE' messages but content.js sends initial instant count as 'VIEWER_COUNT' (without _UPDATE suffix)
+      **Impact**: Side panel never receives initial viewer count, stays at 0 despite content.js detecting counts correctly
+      
+      **Fix Applied**: Modified background.js message handler to accept both:
+      - 'VIEWER_COUNT' (instant initial sends)  
+      - 'VIEWER_COUNT_UPDATE' (regular updates)
+      
+      File Modified:
+      - /app/frontend/extension/background.js (lines 252-260)
+      
+      Next Steps:
+      - Test the extension to verify viewer counts now appear instantly
+      - Check console logs for proper message flow
+      - Verify side panel updates when viewer count changes
