@@ -505,209 +505,102 @@ function detectNavigation() {
 // ============================================================================
 // Start Tracking (Initialize Warm-Up + Observer)
 // ============================================================================
+// ============================================================================
+// SIMPLIFIED TRACKING SYSTEM (removed complex warm-up logic)
+// ============================================================================
 function startTracking() {
   if (isTracking) {
-    console.debug('[VIEWER:PAGE] Already tracking, ignoring duplicate START');
+    console.log('[VIEWER:PAGE] already tracking');
     return;
   }
   
   isTracking = true;
-  console.debug('[VIEWER:PAGE] startTracking() invoked', { platform, isTracking: true });
-  console.log('[VIEWER:PAGE] Starting viewer count tracking...');
+  console.log('[VIEWER:PAGE] tracking started');
   
-  // Initialize persistent port for reliable messaging
+  // Initialize port connection
   initializeViewerCountPort();
   
-  // TikTok: Use warm-up + observer with retry loop for node discovery
   if (platform === 'tiktok') {
-    let retryCount = 0;
-    const maxRetries = 10;
-    
-    const tryDiscoverNode = () => {
-      const node = queryViewerNode();
-      
-      if (node) {
-        const testParse = normalizeAndParse(node);
-        if (testParse !== null) {
-          console.debug('[VIEWER:PAGE] ✅ Viewer node found', { 
-            cached: !!cachedViewerEl, 
-            retries: retryCount,
-            initialValue: testParse 
-          });
-          
-          // ⚡ INSTANT SEND: Send initial value immediately (don't wait for warm-up)
-          if (testParse > 0) {
-            safeSendMessage({
-              type: 'VIEWER_COUNT',
-              count: testParse,
-              delta: 0,
-              timestamp: Date.now(),
-              source: 'initial_instant'
-            });
-            console.log(`[VIEWER:PAGE] ⚡ Sent initial count immediately: ${testParse} (no warm-up wait)`);
-          }
-          
-          // Setup observer first
-          setupMutationObserver();
-          
-          // Force initial DOM read after 100ms to seed warm-up
-          setTimeout(() => {
-            console.debug('[VC:INIT] Forcing initial DOM read');
-            handleMutation();
-          }, 100);
-          
-          // Start warm-up after observer is ready
-          startWarmup();
-          
-          return true; // Success
-        }
+    // Start direct polling for TikTok (800ms cycle)
+    detectionInterval = setInterval(() => {
+      const count = detectViewerCount();
+      if (count !== null && count !== currentViewerCount) {
+        const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
+        emitViewerCount(count, delta);
+        setupMutationObserver(); // Rebind observer to current node
       }
-      
-      // Node not found or invalid, retry
-      retryCount++;
-      if (retryCount <= maxRetries) {
-        console.debug('[VC:INIT] Retry #' + retryCount + ': searching for viewer node...');
-        setTimeout(tryDiscoverNode, 300);
-      } else {
-        // After max retries, keep trying in background (non-blocking)
-        console.warn('[VC:INIT] Node not found after ' + maxRetries + ' attempts, continuing background retries');
-        setTimeout(tryDiscoverNode, 1000);
-      }
-      
-      return false; // Keep retrying
-    };
+    }, CONFIG.POLL_INTERVAL_MS);
     
-    // Start discovery
-    tryDiscoverNode();
-    
-    // SPA navigation detection
-    if (detectionInterval) clearInterval(detectionInterval);
-    detectionInterval = setInterval(detectNavigation, 1000);
-    
-    // Heartbeat: re-emit every 5s for panel sync
+    // Heartbeat every 5s even if unchanged
     setInterval(() => {
-      if (isTracking && lastEmittedCount > 0) {
-        const now = Date.now();
-        if (now - lastEmittedAt > 5000) {
-          emitViewerCount(lastEmittedCount, 0);
-        }
+      if (isTracking && currentViewerCount > 0) {
+        safeSendMessage({
+          type: 'VIEWER_HEARTBEAT',
+          platform,
+          count: currentViewerCount,
+          timestamp: Date.now()
+        });
       }
-    }, 5000);
+    }, CONFIG.HEARTBEAT_INTERVAL_MS);
     
-    return;
-  }
-  
-  // Non-TikTok platforms: Use legacy polling
-  if (detectionInterval) return;
-  
-  detectionInterval = setInterval(() => {
-    try {
-      let element = (cachedViewerEl && document.contains(cachedViewerEl))
-        ? cachedViewerEl
-        : findViewerElement();
-      if (element && element !== cachedViewerEl) cachedViewerEl = element;
-
-      if (element) {
-        const count = parseViewerCount(element);
-        const text = element.textContent?.trim() || '';
-
-        let shouldSend = false;
-        let delta = 0;
-
-        if (count > 0) {
-          if (count !== currentViewerCount) {
-            const previousCount = currentViewerCount;
-            currentViewerCount = count;
-            delta = previousCount > 0 ? count - previousCount : 0;
-            shouldSend = true;
-          } else if (Date.now() - lastSentAt > 5000) {
-            delta = 0;
-            shouldSend = true;
-          }
-        }
-
-        if (shouldSend) {
-          const payload = {
-            type: 'VIEWER_COUNT_UPDATE',
-            platform,
-            count,
-            delta,
-            timestamp: Date.now(),
-            rawText: text,
-            confidence: 1.0
-          };
-
-          safeSendMessage(payload);
-          lastSentAt = Date.now();
-          lastSentCount = count;
-
-          console.log(`[Spikely] ${platform} viewer count: ${count} (${delta >= 0 ? '+' : ''}${delta})`);
-        }
-      } else if (Date.now() % 10000 < 100) {
-        console.warn('[Spikely] No viewer count element found');
-      }
-    } catch (_e) {
-      // Never let polling crash
+    // Try initial detection
+    const initialCount = detectViewerCount();
+    if (initialCount !== null && initialCount > 0) {
+      emitViewerCount(initialCount, 0);
+      setupMutationObserver();
     }
-  }, 500);
+  } else {
+    // Non-TikTok platforms: simplified polling
+    detectionInterval = setInterval(() => {
+      const element = queryViewerNode();
+      if (element) {
+        const count = normalizeAndParse(element);
+        if (count !== null && count !== currentViewerCount) {
+          const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
+          emitViewerCount(count, delta);
+        }
+      }
+    }, CONFIG.POLL_INTERVAL_MS);
+  }
 }
 
 function stopTracking() {
-  console.debug('[VC:CT:STOP] stopTracking invoked');
+  if (!isTracking) return;
+  isTracking = false;
+  
+  console.log('[VIEWER:PAGE] tracking stopped');
+  
   if (detectionInterval) {
     clearInterval(detectionInterval);
     detectionInterval = null;
   }
-  isTracking = false;
-  console.log('[Spikely] Stopped viewer count tracking');
   
-  // Clear warm-up state
-  warmupSamples = [];
-  isWarmupComplete = false;
-  if (warmupReselectTimer) clearTimeout(warmupReselectTimer);
-  if (warmupStuckTimer) clearTimeout(warmupStuckTimer);
-  if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
+  if (domObserver) {
+    try { domObserver.disconnect(); } catch (_) {}
+    domObserver = null;
+  }
   
-  // Disconnect observer
-  try { domObserver?.disconnect(); domObserver = null; } catch (_) {}
+  if (viewerCountPort) {
+    try { viewerCountPort.disconnect(); } catch (_) {}
+    viewerCountPort = null;
+  }
 }
 
-// Clear all state so switching lives can't glitch
-function clearState() {
-  try { clearInterval(detectionInterval); } catch (_) {}
-  detectionInterval = null;
-  isTracking = false;
-  currentViewerCount = 0;
-  lastSentCount = 0;
-  lastSentAt = 0;
-  lastEmittedCount = 0;
-  lastEmittedAt = 0;
-  cachedViewerEl = null;
-  cachedContainer = null;
+// Simplified detection function
+function detectViewerCount() {
+  const node = queryViewerNode();
+  if (node) {
+    return normalizeAndParse(node);
+  }
   
-  // Clear warm-up state
-  warmupSamples = [];
-  isWarmupComplete = false;
-  if (warmupReselectTimer) clearTimeout(warmupReselectTimer);
-  if (warmupStuckTimer) clearTimeout(warmupStuckTimer);
-  if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
+  // Throttled missing log
+  const now = Date.now();
+  if (now - lastNotFoundLog > CONFIG.LOG_THROTTLE_MS) {
+    console.log('[VIEWER:PAGE] node missing');
+    lastNotFoundLog = now;
+  }
   
-  try { domObserver?.disconnect(); } catch (_) {}
-  domObserver = null;
-}
-
-function resetTracking() {
-  console.debug('[VC:CT:RESET] resetTracking invoked', { stack: (new Error()).stack?.split('\n').slice(0,3).join(' | ') });
-  console.log('[Spikely] Resetting viewer count tracking - STOPPING tracking completely');
-  stopTracking();
-  // Send final zero count update
-  safeSendMessage({
-    type: 'VIEWER_COUNT_UPDATE',
-    count: 0,
-    delta: 0,
-    platform,
-    timestamp: Date.now()
-  });
+  return null;
 }
 
 // Listen for commands from background script
