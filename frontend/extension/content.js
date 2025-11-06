@@ -179,28 +179,56 @@ function detectViewerCount() {
   return null;
 }
 
-// Validate node visibility and connectivity
-function isValidVisibleNode(element) {
+// LVT PATCH: Enhanced visibility validation with pre-render node filtering
+function isEnhancedValidVisibleNode(element) {
   if (!element) return false;
   
-  // 1. Check if node is connected (reject React fiber clones)
+  // 1. LVT PATCH: Check if node is connected (reject React fiber clones)
   if (!element.isConnected) return false;
   
-  // 2. Check aria-hidden
+  // 2. LVT PATCH: Check aria-hidden
   if (element.getAttribute('aria-hidden') === 'true') return false;
   
-  // 3. Check offsetParent (display:none elements have null offsetParent)
+  // 3. LVT PATCH: Check offsetParent with position exception
   if (element.offsetParent === null) {
-    // Exception: elements with position:fixed can have null offsetParent but still be visible
     const style = window.getComputedStyle(element);
-    if (style.position !== 'fixed' && style.display === 'none') return false;
+    if (style.position !== 'fixed') return false; // LVT PATCH: Allow fixed positioning
   }
   
-  // 4. Check opacity
+  // 4. LVT PATCH: Check computed opacity
   const style = window.getComputedStyle(element);
   if (parseFloat(style.opacity) === 0) return false;
   
+  // 5. LVT PATCH: Filter out zero-alpha duplicates and invisible pre-render nodes
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return false; // LVT PATCH: Zero-size check
+  
   return true;
+}
+
+// LVT PATCH: Deduplicate counters by text normalization and bounding box overlap  
+function deduplicateCounters(candidates) {
+  const deduplicated = [];
+  
+  candidates.forEach(candidate => {
+    const isDuplicate = deduplicated.some(existing => {
+      // LVT PATCH: Check text normalization
+      const textMatch = existing.text === candidate.text;
+      
+      // LVT PATCH: Check bounding box overlap
+      const rectOverlap = Math.abs(existing.rect.left - candidate.rect.left) < 10 &&
+                         Math.abs(existing.rect.top - candidate.rect.top) < 10;
+      
+      return textMatch || rectOverlap;
+    });
+    
+    if (!isDuplicate) {
+      deduplicated.push(candidate);
+    }
+  });
+  
+  // LVT PATCH: Sort by largest count (most likely to be real)
+  return deduplicated.sort((a, b) => b.count - a.count);
 }
 
 
