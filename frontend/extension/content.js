@@ -558,10 +558,13 @@ function stopTracking() {
   currentViewerCount = 0;
 }
 
-// LVT PATCH FIX: Enhanced message sender with exponential backoff retry
-function safeSendMessage(payload, attempt = 1) {
+// LVT PATCH R2: Message reliability enhancement with retry queue
+let messageQueue = [];
+let retryInProgress = false;
+
+function sendWithRetry(payload, contextTag = "LVT_UPDATE", attempt = 1) {
   const MAX_ATTEMPTS = 3;
-  const baseDelay = 50; // LVT PATCH FIX: 50ms, 100ms, 200ms exponential backoff
+  const baseDelay = 50; // LVT PATCH R2: 50ms → 100ms → 200ms exponential backoff
   
   if (!chrome?.runtime?.id) {
     console.log('[VIEWER:DBG] extension context invalid');
@@ -573,23 +576,46 @@ function safeSendMessage(payload, attempt = 1) {
       if (chrome.runtime.lastError) {
         const error = chrome.runtime.lastError.message;
         
-        // LVT PATCH FIX: Retry on "Receiving end does not exist"
+        // LVT PATCH R2: Retry on connection errors with exponential backoff
         if (error.includes('Receiving end does not exist') && attempt < MAX_ATTEMPTS) {
-          const delay = baseDelay * Math.pow(2, attempt - 1); // LVT PATCH FIX: Exponential backoff
-          console.log(`[VIEWER:DBG] retry ${attempt}/${MAX_ATTEMPTS} in ${delay}ms: ${error}`);
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          console.log(`[VIEWER:DBG] ${contextTag} retry ${attempt}/${MAX_ATTEMPTS} in ${delay}ms: ${error}`);
           
           setTimeout(() => {
-            safeSendMessage(payload, attempt + 1); // LVT PATCH FIX: Recursive retry
+            sendWithRetry(payload, contextTag, attempt + 1);
           }, delay);
         } else if (!error.includes('Extension context invalidated')) {
-          console.log(`[VIEWER:DBG] send failed after ${attempt} attempts: ${error}`);
+          console.log(`[VIEWER:DBG] ${contextTag} failed after ${attempt} attempts: ${error}`);
+          
+          // LVT PATCH R2: Queue failed sends for retry when connection established
+          if (!retryInProgress) {
+            messageQueue.push({ payload, contextTag });
+            processMessageQueue();
+          }
         }
       } else {
-        console.log(`[VIEWER:DBG] sent successfully on attempt ${attempt}`);
+        console.log(`[VIEWER:DBG] ${contextTag} sent successfully on attempt ${attempt}`);
       }
     });
   } catch (error) {
-    console.log(`[VIEWER:DBG] send error: ${error.message}`);
+    console.log(`[VIEWER:DBG] ${contextTag} send error: ${error.message}`);
+  }
+}
+
+// LVT PATCH R2: Process queued messages when connection restored
+function processMessageQueue() {
+  if (retryInProgress || messageQueue.length === 0) return;
+  retryInProgress = true;
+  
+  const queuedMessage = messageQueue.shift();
+  if (queuedMessage) {
+    setTimeout(() => {
+      sendWithRetry(queuedMessage.payload, queuedMessage.contextTag);
+      retryInProgress = false;
+      processMessageQueue(); // LVT PATCH R2: Process next queued message
+    }, 100);
+  } else {
+    retryInProgress = false;
   }
 }
 
