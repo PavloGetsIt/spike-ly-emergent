@@ -518,10 +518,13 @@ function stopTracking() {
   currentViewerCount = 0;
 }
 
-// Enhanced message sender with retry
-function safeSendMessage(payload) {
+// LVT PATCH FIX: Enhanced message sender with exponential backoff retry
+function safeSendMessage(payload, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const baseDelay = 50; // LVT PATCH FIX: 50ms, 100ms, 200ms exponential backoff
+  
   if (!chrome?.runtime?.id) {
-    console.log('[VIEWER:PAGE] extension context invalid');
+    console.log('[VIEWER:DBG] extension context invalid');
     return;
   }
   
@@ -529,13 +532,24 @@ function safeSendMessage(payload) {
     chrome.runtime.sendMessage(payload, (response) => {
       if (chrome.runtime.lastError) {
         const error = chrome.runtime.lastError.message;
-        if (!error.includes('Extension context invalidated')) {
-          console.log(`[VIEWER:PAGE] send failed: ${error}`);
+        
+        // LVT PATCH FIX: Retry on "Receiving end does not exist"
+        if (error.includes('Receiving end does not exist') && attempt < MAX_ATTEMPTS) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // LVT PATCH FIX: Exponential backoff
+          console.log(`[VIEWER:DBG] retry ${attempt}/${MAX_ATTEMPTS} in ${delay}ms: ${error}`);
+          
+          setTimeout(() => {
+            safeSendMessage(payload, attempt + 1); // LVT PATCH FIX: Recursive retry
+          }, delay);
+        } else if (!error.includes('Extension context invalidated')) {
+          console.log(`[VIEWER:DBG] send failed after ${attempt} attempts: ${error}`);
         }
+      } else {
+        console.log(`[VIEWER:DBG] sent successfully on attempt ${attempt}`);
       }
     });
   } catch (error) {
-    console.log(`[VIEWER:PAGE] send error: ${error.message}`);
+    console.log(`[VIEWER:DBG] send error: ${error.message}`);
   }
 }
 
