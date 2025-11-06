@@ -402,6 +402,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'PING') {
+    // LVT PATCH: Enhanced PING handling with proper async response
+    console.log('[VIEWER:BG] ping received');
+    sendResponse?.({ type: 'PONG', success: true, timestamp: Date.now() }); // LVT PATCH: Enhanced response
+    return true; // LVT PATCH: Return true for async delivery
   } else if (message.type === 'START_AUDIO_CAPTURE') {
     (async () => {
       console.debug('[AUDIO:BG:START] START_AUDIO_CAPTURE received');
