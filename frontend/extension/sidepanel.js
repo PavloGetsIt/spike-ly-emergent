@@ -800,16 +800,11 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      console.log(`[VIEWER:SP] rendered=${message.count}`);
-      // Fall through to VIEWER_COUNT handler
     case 'VIEWER_COUNT':
       console.log(`[VIEWER:SP] rendered=${message.count}`);
       
-      // Handle instant modes (initial, cached flush, etc)
-      if (message.source === 'initial_instant' || 
-          message.source === 'cached_flush' || 
-          message.source === 'cached_on_connect') {
-        console.log(`[VIEWER:SP] rendered=${message.count} (instant: ${message.source})`);
+      // Handle instant modes
+      if (message.source === 'initial' || message.source === 'cached_flush') {
         firstCountReceived = true;
         isInWarmup = false;
         updateEngineStatus('TRACKING', {});
