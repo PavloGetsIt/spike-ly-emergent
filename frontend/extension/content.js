@@ -56,36 +56,41 @@ let mutationDebounceTimer = null;
 let observerInProgress = false;
 
 // ============================================================================
-// LVT PATCH R2: Shadow DOM recursion fix with walkShadows
+// LVT PATCH R3: Comprehensive shadow DOM recursion with all nested roots
 // ============================================================================
 function walkShadows(node, collectCallback, visited = new WeakSet()) {
   if (!node || visited.has(node)) return;
   visited.add(node);
   
-  // LVT PATCH R2: Process current node
-  collectCallback(node);
+  // LVT PATCH R3: Process current node first
+  if (collectCallback) collectCallback(node);
   
-  // LVT PATCH R2: If node.shadowRoot, recursively walk shadows
+  // LVT PATCH R3: Recursively traverse shadowRoot if it exists
   if (node.shadowRoot && !visited.has(node.shadowRoot)) {
     visited.add(node.shadowRoot);
+    console.log(`[VIEWER:DBG] traversing shadow root on ${node.tagName}`); // LVT PATCH R3: Log shadow traversal
+    
+    // LVT PATCH R3: Walk all elements in this shadow root
     const shadowElements = node.shadowRoot.querySelectorAll('*');
     for (const shadowEl of shadowElements) {
       walkShadows(shadowEl, collectCallback, visited);
     }
   }
   
-  // LVT PATCH R2: Walk child elements
-  for (const child of node.children || []) {
-    walkShadows(child, collectCallback, visited);
+  // LVT PATCH R3: Walk all child elements recursively
+  if (node.children) {
+    for (const child of node.children) {
+      walkShadows(child, collectCallback, visited);
+    }
   }
 }
 
-// LVT PATCH R2: Enhanced shadow DOM traversal with recursive collection
+// LVT PATCH R3: Enhanced shadow DOM traversal with comprehensive collection
 function deepQuerySelector(selectors, root = document, depth = 0) {
-  const MAX_DEPTH = 4;
+  const MAX_DEPTH = 6; // LVT PATCH R3: Increased depth limit for deeper nesting
   if (depth > MAX_DEPTH) return null;
   
-  // LVT PATCH R2: Direct query first
+  // LVT PATCH R3: Direct query first with latest TikTok selectors
   for (const selector of selectors) {
     try {
       const element = root.querySelector(selector);
@@ -98,28 +103,39 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
     }
   }
   
-  // LVT PATCH R2: Recursive shadow traversal using walkShadows
+  // LVT PATCH R3: Comprehensive shadow traversal using walkShadows
   const candidates = [];
+  let shadowRootsFound = 0;
+  
   walkShadows(root, (node) => {
-    // LVT PATCH R2: Collect all span, div, strong elements with numeric text
+    // LVT PATCH R3: Count shadow roots for validation
+    if (node.shadowRoot) {
+      shadowRootsFound++;
+      console.log(`[VIEWER:DBG] shadow root #${shadowRootsFound} found on ${node.tagName}`);
+    }
+    
+    // LVT PATCH R3: Collect numeric elements with enhanced visibility check
     if ((node.tagName === 'SPAN' || node.tagName === 'DIV' || node.tagName === 'STRONG') && node.textContent) {
       const text = node.textContent.trim();
-      if (/^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(text)) {
-        // LVT PATCH R2: Skip nodes with opacity:0, aria-hidden:true, or detached
-        if (isEnhancedValidVisibleNode(node)) {
-          const count = parseViewerCount(text);
+      // LVT PATCH R3: Visibility-safe regex for formats like "173K", "184,490", "1.8k watching"
+      const sanitized = text.replace(/[^\d.,KkMm]/g, '');
+      if (sanitized && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(sanitized)) {
+        if (isComprehensivelyVisible(node)) { // LVT PATCH R3: Use comprehensive visibility check
+          const count = parseViewerCount(sanitized);
           if (count > CONFIG.VIEWER_MIN_THRESHOLD) {
-            candidates.push({ element: node, count, rect: node.getBoundingClientRect() });
+            console.log("✅ Shadow DOM number found:", text); // LVT PATCH R3: Validation capture log
+            candidates.push({ element: node, count, rect: node.getBoundingClientRect(), text: sanitized });
           }
         }
       }
     }
   });
   
-  // LVT PATCH R2: Deduplicate by bounding box overlap and return highest stable count
+  console.log(`[VIEWER:DBG] walkShadows found ${shadowRootsFound} shadow roots, ${candidates.length} candidates`);
+  
+  // LVT PATCH R3: Return best candidate after deduplication
   if (candidates.length > 0) {
     const deduped = deduplicateCounters(candidates);
-    console.log(`[VIEWER:DBG] walkShadows found ${candidates.length} candidates, ${deduped.length} after dedup`);
     return deduped[0]?.element || null;
   }
   
