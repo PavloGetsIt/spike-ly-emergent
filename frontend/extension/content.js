@@ -185,20 +185,31 @@ function isValidVisibleNode(element) {
 
 
 // ============================================================================
-// HYSTERESIS AND EMISSION CONTROL
+// JITTER FILTER AND EMISSION CONTROL
 // ============================================================================
 let lastEmittedCount = 0;
 let lastEmitTime = 0;
-const EMIT_MIN_DELTA = 1;
 const EMIT_MIN_INTERVAL = 250; // 250ms minimum between emissions
 
-function shouldEmitUpdate(count) {
+// Jitter filter: ignore ±2, accept >2 immediately
+function shouldEmitWithJitterFilter(count) {
   const now = Date.now();
   const delta = Math.abs(count - lastEmittedCount);
   const timeSinceLastEmit = now - lastEmitTime;
   
-  // Only emit if significant change AND enough time passed
-  return delta >= EMIT_MIN_DELTA && timeSinceLastEmit >= EMIT_MIN_INTERVAL;
+  // Accept anything >2 immediately
+  if (delta > 2) {
+    console.log(`[VIEWER:DBG] large delta: ${delta}, emitting immediately`);
+    return true;
+  }
+  
+  // Ignore deltas ±2 or smaller unless enough time passed
+  if (delta <= 2 && timeSinceLastEmit < EMIT_MIN_INTERVAL) {
+    console.log(`[VIEWER:DBG] jitter filtered: delta=${delta}, time=${timeSinceLastEmit}ms`);
+    return false;
+  }
+  
+  return true;
 }
 
 function emitViewerUpdate(count) {
@@ -211,7 +222,8 @@ function emitViewerUpdate(count) {
   
   console.log(`[VIEWER:PAGE] value=${count}`);
   
-  safeSendMessage({
+  // Use reliable message sending with retry
+  reliableSendMessage({
     type: 'VIEWER_COUNT_UPDATE',
     platform,
     count,
@@ -219,6 +231,43 @@ function emitViewerUpdate(count) {
     timestamp: now,
     source: 'validated'
   });
+}
+
+// ============================================================================
+// HARDENED MESSAGE RELIABILITY WITH RETRY
+// ============================================================================
+function reliableSendMessage(payload, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const baseDelay = 50; // 50ms, 100ms, 200ms as specified
+  
+  if (!chrome?.runtime?.id) {
+    console.log('[VIEWER:DBG] extension context invalid');
+    return;
+  }
+  
+  try {
+    chrome.runtime.sendMessage(payload, (response) => {
+      if (chrome.runtime.lastError) {
+        const error = chrome.runtime.lastError.message;
+        
+        // Retry on "Receiving end does not exist"
+        if (error.includes('Receiving end does not exist') && attempt < MAX_ATTEMPTS) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`[VIEWER:DBG] retry ${attempt}/${MAX_ATTEMPTS} in ${delay}ms: ${error}`);
+          
+          setTimeout(() => {
+            reliableSendMessage(payload, attempt + 1);
+          }, delay);
+        } else if (!error.includes('Extension context invalidated')) {
+          console.log(`[VIEWER:DBG] send failed after ${attempt} attempts: ${error}`);
+        }
+      } else {
+        console.log(`[VIEWER:DBG] sent successfully on attempt ${attempt}`);
+      }
+    });
+  } catch (error) {
+    console.log(`[VIEWER:DBG] send error: ${error.message}`);
+  }
 }
 
 // ============================================================================
