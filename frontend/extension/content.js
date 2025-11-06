@@ -1,20 +1,10 @@
-(function(){
-  try {
-    if (window.__SPIKELY_CONTENT_ACTIVE__) {
-      console.log('[Spikely] Content script already initialized - skipping reinjection');
-      return;
-    }
-    window.__SPIKELY_CONTENT_ACTIVE__ = true;
-  } catch (_) {}
-
 // ============================================================================
-// SPIKELY CONTENT SCRIPT - CLEAN MODULAR VIEWER DETECTION  
+// SPIKELY CONTENT SCRIPT - RESILIENT SHADOW DOM VIEWER DETECTION
 // ============================================================================
 
 (function(){
   try {
     if (window.__SPIKELY_CONTENT_ACTIVE__) {
-      console.log('[Spikely] Content script already initialized - skipping reinjection');
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
@@ -23,12 +13,10 @@
 // Configuration
 const CONFIG = {
   POLL_INTERVAL_MS: 800,
-  HEARTBEAT_INTERVAL_MS: 5000, 
+  HEARTBEAT_INTERVAL_MS: 5000,
   MUTATION_DEBOUNCE_MS: 100,
-  PORT_RETRY_MAX: 5,
-  PORT_RETRY_DELAY_BASE: 1000,
-  LOG_THROTTLE_MS: 15000,
-  VIEWER_MIN_THRESHOLD: 100
+  LOG_THROTTLE_MS: 5000,
+  VIEWER_MIN_THRESHOLD: 1
 };
 
 // Platform detection
@@ -36,240 +24,132 @@ function detectPlatform() {
   const hostname = window.location.hostname;
   if (hostname.includes('tiktok.com')) return 'tiktok';
   if (hostname.includes('twitch.tv')) return 'twitch';
-  if (hostname.includes('kick.com')) return 'kick';  
+  if (hostname.includes('kick.com')) return 'kick';
   if (hostname.includes('youtube.com')) return 'youtube';
   return 'unknown';
 }
 
 const platform = detectPlatform();
 
-// Platform-specific selectors
-const PLATFORM_SELECTORS = {
-  tiktok: [
-    '[data-e2e="live-room-viewers"]',
-    '[data-testid="live-room-viewers"]',
-    '[data-e2e*="live-audience"]', 
-    '[data-e2e*="viewer-count"]',
-    '[data-testid*="viewer"]',
-    '[class*="LiveViewerCount"]',
-    '[class*="AudienceCount"]',
-    '.P4-Regular.text-UIText3',
-    'div:has(> span.inline-flex.justify-center)',
-    '[class*="viewer"]'
-  ],
-  twitch: [
-    '[data-a-target="animated-channel-viewers-count"]',
-    '.live-indicator-container span',
-    'p[data-test-selector="viewer-count"]'
-  ],
-  kick: [
-    '[class*="viewer-count"]',
-    '[class*="ViewerCount"]',
-    'div[class*="stats"] span:first-child'
-  ],
-  youtube: [
-    'span.ytp-live-badge + span',
-    '.ytp-live .ytp-time-current', 
-    'ytd-video-primary-info-renderer #count'
-  ]
-};
-
 // State variables
-let currentViewerCount = 0;
-let detectionInterval = null;
 let isTracking = false;
-let lastSentCount = 0;
-let lastSentAt = 0;
-let cachedViewerEl = null;
-let cachedContainer = null;
-let domObserver = null;
-let lastNotFoundLog = 0;
+let currentViewerCount = 0;
+let pollTimer = null;
+let heartbeatTimer = null;
+let lastLogTime = 0;
 
-// Port management
-let viewerCountPort = null;
-let portRetryAttempts = 0;
-let portReconnectTimer = null;
-let mutationRetryCount = 0;
-let mutationRetryTimer = null;
-let mutationDebounceTimer = null;
-
-// Silence noisy unhandled rejections when extension reloads
-try {
-  window.addEventListener('unhandledrejection', (e) => {
-    const reason = String(e.reason || '');
-    if (
-      reason.includes('Extension context invalidated') ||
-      reason.includes('Could not establish connection') ||
-      reason.includes('Receiving end does not exist')
-    ) {
-      e.preventDefault();
+// ============================================================================
+// RECURSIVE SHADOW DOM TRAVERSAL
+// ============================================================================
+function deepQuerySelector(selectors, root = document) {
+  // First try direct query
+  for (const selector of selectors) {
+    const element = root.querySelector(selector);
+    if (element && hasValidViewerCount(element)) {
+      return element;
     }
-  });
-} catch (_) {}
+  }
+  
+  // Recursive shadow DOM traversal
+  const allElements = root.querySelectorAll('*');
+  for (const element of allElements) {
+    if (element.shadowRoot) {
+      const shadowResult = deepQuerySelector(selectors, element.shadowRoot);
+      if (shadowResult) return shadowResult;
+    }
+  }
+  
+  return null;
+}
 
-
-console.log(`[Spikely] Detected platform: ${platform}`);
-
-// Enhanced TikTok viewer detection with dynamic node re-querying
-function queryViewerNode() {
-  // Always re-query the node (do not store static reference for ephemeral DOM)
-  cachedViewerEl = null;
-
+// ============================================================================
+// ENHANCED TIKTOK VIEWER DETECTION
+// ============================================================================
+function detectViewerCount() {
   if (platform === 'tiktok') {
     
-    // TIER 1: Enhanced 2025 TikTok selectors
-    const tier1Selectors = [
+    // Modern TikTok selectors for shadow DOM
+    const selectors = [
+      '.viewer-count',
+      'span[data-e2e="live-viewer-count"]',
       '[data-e2e="live-room-viewers"]',
       '[data-testid="live-room-viewers"]',
-      '[data-e2e*="live-audience"]',
-      '[data-e2e*="viewer-count"]',
-      '[data-testid*="viewer"]',
-      '[class*="LiveViewerCount"]',
-      '[class*="AudienceCount"]'
+      '[data-e2e*="viewer"]',
+      '[data-e2e*="audience"]',
+      '[class*="ViewerCount"]',
+      '[class*="LiveAudience"]'
     ];
     
-    for (const selector of tier1Selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const element of elements) {
-        const parsed = normalizeAndParse(element);
-        if (parsed !== null && parsed > 0) {
-          console.log(`[VIEWER:PAGE] value=${parsed}`);
-          cachedViewerEl = element;
-          cachedContainer = element.closest('div[data-e2e*="live"], section, [class*="live"]') || element.parentElement;
-          return element;
-        }
+    // Try shadow DOM traversal
+    const element = deepQuerySelector(selectors);
+    if (element) {
+      const count = parseViewerCount(element);
+      if (count > 0) {
+        return count;
       }
     }
     
-    // TIER 2: Aria-label with enhanced regex
-    const ariaElements = document.querySelectorAll('[aria-label*="view"], [aria-label*="watching"], [aria-label*="audience"]');
-    for (const element of ariaElements) {
-      const ariaLabel = element.getAttribute('aria-label');
-      if (ariaLabel) {
-        // Extract number with enhanced regex: [0-9,\.KM]+
-        const match = ariaLabel.match(/([0-9,]+(?:\.[0-9]+)?[KkMm]?)/);
-        if (match) {
-          const countText = match[1].replace(/,/g, '');
-          const parsed = normalizeAndParse(countText);
-          if (parsed !== null && parsed > 0) {
-            console.log(`[VIEWER:PAGE] value=${parsed}`);
-            cachedViewerEl = element;
-            cachedContainer = element.closest('div[data-e2e*="live"], section, [class*="live"]') || element.parentElement;
-            return element;
-          }
-        }
-      }
-    }
-    
-    // TIER 3: Widget container traversal (find smallest container)
-    const widgetContainers = document.querySelectorAll('div[data-e2e*="live"], section[class*="live"], [class*="viewer-info"]');
-    for (const container of widgetContainers) {
-      const numberSpans = container.querySelectorAll('span, div, strong');
-      for (const span of numberSpans) {
-        const text = span.textContent?.trim();
-        if (text && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(text)) {
-          const containerText = container.textContent.toLowerCase();
-          if (containerText.includes('viewer') || containerText.includes('watching') || 
-              containerText.includes('audience') || containerText.includes('live')) {
-            const parsed = normalizeAndParse(text);
-            if (parsed !== null && parsed > 100) {
-              console.log(`[VIEWER:PAGE] value=${parsed}`);
-              cachedViewerEl = span;
-              cachedContainer = container; // Use widget container for observation
-              return span;
+    // Fallback: Search for numeric text near Live badge
+    const liveElements = document.querySelectorAll('*');
+    for (const el of liveElements) {
+      const text = el.textContent?.trim();
+      if (text && (text.includes('LIVE') || text.includes('Live'))) {
+        // Look for nearby numeric elements
+        const parent = el.closest('div, section, span');
+        if (parent) {
+          const numbers = parent.querySelectorAll('span, div');
+          for (const numEl of numbers) {
+            const numText = numEl.textContent?.trim();
+            if (numText && /^\d+(\.\d+)?[KkMm]?$/.test(numText)) {
+              const count = parseViewerCount(numText);
+              if (count >= CONFIG.VIEWER_MIN_THRESHOLD) {
+                return count;
+              }
             }
           }
         }
       }
     }
     
-    // Throttled "not found" logging (max 1 per 15s)
-    const now = Date.now();
-    if (now - lastNotFoundLog > 15000) {
-      console.log('[VIEWER:PAGE] node missing (throttled warning)');
-      lastNotFoundLog = now;
-    }
-    
     return null;
   }
-
-  return null;
-}
-
-// Add throttling for "not found" logs
-let lastNotFoundLog = 0;
-        }
-      }
-    }
-
-    // Tier 2: Priority selector sweep
-    const selectors = PLATFORM_SELECTORS[platform] || [];
-    console.log('[VC:DEBUG] 🎯 Trying', selectors.length, 'priority selectors...');
-    
-    for (let i = 0; i < selectors.length; i++) {
-      const selector = selectors[i];
-      const element = document.querySelector(selector);
-      
-      if (element && element.textContent?.trim()) {
-        const text = element.textContent.trim();
-        const parsed = normalizeAndParse(element);
-        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → "${text}" → ${parsed}`);
-        
-        if (parsed !== null && parsed > 0) {
-          console.log('[VC:DEBUG] ✅ TIER 2 SUCCESS: Found via selector', i + 1, 'count =', parsed);
-          cachedViewerEl = element;
-          return element;
-        }
-      } else {
-        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → NOT FOUND`);
-      }
-    }
-
-    console.log('[VC:DEBUG] ❌ All methods failed - no viewer count found');
-    return null;
-  }
-
-  // Non-TikTok platforms: simple selector sweep
-  const selectors = PLATFORM_SELECTORS[platform] || [];
+  
+  // Non-TikTok platforms
+  const platformSelectors = {
+    twitch: ['[data-a-target="animated-channel-viewers-count"]', '.live-indicator-container span'],
+    kick: ['[class*="viewer-count"]', '[class*="ViewerCount"]'],
+    youtube: ['span.ytp-live-badge + span', '.ytp-live .ytp-time-current']
+  };
+  
+  const selectors = platformSelectors[platform] || [];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
-    if (element && element.textContent?.trim()) {
-      cachedViewerEl = element;
-      return element;
+    if (element && hasValidViewerCount(element)) {
+      return parseViewerCount(element);
     }
   }
   
-  // Non-TikTok platforms: simple selector sweep
-  const platformSelectors = PLATFORM_SELECTORS[platform] || [];
-  for (const selector of platformSelectors) {
-    const element = document.querySelector(selector);
-    if (element && element.textContent?.trim()) {
-      cachedViewerEl = element;
-      return element;
-    }
-  }
-
   return null;
 }
 
-// ============================================================================
-// ROBUST TEXT NORMALIZATION & PARSING
-// ============================================================================
-function normalizeAndParse(textOrElement) {
-  if (!textOrElement) return null;
-  
+function hasValidViewerCount(element) {
+  const text = element.textContent?.trim();
+  return text && /\d/.test(text) && text.length <= 10;
+}
+
+function parseViewerCount(textOrElement) {
   let text;
   if (typeof textOrElement === 'string') {
     text = textOrElement;
-  } else if (textOrElement.textContent) {
+  } else if (textOrElement?.textContent) {
     text = textOrElement.textContent.trim();
   } else {
-    return null;
+    return 0;
   }
   
   const cleaned = text.toLowerCase().replace(/[\s,]/g, '');
   const match = cleaned.match(/([\d.]+)([km])?/);
-  if (!match) return null;
+  if (!match) return 0;
   
   let num = parseFloat(match[1]);
   const suffix = match[2];
@@ -278,201 +158,11 @@ function normalizeAndParse(textOrElement) {
   if (suffix === 'm') num *= 1000000;
   
   const result = Math.round(num);
-  return isFinite(result) && result >= 0 ? result : null;
-}
-
-// Initialize persistent port connection with enhanced lifecycle management
-function initializeViewerCountPort() {
-  try {
-    if (viewerCountPort) {
-      try {
-        viewerCountPort.disconnect();
-      } catch (e) {
-        // Port already disconnected
-      }
-    }
-    
-    viewerCountPort = chrome.runtime.connect({ name: 'viewer-count-port' });
-    portRetryAttempts = 0;
-    
-    // All ports must register port.onDisconnect with auto-reconnect
-    viewerCountPort.onDisconnect.addListener(() => {
-      console.log('[VIEWER:PAGE] port disconnected, reconnecting...');
-      viewerCountPort = null;
-      
-      // Auto-reconnect with exponential backoff (max 5 attempts)
-      if (portRetryAttempts < MAX_PORT_RETRIES) {
-        portRetryAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, portRetryAttempts - 1), 8000);
-        
-        if (portReconnectTimer) clearTimeout(portReconnectTimer);
-        portReconnectTimer = setTimeout(() => {
-          initializeViewerCountPort();
-        }, delay);
-      } else {
-        console.log('[VIEWER:PAGE] port max retries reached, fallback mode');
-        portRetryAttempts = 0; // Reset for future attempts
-      }
-    });
-    
-    console.log('[VIEWER:PAGE] port connected');
-  } catch (error) {
-    // Never throw raw errors on disconnect
-    console.log('[VIEWER:PAGE] port connection failed:', error.message);
-    viewerCountPort = null;
-  }
-}
-
-// Enhanced safe message sender - never throws raw errors
-function safeSendMessage(payload) {
-  try {
-    // Try persistent port first
-    if (viewerCountPort) {
-      try {
-        viewerCountPort.postMessage(payload);
-        return;
-      } catch (error) {
-        // Don't log expected disconnection errors
-        if (!error.message.includes('disconnected') && !error.message.includes('closed')) {
-          console.log('[VIEWER:PAGE] port send failed:', error.message);
-        }
-        viewerCountPort = null;
-      }
-    }
-    
-    // Fallback to runtime sendMessage
-    if (chrome?.runtime?.id) {
-      chrome.runtime.sendMessage(payload, (response) => {
-        if (chrome.runtime.lastError) {
-          const errorMsg = chrome.runtime.lastError.message;
-          // Only log unexpected errors
-          if (!errorMsg.includes('Extension context invalidated') && 
-              !errorMsg.includes('Could not establish connection') &&
-              !errorMsg.includes('disconnected')) {
-            console.log('[VIEWER:PAGE] runtime message error:', errorMsg);
-          }
-        }
-      });
-    }
-  } catch (error) {
-    // Silent fail for context invalidation
-  }
+  return isFinite(result) && result >= 0 ? result : 0;
 }
 
 // ============================================================================
-// SIMPLIFIED VIEWER COUNT EMISSION (removed complex warmup logic)
-// ============================================================================
-function emitViewerCount(count, delta) {
-  const now = Date.now();
-  currentViewerCount = count;
-  lastSentCount = count;
-  lastSentAt = now;
-  
-  const payload = {
-    type: 'VIEWER_COUNT_UPDATE',
-    platform,
-    count,
-    delta,
-    timestamp: now,
-    confidence: 1.0
-  };
-  
-  safeSendMessage(payload);
-  console.log(`[VIEWER:PAGE] value=${count}`);
-}
-
-// ============================================================================
-// Enhanced MutationObserver that rebinds on node disappearance
-// ============================================================================
-let mutationDebounceTimer = null;
-let mutationRetryCount = 0;
-let mutationRetryTimer = null;
-
-function setupMutationObserver() {
-  if (domObserver) {
-    try { domObserver.disconnect(); } catch (_) {}
-  }
-  
-  if (!cachedContainer) {
-    // Retry with reduced attempts to avoid infinite loops
-    if (mutationRetryCount < 5) {
-      mutationRetryCount++;
-      if (mutationRetryTimer) clearTimeout(mutationRetryTimer);
-      mutationRetryTimer = setTimeout(() => {
-        const node = queryViewerNode();
-        if (node && cachedContainer) {
-          mutationRetryCount = 0;
-          setupMutationObserver();
-        }
-      }, 1000);
-    }
-    return;
-  }
-  
-  try {
-    domObserver = new MutationObserver((mutations) => {
-      // Check if cached node still exists, rebind if disappeared
-      if (cachedViewerEl && !document.contains(cachedViewerEl)) {
-        console.log('[VIEWER:PAGE] node disappeared, rebinding observer');
-        const node = queryViewerNode();
-        if (node && cachedContainer) {
-          setupMutationObserver(); // Rebind to new container
-        }
-        return;
-      }
-      
-      // Detect numeric changes via text OR aria-label regex
-      let shouldUpdate = false;
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' || mutation.type === 'characterData') {
-          shouldUpdate = true;
-          break;
-        } else if (mutation.type === 'attributes' && mutation.attributeName === 'aria-label') {
-          const newAriaLabel = mutation.target.getAttribute('aria-label');
-          if (newAriaLabel && /[0-9,\.KM]+/.test(newAriaLabel)) {
-            shouldUpdate = true;
-            break;
-          }
-        }
-      }
-      
-      if (shouldUpdate) {
-        if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
-        mutationDebounceTimer = setTimeout(() => {
-          handleMutation();
-        }, TT_CONFIG.MUTATION_DEBOUNCE_MS);
-      }
-    });
-    
-    // Observe only the widget container (not document.body)
-    domObserver.observe(cachedContainer, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['aria-label']
-    });
-    
-    console.log('[VIEWER:PAGE] observer bound to widget container');
-    mutationRetryCount = 0;
-  } catch (e) {
-    console.log('[VIEWER:PAGE] observer setup failed:', e.message);
-  }
-}
-
-function handleMutation() {
-  // Always re-query the node on mutation (dynamic DOM changes)
-  const node = queryViewerNode();
-  if (node) {
-    const parsed = normalizeAndParse(node);
-    if (parsed !== null) {
-      processValidatedSample(parsed);
-    }
-  }
-}
-
-// ============================================================================
-// SIMPLIFIED TRACKING SYSTEM
+// TRACKING SYSTEM WITH 800MS POLLING
 // ============================================================================
 function startTracking() {
   if (isTracking) {
@@ -483,50 +173,62 @@ function startTracking() {
   isTracking = true;
   console.log('[VIEWER:PAGE] tracking started');
   
-  // Initialize port connection
-  initializeViewerCountPort();
-  
-  if (platform === 'tiktok') {
-    // Start direct polling for TikTok (800ms cycle)
-    detectionInterval = setInterval(() => {
-      const count = detectViewerCount();
-      if (count !== null && count !== currentViewerCount) {
-        const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
-        emitViewerCount(count, delta);
-        setupMutationObserver(); // Rebind observer to current node
-      }
-    }, CONFIG.POLL_INTERVAL_MS);
+  // Poll every 800ms
+  pollTimer = setInterval(() => {
+    const count = detectViewerCount();
     
-    // Heartbeat every 5s even if unchanged
-    setInterval(() => {
-      if (isTracking && currentViewerCount > 0) {
+    if (count !== null && count >= CONFIG.VIEWER_MIN_THRESHOLD) {
+      console.log(`[VIEWER:PAGE] value=${count}`);
+      
+      if (count !== currentViewerCount) {
+        const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
+        currentViewerCount = count;
+        
+        // Send viewer update
         safeSendMessage({
-          type: 'VIEWER_HEARTBEAT',
+          type: 'VIEWER_COUNT_UPDATE',
           platform,
-          count: currentViewerCount,
-          timestamp: Date.now()
+          count,
+          delta,
+          timestamp: Date.now(),
+          source: 'polling'
         });
       }
-    }, CONFIG.HEARTBEAT_INTERVAL_MS);
-    
-    // Try initial detection
-    const initialCount = detectViewerCount();
-    if (initialCount !== null && initialCount > 0) {
-      emitViewerCount(initialCount, 0);
-      setupMutationObserver();
-    }
-  } else {
-    // Non-TikTok platforms: simplified polling
-    detectionInterval = setInterval(() => {
-      const element = queryViewerNode();
-      if (element) {
-        const count = normalizeAndParse(element);
-        if (count !== null && count !== currentViewerCount) {
-          const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
-          emitViewerCount(count, delta);
-        }
+    } else {
+      // Throttled missing log
+      const now = Date.now();
+      if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
+        console.log('[VIEWER:PAGE] missing node (throttled)');
+        lastLogTime = now;
       }
-    }, CONFIG.POLL_INTERVAL_MS);
+    }
+  }, CONFIG.POLL_INTERVAL_MS);
+  
+  // Heartbeat every 5s
+  heartbeatTimer = setInterval(() => {
+    if (isTracking && currentViewerCount > 0) {
+      safeSendMessage({
+        type: 'VIEWER_HEARTBEAT',
+        platform,
+        count: currentViewerCount,
+        timestamp: Date.now()
+      });
+    }
+  }, CONFIG.HEARTBEAT_INTERVAL_MS);
+  
+  // Try immediate detection
+  const initialCount = detectViewerCount();
+  if (initialCount > 0) {
+    console.log(`[VIEWER:PAGE] value=${initialCount}`);
+    currentViewerCount = initialCount;
+    safeSendMessage({
+      type: 'VIEWER_COUNT_UPDATE',
+      platform,
+      count: initialCount,
+      delta: 0,
+      timestamp: Date.now(),
+      source: 'initial'
+    });
   }
 }
 
@@ -536,37 +238,37 @@ function stopTracking() {
   
   console.log('[VIEWER:PAGE] tracking stopped');
   
-  if (detectionInterval) {
-    clearInterval(detectionInterval);
-    detectionInterval = null;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
   
-  if (domObserver) {
-    try { domObserver.disconnect(); } catch (_) {}
-    domObserver = null;
-  }
-  
-  if (viewerCountPort) {
-    try { viewerCountPort.disconnect(); } catch (_) {}
-    viewerCountPort = null;
-  }
+  currentViewerCount = 0;
 }
 
-// Simplified detection function
-function detectViewerCount() {
-  const node = queryViewerNode();
-  if (node) {
-    return normalizeAndParse(node);
+// Enhanced message sender with retry
+function safeSendMessage(payload) {
+  if (!chrome?.runtime?.id) {
+    console.log('[VIEWER:PAGE] extension context invalid');
+    return;
   }
   
-  // Throttled missing log
-  const now = Date.now();
-  if (now - lastNotFoundLog > CONFIG.LOG_THROTTLE_MS) {
-    console.log('[VIEWER:PAGE] node missing');
-    lastNotFoundLog = now;
+  try {
+    chrome.runtime.sendMessage(payload, (response) => {
+      if (chrome.runtime.lastError) {
+        const error = chrome.runtime.lastError.message;
+        if (!error.includes('Extension context invalidated')) {
+          console.log(`[VIEWER:PAGE] send failed: ${error}`);
+        }
+      }
+    });
+  } catch (error) {
+    console.log(`[VIEWER:PAGE] send error: ${error.message}`);
   }
-  
-  return null;
 }
 
 // ============================================================================
@@ -574,11 +276,8 @@ function detectViewerCount() {
 // ============================================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_TRACKING') {
-    if (message?.reset) {
-      stopTracking();
-    }
     startTracking();
-    sendResponse({ type: 'ACK_START', platform, isTracking: true });
+    sendResponse({ success: true, platform });
   } else if (message.type === 'STOP_TRACKING') {
     stopTracking();
     sendResponse({ success: true });
@@ -589,27 +288,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // ============================================================================
-// INITIALIZATION & CLEANUP
+// INITIALIZATION
 // ============================================================================
-console.log('[VIEWER:PAGE] content script loaded - v2.2.0-CLEAN');
+console.log(`[VIEWER:PAGE] loaded on ${platform} - v2.2.1-SHADOW-DOM`);
 
-// Enhanced cleanup on navigation
+// Auto-detect React remount events
+let lastElementCount = 0;
+setInterval(() => {
+  const elementCount = document.querySelectorAll('*').length;
+  if (Math.abs(elementCount - lastElementCount) > 100) {
+    console.log('[VIEWER:PAGE] DOM remount detected, rebinding');
+    lastElementCount = elementCount;
+  }
+}, 2000);
+
+// Cleanup on navigation
 function cleanup() {
-  try {
-    stopTracking();
-    if (portReconnectTimer) {
-      clearTimeout(portReconnectTimer);
-      portReconnectTimer = null;
-    }
-    if (mutationRetryTimer) {
-      clearTimeout(mutationRetryTimer);
-      mutationRetryTimer = null;
-    }
-  } catch (_) {}
+  stopTracking();
 }
 
-window.addEventListener('pagehide', cleanup);
 window.addEventListener('beforeunload', cleanup);
-window.addEventListener('unload', cleanup);
+window.addEventListener('pagehide', cleanup);
 
 })();
