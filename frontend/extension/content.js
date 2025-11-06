@@ -378,7 +378,7 @@ function parseViewerCount(textOrElement) {
 }
 
 // ============================================================================
-// SIMPLIFIED TRACKING WITH MUTATIONOBSERVER + POLLING FALLBACK
+// STABILIZED TRACKING WITH OBSERVER + POLLING FALLBACK
 // ============================================================================
 function startTracking() {
   if (isTracking) {
@@ -396,14 +396,16 @@ function startTracking() {
       emitViewerUpdate(initialCount);
     }
     
-    // Polling fallback every 800ms (only when observer is idle)
+    // Polling fallback (only when MutationObserver is idle)
     pollTimer = setInterval(() => {
-      // Only poll if observer is idle or unbound
-      if (!domObserver || !currentObserverTarget || 
-          (observerIdleTimer && Date.now() - lastEmitTime > OBSERVER_IDLE_TIMEOUT)) {
-        
+      // Only poll if no active observer or observer hasn't fired recently
+      const observerActive = domObserver && currentObserverTarget && 
+                           isValidVisibleNode(currentObserverTarget);
+      
+      if (!observerActive) {
+        console.log('[VIEWER:DBG] polling fallback active');
         const count = detectViewerCount();
-        if (count !== null && shouldEmitUpdate(count)) {
+        if (count !== null && shouldEmitWithJitterFilter(count)) {
           emitViewerUpdate(count);
         } else if (count === null) {
           // Throttled missing log
@@ -419,7 +421,7 @@ function startTracking() {
     // Heartbeat every 5s
     setInterval(() => {
       if (isTracking && currentViewerCount > 0) {
-        safeSendMessage({
+        reliableSendMessage({
           type: 'VIEWER_HEARTBEAT',
           platform,
           count: currentViewerCount,
@@ -429,14 +431,11 @@ function startTracking() {
     }, CONFIG.HEARTBEAT_INTERVAL_MS);
     
   } else {
-    // Non-TikTok platforms: simple polling with validation
+    // Non-TikTok platforms: polling with validation
     pollTimer = setInterval(() => {
-      const element = deepQuerySelector(platformSelectors[platform] || []);
-      if (element && isValidVisibleNode(element)) {
-        const count = parseViewerCount(element);
-        if (count !== null && shouldEmitUpdate(count)) {
-          emitViewerUpdate(count);
-        }
+      const count = detectViewerCount();
+      if (count !== null && shouldEmitWithJitterFilter(count)) {
+        emitViewerUpdate(count);
       }
     }, CONFIG.POLL_INTERVAL_MS);
   }
@@ -458,12 +457,13 @@ function stopTracking() {
     domObserver = null;
   }
   
-  if (observerIdleTimer) {
-    clearTimeout(observerIdleTimer);
-    observerIdleTimer = null;
+  if (mutationDebounceTimer) {
+    clearTimeout(mutationDebounceTimer);
+    mutationDebounceTimer = null;
   }
   
   currentObserverTarget = null;
+  observerInProgress = false;
   currentViewerCount = 0;
 }
 
