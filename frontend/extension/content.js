@@ -49,6 +49,9 @@ let domObserver = null;
 let currentObserverTarget = null;
 let observerIdleTimer = null;
 let mutationDebounceTimer = null;
+
+// Add missing variables for the new system
+let observerInProgress = false;
 let domObserver = null;
 
 // ============================================================================
