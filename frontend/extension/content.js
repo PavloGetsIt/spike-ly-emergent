@@ -212,43 +212,41 @@ function detectViewerCount() {
   return null;
 }
 
-// LVT PATCH: Enhanced visibility validation with pre-render node filtering
+// LVT PATCH R2: Enhanced visibility validation with computed style checks
 function isEnhancedValidVisibleNode(element) {
   if (!element) return false;
   
-  // 1. LVT PATCH: Check if node is connected (reject React fiber clones)
+  // 1. LVT PATCH R2: Check if node is connected (reject React fiber clones)
   if (!element.isConnected) return false;
   
-  // 2. LVT PATCH: Check aria-hidden
+  // 2. LVT PATCH R2: Check aria-hidden
   if (element.getAttribute('aria-hidden') === 'true') return false;
   
-  // 3. LVT PATCH: Check offsetParent with position exception
-  if (element.offsetParent === null) {
-    const style = window.getComputedStyle(element);
-    if (style.position !== 'fixed') return false; // LVT PATCH: Allow fixed positioning
-  }
-  
-  // 4. LVT PATCH: Check computed opacity
+  // 3. LVT PATCH R2: Add computed-style validation for 0 height/width or display:none
   const style = window.getComputedStyle(element);
+  if (style.display === 'none') return false;
   if (parseFloat(style.opacity) === 0) return false;
   
-  // 5. LVT PATCH: Filter out zero-alpha duplicates and invisible pre-render nodes
+  // 4. LVT PATCH R2: Check bounding box for zero-size elements
   const rect = element.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) return false; // LVT PATCH: Zero-size check
+  if (rect.width === 0 && rect.height === 0) return false;
+  
+  // 5. LVT PATCH R2: Check offsetParent with position exception
+  if (element.offsetParent === null && style.position !== 'fixed') return false;
   
   return true;
 }
 
-// LVT PATCH: Deduplicate counters by text normalization and bounding box overlap  
+// LVT PATCH R2: Enhanced deduplication with TikTok pattern prioritization
 function deduplicateCounters(candidates) {
   const deduplicated = [];
   
   candidates.forEach(candidate => {
     const isDuplicate = deduplicated.some(existing => {
-      // LVT PATCH: Check text normalization
-      const textMatch = existing.text === candidate.text;
+      // LVT PATCH R2: Check text normalization match
+      const textMatch = existing.element.textContent.trim() === candidate.element.textContent.trim();
       
-      // LVT PATCH: Check bounding box overlap
+      // LVT PATCH R2: Check bounding box overlap (within 10px)
       const rectOverlap = Math.abs(existing.rect.left - candidate.rect.left) < 10 &&
                          Math.abs(existing.rect.top - candidate.rect.top) < 10;
       
@@ -260,8 +258,18 @@ function deduplicateCounters(candidates) {
     }
   });
   
-  // LVT PATCH: Sort by largest count (most likely to be real)
-  return deduplicated.sort((a, b) => b.count - a.count);
+  // LVT PATCH R2: Prioritize elements within TikTok patterns, then by count
+  return deduplicated.sort((a, b) => {
+    // LVT PATCH R2: Check if element is within TikTok viewer patterns
+    const aTikTokPattern = a.element.closest('.tiktok-live-viewer, .count, [data-e2e*="viewer"]');
+    const bTikTokPattern = b.element.closest('.tiktok-live-viewer, .count, [data-e2e*="viewer"]');
+    
+    if (aTikTokPattern && !bTikTokPattern) return -1;
+    if (!aTikTokPattern && bTikTokPattern) return 1;
+    
+    // LVT PATCH R2: Sort by largest count (most likely real)
+    return b.count - a.count;
+  });
 }
 
 
