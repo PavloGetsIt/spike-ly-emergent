@@ -221,65 +221,81 @@ function emitViewerUpdate(count) {
   });
 }
 
-// MutationObserver directly on viewer text node
-let currentObserverTarget = null;
-let observerIdleTimer = null;
-const OBSERVER_IDLE_TIMEOUT = 2000; // 2s idle = fallback to polling
+// ============================================================================
+// STABILIZED MUTATIONOBSERVER WITH DEBOUNCING
+// ============================================================================
+const OBSERVER_DEBOUNCE_MS = 150; // 120-200ms as specified
+let observerInProgress = false;
 
-function bindMutationObserver(element) {
-  if (currentObserverTarget === element) return; // Already bound
+// MutationObserver with reentrant spam prevention
+function bindMutationObserver(element, forceInit = false) {
+  // Prevent re-initialization spam
+  if (domObserver && currentObserverTarget === element && !forceInit) {
+    console.log('[VIEWER:DBG] observer already bound to this element');
+    return;
+  }
   
   // Unbind previous observer
   if (domObserver) {
-    try { domObserver.disconnect(); } catch (_) {}
+    try { 
+      domObserver.disconnect();
+      console.log('[VIEWER:DBG] unbound previous observer');
+    } catch (_) {}
     domObserver = null;
   }
   
-  if (!element || !isValidVisibleNode(element)) return;
+  if (!element || !isValidVisibleNode(element)) {
+    console.log('[VIEWER:DBG] invalid element for observer binding');
+    return;
+  }
   
   try {
     currentObserverTarget = element;
     
-    domObserver = new MutationObserver(() => {
-      // Reset idle timer - observer is active
-      if (observerIdleTimer) clearTimeout(observerIdleTimer);
-      observerIdleTimer = setTimeout(() => {
-        console.log('[VIEWER:PAGE] observer idle, enabling polling fallback');
-      }, OBSERVER_IDLE_TIMEOUT);
+    domObserver = new MutationObserver((mutations) => {
+      // Prevent reentrant spam
+      if (observerInProgress) return;
+      observerInProgress = true;
       
-      // Validate and emit on mutation
-      if (isValidVisibleNode(element)) {
-        const count = parseViewerCount(element);
-        if (count > 0 && shouldEmitUpdate(count)) {
-          emitViewerUpdate(count);
+      console.log(`[VIEWER:DBG] mutation detected: ${mutations.length} changes`);
+      
+      // Debounce 150ms
+      if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
+      mutationDebounceTimer = setTimeout(() => {
+        // Validate element still visible and connected
+        if (isValidVisibleNode(element)) {
+          const count = parseViewerCount(element);
+          if (count > 0 && shouldEmitWithJitterFilter(count)) {
+            emitViewerUpdate(count);
+          }
+        } else {
+          // Element became invalid, rebind via detection
+          console.log('[VIEWER:DBG] element invalidated during mutation, rebinding');
+          setTimeout(() => {
+            const newElement = detectViewerCount();
+            if (newElement) {
+              bindMutationObserver(newElement, true);
+            }
+          }, 200);
         }
-      } else {
-        // Node became invalid, rebind
-        console.log('[VIEWER:PAGE] node invalidated, rebinding');
-        const newElement = detectViewerCount();
-        if (newElement) {
-          bindMutationObserver(newElement);
-        }
-      }
+        
+        observerInProgress = false;
+      }, OBSERVER_DEBOUNCE_MS);
     });
     
-    // Observe the specific text node
+    // Observe subtree + childList + characterData as specified
     domObserver.observe(element, {
+      subtree: true,
       childList: true,
-      characterData: true,
-      subtree: false // Only this specific element
+      characterData: true
     });
     
-    console.log('[VIEWER:PAGE] observer bound to text node');
-    
-    // Start idle timer
-    observerIdleTimer = setTimeout(() => {
-      console.log('[VIEWER:PAGE] observer idle, enabling polling fallback');
-    }, OBSERVER_IDLE_TIMEOUT);
+    console.log('[VIEWER:DBG] observer bound to text node');
     
   } catch (e) {
-    console.log(`[VIEWER:PAGE] observer binding failed: ${e.message}`);
+    console.log(`[VIEWER:DBG] observer binding failed: ${e.message}`);
     currentObserverTarget = null;
+    observerInProgress = false;
   }
 }
 
