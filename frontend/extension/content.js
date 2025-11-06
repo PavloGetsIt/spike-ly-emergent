@@ -287,7 +287,7 @@ function parseViewerCount(textOrElement) {
 }
 
 // ============================================================================
-// TRACKING SYSTEM WITH 800MS POLLING
+// SIMPLIFIED TRACKING WITH MUTATIONOBSERVER + POLLING FALLBACK
 // ============================================================================
 function startTracking() {
   if (isTracking) {
@@ -298,62 +298,56 @@ function startTracking() {
   isTracking = true;
   console.log('[VIEWER:PAGE] tracking started');
   
-  // Poll every 800ms
-  pollTimer = setInterval(() => {
-    const count = detectViewerCount();
+  if (platform === 'tiktok') {
+    // Try initial detection and bind observer
+    const initialCount = detectViewerCount();
+    if (initialCount !== null && initialCount > 0) {
+      emitViewerUpdate(initialCount);
+    }
     
-    if (count !== null && count >= CONFIG.VIEWER_MIN_THRESHOLD) {
-      console.log(`[VIEWER:PAGE] value=${count}`);
-      
-      if (count !== currentViewerCount) {
-        const delta = currentViewerCount > 0 ? count - currentViewerCount : 0;
-        currentViewerCount = count;
+    // Polling fallback every 800ms (only when observer is idle)
+    pollTimer = setInterval(() => {
+      // Only poll if observer is idle or unbound
+      if (!domObserver || !currentObserverTarget || 
+          (observerIdleTimer && Date.now() - lastEmitTime > OBSERVER_IDLE_TIMEOUT)) {
         
-        // Send viewer update
+        const count = detectViewerCount();
+        if (count !== null && shouldEmitUpdate(count)) {
+          emitViewerUpdate(count);
+        } else if (count === null) {
+          // Throttled missing log
+          const now = Date.now();
+          if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
+            console.log('[VIEWER:PAGE] missing node');
+            lastLogTime = now;
+          }
+        }
+      }
+    }, CONFIG.POLL_INTERVAL_MS);
+    
+    // Heartbeat every 5s
+    setInterval(() => {
+      if (isTracking && currentViewerCount > 0) {
         safeSendMessage({
-          type: 'VIEWER_COUNT_UPDATE',
+          type: 'VIEWER_HEARTBEAT',
           platform,
-          count,
-          delta,
-          timestamp: Date.now(),
-          source: 'polling'
+          count: currentViewerCount,
+          timestamp: Date.now()
         });
       }
-    } else {
-      // Throttled missing log
-      const now = Date.now();
-      if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
-        console.log('[VIEWER:PAGE] missing node (throttled)');
-        lastLogTime = now;
+    }, CONFIG.HEARTBEAT_INTERVAL_MS);
+    
+  } else {
+    // Non-TikTok platforms: simple polling with validation
+    pollTimer = setInterval(() => {
+      const element = deepQuerySelector(platformSelectors[platform] || []);
+      if (element && isValidVisibleNode(element)) {
+        const count = parseViewerCount(element);
+        if (count !== null && shouldEmitUpdate(count)) {
+          emitViewerUpdate(count);
+        }
       }
-    }
-  }, CONFIG.POLL_INTERVAL_MS);
-  
-  // Heartbeat every 5s
-  heartbeatTimer = setInterval(() => {
-    if (isTracking && currentViewerCount > 0) {
-      safeSendMessage({
-        type: 'VIEWER_HEARTBEAT',
-        platform,
-        count: currentViewerCount,
-        timestamp: Date.now()
-      });
-    }
-  }, CONFIG.HEARTBEAT_INTERVAL_MS);
-  
-  // Try immediate detection
-  const initialCount = detectViewerCount();
-  if (initialCount > 0) {
-    console.log(`[VIEWER:PAGE] value=${initialCount}`);
-    currentViewerCount = initialCount;
-    safeSendMessage({
-      type: 'VIEWER_COUNT_UPDATE',
-      platform,
-      count: initialCount,
-      delta: 0,
-      timestamp: Date.now(),
-      source: 'initial'
-    });
+    }, CONFIG.POLL_INTERVAL_MS);
   }
 }
 
@@ -367,11 +361,18 @@ function stopTracking() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
+  
+  if (domObserver) {
+    try { domObserver.disconnect(); } catch (_) {}
+    domObserver = null;
   }
   
+  if (observerIdleTimer) {
+    clearTimeout(observerIdleTimer);
+    observerIdleTimer = null;
+  }
+  
+  currentObserverTarget = null;
   currentViewerCount = 0;
 }
 
