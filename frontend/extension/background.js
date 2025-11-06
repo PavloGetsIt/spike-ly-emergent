@@ -189,11 +189,12 @@ chrome.runtime.onConnect.addListener((port) => {
 
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Handle viewer count messages (both VIEWER_COUNT_UPDATE and VIEWER_HEARTBEAT)
+// LVT PATCH: Enhanced message handling with proper async response
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'VIEWER_COUNT_UPDATE' || message.type === 'VIEWER_HEARTBEAT') {
     console.log(`[VIEWER:BG] forwarded=${message.count}`);
     
-    // Cache last viewer value
+    // LVT PATCH: Cache last viewer value
     lastViewer = {
       platform: message.platform,
       count: message.count,
@@ -221,7 +222,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }));
     }
 
-    // Forward to sidepanel
+    // LVT PATCH: Forward to sidepanel with enhanced error handling
     chrome.runtime.sendMessage({
       type: 'VIEWER_COUNT',
       platform: message.platform,
@@ -231,12 +232,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       source: message.source
     }, () => { 
       if (chrome.runtime.lastError) {
-        // Side panel may not be open
+        console.log('[VIEWER:BG] sidepanel forward failed:', chrome.runtime.lastError.message); // LVT PATCH: Log failures
       }
     });
 
-    sendResponse?.({ success: true });
-    return true;
+    sendResponse?.({ success: true }); // LVT PATCH: Always call sendResponse
+    return true; // LVT PATCH: Return true for async delivery
   }
   
   if (message.type === 'POPUP_ACTIVATED') {
