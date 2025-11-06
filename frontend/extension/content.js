@@ -55,12 +55,37 @@ let observerIdleTimer = null;
 let mutationDebounceTimer = null;
 let observerInProgress = false;
 
-// LVT PATCH FIX: Restore shadow DOM traversal with latest selectors
+// ============================================================================
+// LVT PATCH R2: Shadow DOM recursion fix with walkShadows
+// ============================================================================
+function walkShadows(node, collectCallback, visited = new WeakSet()) {
+  if (!node || visited.has(node)) return;
+  visited.add(node);
+  
+  // LVT PATCH R2: Process current node
+  collectCallback(node);
+  
+  // LVT PATCH R2: If node.shadowRoot, recursively walk shadows
+  if (node.shadowRoot && !visited.has(node.shadowRoot)) {
+    visited.add(node.shadowRoot);
+    const shadowElements = node.shadowRoot.querySelectorAll('*');
+    for (const shadowEl of shadowElements) {
+      walkShadows(shadowEl, collectCallback, visited);
+    }
+  }
+  
+  // LVT PATCH R2: Walk child elements
+  for (const child of node.children || []) {
+    walkShadows(child, collectCallback, visited);
+  }
+}
+
+// LVT PATCH R2: Enhanced shadow DOM traversal with recursive collection
 function deepQuerySelector(selectors, root = document, depth = 0) {
-  const MAX_DEPTH = 4; // LVT PATCH FIX: Depth limit to prevent infinite loops
+  const MAX_DEPTH = 4;
   if (depth > MAX_DEPTH) return null;
   
-  // LVT PATCH FIX: Direct query first with latest TikTok selectors
+  // LVT PATCH R2: Direct query first
   for (const selector of selectors) {
     try {
       const element = root.querySelector(selector);
@@ -73,22 +98,29 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
     }
   }
   
-  // LVT PATCH FIX: Shadow DOM traversal with loop detection
-  const visited = new WeakSet();
-  const allElements = root.querySelectorAll('*');
-  
-  for (const element of allElements) {
-    if (visited.has(element)) continue;
-    visited.add(element);
-    
-    if (element.shadowRoot && !visited.has(element.shadowRoot)) {
-      visited.add(element.shadowRoot);
-      const shadowResult = deepQuerySelector(selectors, element.shadowRoot, depth + 1);
-      if (shadowResult) {
-        console.log(`[VIEWER:DBG] shadow DOM hit at depth ${depth + 1}`);
-        return shadowResult;
+  // LVT PATCH R2: Recursive shadow traversal using walkShadows
+  const candidates = [];
+  walkShadows(root, (node) => {
+    // LVT PATCH R2: Collect all span, div, strong elements with numeric text
+    if ((node.tagName === 'SPAN' || node.tagName === 'DIV' || node.tagName === 'STRONG') && node.textContent) {
+      const text = node.textContent.trim();
+      if (/^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(text)) {
+        // LVT PATCH R2: Skip nodes with opacity:0, aria-hidden:true, or detached
+        if (isEnhancedValidVisibleNode(node)) {
+          const count = parseViewerCount(text);
+          if (count > CONFIG.VIEWER_MIN_THRESHOLD) {
+            candidates.push({ element: node, count, rect: node.getBoundingClientRect() });
+          }
+        }
       }
     }
+  });
+  
+  // LVT PATCH R2: Deduplicate by bounding box overlap and return highest stable count
+  if (candidates.length > 0) {
+    const deduped = deduplicateCounters(candidates);
+    console.log(`[VIEWER:DBG] walkShadows found ${candidates.length} candidates, ${deduped.length} after dedup`);
+    return deduped[0]?.element || null;
   }
   
   return null;
