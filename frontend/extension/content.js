@@ -63,48 +63,49 @@ function deepQuerySelector(selectors, root = document) {
 }
 
 // ============================================================================
-// ENHANCED TIKTOK VIEWER DETECTION
+// RESILIENT VIEWER DETECTION WITH VISIBILITY VALIDATION
 // ============================================================================
 function detectViewerCount() {
   if (platform === 'tiktok') {
     
-    // Modern TikTok selectors for shadow DOM
+    // Enhanced selectors with visibility validation
     const selectors = [
       '.viewer-count',
       'span[data-e2e="live-viewer-count"]',
       '[data-e2e="live-room-viewers"]',
       '[data-testid="live-room-viewers"]',
       '[data-e2e*="viewer"]',
-      '[data-e2e*="audience"]',
       '[class*="ViewerCount"]',
       '[class*="LiveAudience"]'
     ];
     
-    // Try shadow DOM traversal
+    // Try shadow DOM traversal with validation
     const element = deepQuerySelector(selectors);
-    if (element) {
+    if (element && isValidVisibleNode(element)) {
       const count = parseViewerCount(element);
       if (count > 0) {
+        bindMutationObserver(element); // Bind directly to this element
         return count;
       }
     }
     
-    // Fallback: Search for numeric text near Live badge
-    const liveElements = document.querySelectorAll('*');
-    for (const el of liveElements) {
+    // Fallback: Search near LIVE badge with validation
+    const liveElements = Array.from(document.querySelectorAll('*')).filter(el => {
       const text = el.textContent?.trim();
-      if (text && (text.includes('LIVE') || text.includes('Live'))) {
-        // Look for nearby numeric elements
-        const parent = el.closest('div, section, span');
-        if (parent) {
-          const numbers = parent.querySelectorAll('span, div');
-          for (const numEl of numbers) {
-            const numText = numEl.textContent?.trim();
-            if (numText && /^\d+(\.\d+)?[KkMm]?$/.test(numText)) {
-              const count = parseViewerCount(numText);
-              if (count >= CONFIG.VIEWER_MIN_THRESHOLD) {
-                return count;
-              }
+      return text && (text.includes('LIVE') || text.includes('Live')) && isValidVisibleNode(el);
+    });
+    
+    for (const liveEl of liveElements) {
+      const parent = liveEl.closest('div, section, span');
+      if (parent) {
+        const numbers = parent.querySelectorAll('span, div');
+        for (const numEl of numbers) {
+          const numText = numEl.textContent?.trim();
+          if (numText && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(numText) && isValidVisibleNode(numEl)) {
+            const count = parseViewerCount(numText);
+            if (count >= CONFIG.VIEWER_MIN_THRESHOLD) {
+              bindMutationObserver(numEl); // Bind to the number element
+              return count;
             }
           }
         }
@@ -114,7 +115,7 @@ function detectViewerCount() {
     return null;
   }
   
-  // Non-TikTok platforms
+  // Non-TikTok platforms with validation
   const platformSelectors = {
     twitch: ['[data-a-target="animated-channel-viewers-count"]', '.live-indicator-container span'],
     kick: ['[class*="viewer-count"]', '[class*="ViewerCount"]'],
@@ -124,12 +125,98 @@ function detectViewerCount() {
   const selectors = platformSelectors[platform] || [];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
-    if (element && hasValidViewerCount(element)) {
+    if (element && isValidVisibleNode(element) && hasValidViewerCount(element)) {
       return parseViewerCount(element);
     }
   }
   
   return null;
+}
+
+// Validate node visibility and connectivity
+function isValidVisibleNode(element) {
+  if (!element) return false;
+  
+  // 1. Check if node is connected (reject React fiber clones)
+  if (!element.isConnected) return false;
+  
+  // 2. Check aria-hidden
+  if (element.getAttribute('aria-hidden') === 'true') return false;
+  
+  // 3. Check offsetParent (display:none elements have null offsetParent)
+  if (element.offsetParent === null) {
+    // Exception: elements with position:fixed can have null offsetParent but still be visible
+    const style = window.getComputedStyle(element);
+    if (style.position !== 'fixed' && style.display === 'none') return false;
+  }
+  
+  // 4. Check opacity
+  const style = window.getComputedStyle(element);
+  if (parseFloat(style.opacity) === 0) return false;
+  
+  return true;
+}
+
+// MutationObserver directly on viewer text node
+let currentObserverTarget = null;
+let observerIdleTimer = null;
+const OBSERVER_IDLE_TIMEOUT = 2000; // 2s idle = fallback to polling
+
+function bindMutationObserver(element) {
+  if (currentObserverTarget === element) return; // Already bound
+  
+  // Unbind previous observer
+  if (domObserver) {
+    try { domObserver.disconnect(); } catch (_) {}
+    domObserver = null;
+  }
+  
+  if (!element || !isValidVisibleNode(element)) return;
+  
+  try {
+    currentObserverTarget = element;
+    
+    domObserver = new MutationObserver(() => {
+      // Reset idle timer - observer is active
+      if (observerIdleTimer) clearTimeout(observerIdleTimer);
+      observerIdleTimer = setTimeout(() => {
+        console.log('[VIEWER:PAGE] observer idle, enabling polling fallback');
+      }, OBSERVER_IDLE_TIMEOUT);
+      
+      // Validate and emit on mutation
+      if (isValidVisibleNode(element)) {
+        const count = parseViewerCount(element);
+        if (count > 0 && shouldEmitUpdate(count)) {
+          emitViewerUpdate(count);
+        }
+      } else {
+        // Node became invalid, rebind
+        console.log('[VIEWER:PAGE] node invalidated, rebinding');
+        const newElement = detectViewerCount();
+        if (newElement) {
+          bindMutationObserver(newElement);
+        }
+      }
+    });
+    
+    // Observe the specific text node
+    domObserver.observe(element, {
+      childList: true,
+      characterData: true,
+      subtree: false // Only this specific element
+    });
+    
+    console.log('[VIEWER:PAGE] observer bound to text node');
+    
+    // Start idle timer
+    observerIdleTimer = setTimeout(() => {
+      console.log('[VIEWER:PAGE] observer idle, enabling polling fallback');
+    }, OBSERVER_IDLE_TIMEOUT);
+    
+  } catch (e) {
+    console.log(`[VIEWER:PAGE] observer binding failed: ${e.message}`);
+    currentObserverTarget = null;
+  }
 }
 
 function hasValidViewerCount(element) {
