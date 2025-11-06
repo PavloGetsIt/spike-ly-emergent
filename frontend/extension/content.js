@@ -125,12 +125,6 @@ function detectViewerCount() {
   }
   
   // Non-TikTok platforms with validation
-  const platformSelectors = {
-    twitch: ['[data-a-target="animated-channel-viewers-count"]', '.live-indicator-container span'],
-    kick: ['[class*="viewer-count"]', '[class*="ViewerCount"]'],
-    youtube: ['span.ytp-live-badge + span', '.ytp-live .ytp-time-current']
-  };
-  
   const selectors = platformSelectors[platform] || [];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
