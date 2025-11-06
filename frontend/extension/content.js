@@ -31,6 +31,14 @@ function detectPlatform() {
 
 const platform = detectPlatform();
 
+// Platform-specific selectors
+const platformSelectors = {
+  twitch: ['[data-a-target="animated-channel-viewers-count"]', '.live-indicator-container span'],
+  kick: ['[class*="viewer-count"]', '[class*="ViewerCount"]'],
+  youtube: ['span.ytp-live-badge + span', '.ytp-live .ytp-time-current']
+};
+
+
 // State variables
 let isTracking = false;
 let currentViewerCount = 0;
