@@ -228,29 +228,35 @@ function detectViewerCount() {
   return null;
 }
 
-// LVT PATCH R2: Enhanced visibility validation with computed style checks
-function isEnhancedValidVisibleNode(element) {
+// LVT PATCH R3: Comprehensive visibility validation with all checks
+function isComprehensivelyVisible(element) {
   if (!element) return false;
   
-  // 1. LVT PATCH R2: Check if node is connected (reject React fiber clones)
+  // LVT PATCH R3: Check if node is connected (reject React fiber clones)
   if (!element.isConnected) return false;
   
-  // 2. LVT PATCH R2: Check aria-hidden
+  // LVT PATCH R3: Check aria-hidden
   if (element.getAttribute('aria-hidden') === 'true') return false;
   
-  // 3. LVT PATCH R2: Add computed-style validation for 0 height/width or display:none
+  // LVT PATCH R3: Comprehensive computed style validation
   const style = window.getComputedStyle(element);
   if (style.display === 'none') return false;
+  if (style.visibility === 'hidden') return false; // LVT PATCH R3: Added visibility check
   if (parseFloat(style.opacity) === 0) return false;
   
-  // 4. LVT PATCH R2: Check bounding box for zero-size elements
+  // LVT PATCH R3: Check bounding box for zero-size elements
   const rect = element.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return false;
   
-  // 5. LVT PATCH R2: Check offsetParent with position exception
+  // LVT PATCH R3: Check offsetParent (with fixed position exception)
   if (element.offsetParent === null && style.position !== 'fixed') return false;
   
   return true;
+}
+
+// LVT PATCH R3: Update existing function to use comprehensive visibility
+function isEnhancedValidVisibleNode(element) {
+  return isComprehensivelyVisible(element); // LVT PATCH R3: Delegate to comprehensive check
 }
 
 // LVT PATCH R2: Enhanced deduplication with TikTok pattern prioritization
