@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 import json
 import re
 import time
@@ -91,6 +91,12 @@ class HistoryItem(BaseModel):
     delta: int
     emotion: Optional[str] = None
 
+class ChatData(BaseModel):
+    commentCount: int
+    chatRate: int
+    topKeywords: Optional[List[str]] = None
+    recentComments: Optional[List[str]] = None
+
 class InsightRequest(BaseModel):
     transcript: str
     viewerDelta: int
@@ -108,6 +114,8 @@ class InsightRequest(BaseModel):
     winningTopics: Optional[List[str]] = None
     transcriptQuality: Optional[str] = None
     uniqueWordRatio: Optional[float] = None
+    # Chat stream data
+    chatData: Optional[ChatData] = None
 
 class InsightResponse(BaseModel):
     emotionalLabel: str
@@ -285,6 +293,22 @@ Return ONLY valid JSON. No markdown, no explanations."""
             if request.uniqueWordRatio:
                 quality_indicator += f" (word variety: {request.uniqueWordRatio:.0%})"
         
+        # Chat context
+        chat_context_str = ""
+        if request.chatData:
+            chat_context_str = f"\n💬 LIVE CHAT CONTEXT:\n"
+            chat_context_str += f"- Comments: {request.chatData.commentCount} in last 30s\n"
+            chat_context_str += f"- Chat rate: {request.chatData.chatRate}/min\n"
+            
+            if request.chatData.topKeywords and len(request.chatData.topKeywords) > 0:
+                chat_context_str += f"- Top chat keywords: {', '.join(request.chatData.topKeywords)}\n"
+            
+            if request.chatData.recentComments and len(request.chatData.recentComments) > 0:
+                chat_context_str += f"- Recent comments:\n"
+                for comment in request.chatData.recentComments[-3:]:  # Show last 3
+                    chat_context_str += f"  • {comment}\n"
+                chat_context_str += "\n💡 Use chat context: Reference specific viewer questions, respond to comments, or acknowledge engagement"
+        
         # Create user prompt with enriched context
         user_prompt = f"""LIVE STREAM DATA:
 
@@ -307,6 +331,8 @@ RECENT PATTERN: {history_str}
 SIGNAL STRENGTH: {request.quality or 'medium'}
 
 {quality_indicator}
+
+{chat_context_str}
 
 ---
 🎯 CONTEXT FOR VARIETY:
@@ -356,8 +382,8 @@ Generate ONE hyper-specific tactical insight NOW. Include concrete nouns from tr
         # Call Claude API directly
         logger.info("🤖 Calling Claude Sonnet 4.5 with your API key...")
         
-        client = Anthropic(api_key=api_key)
-        response = client.messages.create(
+        client = AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=150,
             system=system_prompt,

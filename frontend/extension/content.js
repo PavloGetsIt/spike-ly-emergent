@@ -1,12 +1,112 @@
 (function(){
+  'use strict';
+  
+  // IMMEDIATE LOAD CHECK
+  console.log('%c🚀🚀🚀 [SPIKELY] CONTENT SCRIPT LOADING v2.5.0... 🚀🚀🚀', 'color: green; font-weight: bold; font-size: 16px');
+  console.log('[SPIKELY] URL:', window.location.href);
+  console.log('[SPIKELY] DOM ready state:', document.readyState);
+  
+  // Prevent double initialization
+  if (window.__SPIKELY_CONTENT_ACTIVE__) {
+    console.warn('[Spikely] ⚠️ Content script already active - skipping');
+    return;
+  }
+  
+  // Initialize IMMEDIATELY - no waiting for DOM
+  console.log('[SPIKELY] 🏁 Starting immediate initialization...');
+  window.__SPIKELY_CONTENT_ACTIVE__ = true;
+  
+  // Platform detection
+  const hostname = window.location.hostname;
+  const platform = hostname.includes('tiktok.com') ? 'tiktok' 
+                 : hostname.includes('twitch.tv') ? 'twitch'
+                 : hostname.includes('kick.com') ? 'kick'
+                 : hostname.includes('youtube.com') ? 'youtube'
+                 : 'unknown';
+  
+  console.log('[SPIKELY] Platform detected:', platform);
+  
+  // Send handshake immediately
   try {
-    if (window.__SPIKELY_CONTENT_ACTIVE__) {
-      console.log('[Spikely] Content script already initialized - skipping reinjection');
-      return;
-    }
-    window.__SPIKELY_CONTENT_ACTIVE__ = true;
-  } catch (_) {}
+    console.log('[SPIKELY] 📡 Sending handshake...');
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      platform: platform,
+      url: window.location.href,
+      timestamp: Date.now()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[SPIKELY] ⚠️ Handshake failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[SPIKELY] ✅ Handshake confirmed');
+      }
+    });
+  } catch (e) {
+    console.error('[SPIKELY] ❌ Handshake error:', e);
+  }
 
+// ============================================================================
+// VARIABLE DECLARATIONS - Must be before any function calls
+// ============================================================================
+
+// Platform detection - declare before use
+function detectPlatform() {
+  const hostname = window.location.hostname;
+  if (hostname.includes('tiktok.com')) return 'tiktok';
+  if (hostname.includes('twitch.tv')) return 'twitch';
+  if (hostname.includes('kick.com')) return 'kick';
+  if (hostname.includes('youtube.com')) return 'youtube';
+  return 'unknown';
+}
+
+const platform = detectPlatform();
+
+// Viewer tracking state
+let currentViewerCount = 0;
+let detectionInterval = null;
+let isTracking = false;
+let lastSentCount = 0;
+let lastSentAt = 0;
+
+// Cached element + DOM observer to survive SPA/DOM changes
+let cachedViewerEl = null;
+let cachedContainer = null;
+let domObserver = null;
+
+// Warm-up state
+let warmupSamples = [];
+let warmupStartTime = 0;
+let warmupMutationTicks = 0;
+let isWarmupComplete = false;
+let warmupReselectTimer = null;
+let warmupStuckTimer = null;
+
+// Post-warm-up validation state
+let warmupMedian = 0;
+let warmupMAD = 0;
+let lastValidSamples = [];
+let lastEmittedCount = 0;
+let lastEmittedAt = 0;
+let lastZeroAt = 0;
+let consecutiveZeros = 0;
+
+// Navigation tracking
+let lastPathname = window.location.pathname;
+
+// Chat state
+let chatContainer = null;
+let chatObserver = null;
+let chatBuffer = [];
+let lastChatEmitTime = 0;
+let seenCommentIds = new Set();
+let chatMutationDebounce = null;
+let chatRetryInterval = null;
+let isChatTracking = false;
+
+// Retry state
+let viewerDetectionRetries = 0;
+const MAX_VIEWER_RETRIES = 60; // 60 * 500ms = 30 seconds max
+let viewerRetryInterval = null;
 // ============================================================================
 // TIKTOK VIEWER COUNT STARTUP FIX - Configuration (v025 - INSTANT MODE)
 // ============================================================================
@@ -35,15 +135,122 @@ function detectPlatform() {
   return 'unknown';
 }
 
-// Platform-specific selectors
+// HANDSHAKE - Send ready message to background script
+function sendContentScriptReady() {
+  try {
+    console.log('[SPIKELY] 📡 Sending CONTENT_SCRIPT_READY handshake...');
+    chrome.runtime.sendMessage({
+      type: 'CONTENT_SCRIPT_READY',
+      platform,
+      url: window.location.href,
+      timestamp: Date.now()
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[SPIKELY] ⚠️ Handshake failed:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[SPIKELY] ✅ Handshake confirmed by background script');
+      }
+    });
+  } catch (e) {
+    console.error('[SPIKELY] ❌ Handshake error:', e);
+  }
+}
+
+function startViewerDetectionWithRetry() {
+  console.log('[SPIKELY] 🔍 Starting viewer detection with retry logic (no cache assumptions)...');
+  
+  // Clear any cached elements - start fresh
+  cachedViewerEl = null;
+  cachedContainer = null;
+  
+  function attemptViewerDetection() {
+    console.log(`[SPIKELY] 🔄 Attempt ${viewerDetectionRetries + 1}/${MAX_VIEWER_RETRIES}`);
+    
+    const node = queryViewerNode();
+    
+    if (node) {
+      const parsed = normalizeAndParse(node);
+      console.log('[SPIKELY] ✅ VIEWER DETECTION SUCCESS:', parsed, 'after', viewerDetectionRetries, 'retries');
+      
+      // Clear retry interval
+      if (viewerRetryInterval) {
+        clearInterval(viewerRetryInterval);
+        viewerRetryInterval = null;
+      }
+      
+      // Setup mutation observer to monitor this element
+      setupMutationObserver();
+      
+      // Send initial count immediately
+      if (parsed > 0) {
+        console.log('[SPIKELY] 📤 Sending initial viewer count:', parsed);
+        emitViewerCount(parsed, 0);
+      }
+      
+      return true;
+    } else {
+      viewerDetectionRetries++;
+      
+      if (viewerDetectionRetries >= MAX_VIEWER_RETRIES) {
+        console.warn('[SPIKELY] ❌ Viewer detection failed after', MAX_VIEWER_RETRIES, 'retries (30 seconds)');
+        if (viewerRetryInterval) {
+          clearInterval(viewerRetryInterval);
+          viewerRetryInterval = null;
+        }
+        
+        // Start a slower background retry (every 5 seconds)
+        console.log('[SPIKELY] 🔄 Starting background retry every 5 seconds...');
+        const backgroundRetry = setInterval(() => {
+          console.log('[SPIKELY] 🔍 Background retry...');
+          const bgNode = queryViewerNode();
+          if (bgNode) {
+            clearInterval(backgroundRetry);
+            const parsed = normalizeAndParse(bgNode);
+            console.log('[SPIKELY] ✅ Background retry SUCCESS:', parsed);
+            setupMutationObserver();
+            if (parsed > 0) emitViewerCount(parsed, 0);
+          }
+        }, 5000);
+        
+        return false;
+      }
+      
+      return false;
+    }
+  }
+  
+  // Try once immediately
+  if (!attemptViewerDetection()) {
+    // If failed, start retry interval
+    console.log('[SPIKELY] ⏰ Starting retry interval (500ms)...');
+    viewerRetryInterval = setInterval(attemptViewerDetection, 500);
+  }
+}
+
+// Platform-specific selectors (COMPREHENSIVE 2025 UPDATE)
 const PLATFORM_SELECTORS = {
   tiktok: [
-    '.P4-Regular.text-UIText3', // New TikTok digit container
-    'div:has(> span.inline-flex.justify-center)', // Container with digit spans
+    // 2025 TikTok Live selectors - Updated for current structure
     '[data-e2e="live-viewer-count"]',
-    '[data-e2e="room-stats-viewer-count"]',
-    '.live-viewer-count',
-    'svg[data-e2e="eye-icon"] + span',
+    '[data-e2e*="viewer"]',
+    '[data-testid*="viewer"]',
+    '[class*="LiveViewerCount"]',
+    '[class*="ViewerCount"]',
+    '[class*="live-viewer"]',
+    '[class*="viewer-count"]',
+    
+    // Updated patterns for TikTok's 2025 redesign
+    'div[class*="live"] span[class*="text"]',
+    'div[role="presentation"] span',
+    'div:has(> span:contains("Viewers"))',
+    
+    // Generic number patterns
+    'span:matches(text, /^[\\d,]+\\.?\\d*[KkMm]?$/)',
+    'div:matches(text, /^[\\d,]+\\.?\\d*[KkMm]?$/)',
+    
+    // Original working selectors (preserved)
+    '.P4-Regular.text-UIText3',
+    'div:has(> span.inline-flex.justify-center)'
   ],
   twitch: [
     '[data-a-target="animated-channel-viewers-count"]',
@@ -62,54 +269,6 @@ const PLATFORM_SELECTORS = {
   ]
 };
 
-let currentViewerCount = 0;
-let detectionInterval = null;
-let isTracking = false;
-let lastSentCount = 0;
-let lastSentAt = 0;
-const platform = detectPlatform();
-
-// Cached element + DOM observer to survive SPA/DOM changes
-let cachedViewerEl = null;
-let cachedContainer = null;
-let domObserver = null;
-
-// Warm-up state
-let warmupSamples = [];
-let warmupStartTime = 0;
-let warmupMutationTicks = 0;
-let isWarmupComplete = false;
-let warmupReselectTimer = null;
-let warmupStuckTimer = null;
-
-// Post-warm-up validation state
-let warmupMedian = 0;
-let warmupMAD = 0;
-let lastValidSamples = [];
-let lastEmittedCount = 0;
-let lastEmittedAt = 0;
-let lastZeroAt = 0;
-let consecutiveZeros = 0;
-
-// Navigation tracking
-let lastPathname = window.location.pathname;
-
-// Silence noisy unhandled rejections when extension reloads
-try {
-  window.addEventListener('unhandledrejection', (e) => {
-    const reason = String(e.reason || '');
-    if (
-      reason.includes('Extension context invalidated') ||
-      reason.includes('Could not establish connection') ||
-      reason.includes('Receiving end does not exist')
-    ) {
-      e.preventDefault();
-    }
-  });
-} catch (_) {}
-
-
-console.log(`[Spikely] Detected platform: ${platform}`);
 
 // ============================================================================
 // Multi-tier DOM Selector Strategy (TikTok-specific hardening)
@@ -118,71 +277,131 @@ function queryViewerNode() {
   // Reuse if still in DOM
   if (cachedViewerEl && document.contains(cachedViewerEl)) return cachedViewerEl;
 
-  // TikTok-specific 3-tier selector strategy
+  console.log('[VC:DEBUG] 🔍 Starting TikTok viewer count search...');
+  console.log('[VC:DEBUG] 🌐 Current URL:', window.location.href);
+  
   if (platform === 'tiktok') {
-    // Tier 1: Label-driven lookup (find "Viewers" text)
-    const labels = Array.from(document.querySelectorAll('div,span,strong,p')).filter(
-      el => el.textContent && el.textContent.trim().toLowerCase() === 'viewers'
-    );
-    for (const label of labels) {
-      const parent = label.parentElement || label.closest('div,section,li');
-      const digitContainer = parent?.querySelector('div:has(> span.inline-flex.justify-center)')
-        || parent?.querySelector('.P4-Regular.text-UIText3')
-        || parent?.nextElementSibling;
-      if (digitContainer) {
-        const parsed = normalizeAndParse(digitContainer);
-        if (parsed !== null && parsed > 0) {
-          console.debug('[TT:SEL] ✓ Tier 1: Label-driven match');
-          cachedViewerEl = digitContainer;
-          cachedContainer = digitContainer.closest('div,section,header') || document.body;
-          return digitContainer;
+    
+    // STRATEGY 1: Enhanced querySelectorAll with shadow DOM support
+    console.log('[VC:DEBUG] 🎯 Strategy 1: Enhanced DOM search with shadow roots...');
+    
+    // Get all elements including shadow DOM
+    const getAllElements = (root = document) => {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_ELEMENT,
+        null,
+        false
+      );
+      
+      const elements = [root];
+      let node;
+      while (node = walker.nextNode()) {
+        elements.push(node);
+        // Check shadow roots
+        if (node.shadowRoot) {
+          elements.push(...getAllElements(node.shadowRoot));
+        }
+      }
+      return elements;
+    };
+    
+    const allElements = getAllElements();
+    console.log('[VC:DEBUG] Found', allElements.length, 'elements (including shadow DOM)');
+    
+    // Look for "Viewers • 127" patterns first
+    for (const element of allElements) {
+      const text = element.textContent?.trim() || '';
+      
+      // Match "Viewers • 127" or "Viewers: 127" patterns
+      if (/viewers?\s*[•:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+        console.log('[VC:DEBUG] 🎯 Found "Viewers •" pattern:', text);
+        
+        const match = text.match(/viewers?\s*[•:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
+        if (match) {
+          const countText = match[1];
+          const parsed = normalizeAndParse(countText);
+          
+          if (parsed !== null && parsed > 0) {
+            console.log('[VC:DEBUG] ✅ STRATEGY 1 SUCCESS: Found via "Viewers •":', countText, '→', parsed);
+            cachedViewerEl = element;
+            cachedContainer = element.parentElement;
+            return element;
+          }
         }
       }
     }
-
-    // Tier 2: Priority selector sweep
+    
+    // STRATEGY 2: Look for standalone numbers near "Viewers" text
+    console.log('[VC:DEBUG] 🎯 Strategy 2: Searching for viewer labels and nearby numbers...');
+    
+    const viewerLabels = allElements.filter(el => {
+      const text = el.textContent?.trim().toLowerCase() || '';
+      return text === 'viewers' || text === 'viewer' || text.includes('viewers');
+    });
+    
+    console.log('[VC:DEBUG] Found', viewerLabels.length, 'potential viewer labels');
+    
+    for (const label of viewerLabels) {
+      // Search siblings and children for numbers
+      const parent = label.parentElement;
+      if (!parent) continue;
+      
+      const candidates = [
+        label,
+        ...Array.from(parent.children),
+        parent.nextElementSibling,
+        parent.previousElementSibling,
+        ...Array.from(parent.querySelectorAll('span, div'))
+      ].filter(Boolean);
+      
+      for (const candidate of candidates) {
+        const text = candidate.textContent?.trim() || '';
+        if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
+          const parsed = normalizeAndParse(text);
+          if (parsed !== null && parsed > 0) {
+            console.log('[VC:DEBUG] ✅ STRATEGY 2 SUCCESS: Found number near viewer label:', text, '→', parsed);
+            cachedViewerEl = candidate;
+            cachedContainer = parent;
+            return candidate;
+          }
+        }
+      }
+    }
+    
+    // STRATEGY 3: Priority selectors with querySelectorAll
+    console.log('[VC:DEBUG] 🎯 Strategy 3: Testing priority selectors...');
     const selectors = PLATFORM_SELECTORS[platform] || [];
+    
     for (let i = 0; i < selectors.length; i++) {
-      const element = document.querySelector(selectors[i]);
-      if (element && element.textContent?.trim()) {
-        const parsed = normalizeAndParse(element);
-        if (parsed !== null && parsed > 0) {
-          console.debug(`[TT:SEL] ✓ Tier 2: Selector[${i}] matched`);
-          cachedViewerEl = element;
-          cachedContainer = element.closest('div,section,header') || document.body;
-          return element;
+      const selector = selectors[i];
+      try {
+        // Use querySelectorAll to get all matches, pick best one
+        const elements = document.querySelectorAll(selector);
+        
+        if (elements.length > 0) {
+          console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → found ${elements.length} elements`);
+          
+          for (const element of elements) {
+            const text = element.textContent?.trim() || '';
+            const parsed = normalizeAndParse(element);
+            
+            if (parsed !== null && parsed > 0) {
+              console.log(`[VC:DEBUG] ✅ STRATEGY 3 SUCCESS: Selector ${i + 1}, element with value:`, parsed);
+              cachedViewerEl = element;
+              cachedContainer = element.parentElement;
+              return element;
+            }
+          }
+        } else {
+          console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → no matches`);
         }
+      } catch (e) {
+        console.log(`[VC:DEBUG] Selector ${i + 1}: "${selector}" → ERROR:`, e.message);
       }
     }
 
-    // Tier 3: Heuristic fallback (numeric node near eye icon)
-    const candidates = document.querySelectorAll('span, div, p, strong');
-    for (const node of candidates) {
-      const text = node.textContent?.trim() || '';
-      if (!/^[\d,\.]+[kKmM]?$/.test(text)) continue;
-
-      let ctxNode = node.parentElement;
-      let depth = 0;
-      let hasContext = false;
-      while (ctxNode && depth < 3 && !hasContext) {
-        const ctxText = ctxNode.textContent?.toLowerCase() || '';
-        if (ctxText.includes('viewer') || ctxText.includes('watching')) hasContext = true;
-        if (ctxNode.querySelector('svg[data-e2e="eye-icon"], [data-icon="eye"], svg[aria-label*="eye" i]')) hasContext = true;
-        ctxNode = ctxNode.parentElement;
-        depth++;
-      }
-
-      if (hasContext) {
-        const parsed = normalizeAndParse(node);
-        if (parsed !== null && parsed > 0) {
-          console.debug('[TT:SEL] ✓ Tier 3: Heuristic match');
-          cachedViewerEl = node;
-          cachedContainer = node.closest('div,section,header') || document.body;
-          return node;
-        }
-      }
-    }
-    console.debug('[TT:SEL] ✗ No match found');
+    console.log('[VC:DEBUG] ❌ All strategies failed - no viewer count found');
     return null;
   }
 
@@ -195,13 +414,124 @@ function queryViewerNode() {
       return element;
     }
   }
-
+  
   return null;
 }
 
-// Legacy alias for non-TikTok platforms
+// DEPRECATED: Legacy method for backward compatibility
 function findViewerElement() {
   return queryViewerNode();
+}
+
+
+// ============================================================================
+// Robust Text Normalization & Parsing (with K/M suffix support)
+// ============================================================================
+function normalizeAndParse(textOrElement) {
+  if (!textOrElement) return null;
+  
+  // Handle Element objects (TikTok split-digit format)
+  if (textOrElement instanceof Element) {
+    const el = textOrElement;
+
+    // Try split-digit parsing first (TikTok renders each digit separately)
+    let best = null;
+    const digitSpans = el.querySelectorAll('span.inline-flex.justify-center');
+    if (digitSpans.length > 0) {
+      const digits = Array.from(digitSpans)
+        .map(span => span.textContent.trim())
+        .join('')
+        .replace(/[·\s,]/g, '');
+
+      const suffixMatch = (el.textContent || '').toLowerCase().match(/([km])/);
+      // FIX: Use parseFloat instead of parseInt to preserve decimals (1.2K → 1200, not 1000)
+      let parsed = parseFloat(digits);
+      if (!isNaN(parsed) && parsed > 0) {
+        if (suffixMatch?.[1] === 'k') parsed *= 1000;
+        if (suffixMatch?.[1] === 'm') parsed *= 1000000;
+        // Round to nearest integer for final count
+        best = Math.round(parsed);
+        console.debug(`[TT:PARSE] Split-digit: "${digits}" + suffix "${suffixMatch?.[1] || 'none'}" → ${best}`);
+      }
+    }
+
+    // Also try full text parse
+    const fullText = (el.textContent || '').trim().toLowerCase();
+    const fullParsed = parseTextToCount(fullText);
+    
+    return best !== null ? best : fullParsed;
+  }
+  
+  // Handle string text
+  return parseTextToCount(String(textOrElement));
+}
+
+function parseTextToCount(text) {
+  const cleaned = text.toLowerCase().replace(/[\s,·•]/g, '');
+  const match = cleaned.match(/([\d.]+)([km])?/);
+  if (!match) {
+    console.debug(`[TT:PARSE] ✗ No match: "${text}"`);
+    return null;
+  }
+  
+  let num = parseFloat(match[1]);
+  const suffix = match[2];
+  
+  if (suffix === 'k') num *= 1000;
+  if (suffix === 'm') num *= 1000000;
+  
+  // Use Math.round for better accuracy (1.2K → 1200, not 1000)
+  const result = Math.round(num);
+  
+  if (!isFinite(result) || isNaN(result) || result < 0) {
+    console.debug(`[TT:PARSE] ✗ Invalid: "${text}" → NaN/Inf/negative`);
+    return null;
+  }
+  
+  console.debug(`[TT:PARSE] ✓ "${text}" → ${result}`);
+  return result;
+}
+
+// Run parser validation tests on load
+function validateParserFix() {
+  const tests = [
+    { input: "953", expected: 953 },
+    { input: "1K", expected: 1000 },
+    { input: "1.0K", expected: 1000 },
+    { input: "1.2K", expected: 1200 },
+    { input: "1.5K", expected: 1500 },
+    { input: "1.9K", expected: 1900 },
+    { input: "15K", expected: 15000 },
+    { input: "15.3K", expected: 15300 },
+    { input: "1M", expected: 1000000 },
+    { input: "1.5M", expected: 1500000 },
+    { input: "1.2m", expected: 1200000 },
+    { input: "2.5k", expected: 2500 }
+  ];
+  
+  console.log('[TT:PARSE] 🧪 Running parser validation tests...');
+  let passed = 0;
+  let failed = 0;
+  
+  tests.forEach(({ input, expected }) => {
+    const result = parseTextToCount(input);
+    if (result === expected) {
+      console.log(`[TT:PARSE] ✅ "${input}" → ${result} (expected ${expected})`);
+      passed++;
+    } else {
+      console.error(`[TT:PARSE] ❌ "${input}" → ${result} (expected ${expected})`);
+      failed++;
+    }
+  });
+  
+  console.log(`[TT:PARSE] 🧪 Test Results: ${passed}/${tests.length} passed, ${failed} failed`);
+  return failed === 0;
+}
+
+// Legacy alias for backward compatibility
+function parseViewerCount(textOrElement) {
+  const result = normalizeAndParse(textOrElement);
+  return result !== null ? result : 0;
 }
 
 
@@ -818,17 +1148,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       resetTracking();
     } else {
       startTracking();
+      // Also start chat tracking
+      startChatTracking();
     }
-    console.debug('[VC:CT:ACK] STARTED', { platform, isTracking: true });
-    sendResponse({ type: 'ACK_START', platform, isTracking: true });
+    console.debug('[VC:CT:ACK] STARTED', { platform, isTracking: true, isChatTracking: true });
+    sendResponse({ type: 'ACK_START', platform, isTracking: true, isChatTracking: true });
   } else if (message.type === 'STOP_TRACKING') {
     stopTracking();
+    stopChatTracking();
     sendResponse({ success: true });
   } else if (message.type === 'RESET_TRACKING') {
     resetTracking();
+    stopChatTracking();
     sendResponse({ success: true, platform });
   } else if (message.type === 'GET_STATUS') {
-    sendResponse({ isTracking, platform, currentCount: currentViewerCount });
+    sendResponse({ 
+      isTracking, 
+      isChatTracking,
+      platform, 
+      currentCount: currentViewerCount,
+      chatBufferSize: chatBuffer.length
+    });
   } else if (message.type === 'PING') {
     console.debug('[VC:CT:ACK] PONG', { platform });
     sendResponse({ type: 'PONG', platform, isReady: true });
@@ -836,8 +1176,589 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // All responses above are synchronous; no need to return true.
 });
 
-// Content script loaded - no auto-start, wait for explicit START_TRACKING
-console.log('[Spikely] Content script loaded - Version 2.0.6-ROLLBACK (Stable)');
+
+// ============================================================================
+// TIKTOK LIVE CHAT STREAM DETECTION - v1.0
+// ============================================================================
+
+const CHAT_CONFIG = {
+  BUFFER_DURATION_MS: 30000,           // 30 second rolling buffer
+  MAX_BUFFER_SIZE: 200,                // Max comments to keep in memory
+  EMIT_BATCH_INTERVAL_MS: 2000,        // Send batches every 2s
+  MUTATION_DEBOUNCE_MS: 100,           // Debounce chat mutations
+  DUPLICATE_WINDOW_MS: 1000,           // Ignore duplicates within 1s
+  RETRY_FIND_INTERVAL_MS: 3000         // Retry finding chat container every 3s
+};
+
+// Platform-specific chat selectors
+const CHAT_SELECTORS = {
+  tiktok: {
+    // Container selectors (most to least specific)
+    containers: [
+      '[data-e2e="live-chat-list"]',
+      '[data-e2e*="chat"]',
+      '[class*="LiveChatList"]',
+      '[class*="ChatList"]',
+      '[class*="live-chat"]',
+      '[class*="chat-list"]',
+      '[class*="comment-list"]',
+      'div[class*="Chat"][class*="Container"]'
+    ],
+    // Comment item selectors
+    comments: [
+      '[data-e2e="live-chat-item"]',
+      '[data-e2e*="comment"]',
+      '[class*="ChatItem"]',
+      '[class*="CommentItem"]',
+      '[class*="chat-item"]',
+      '[class*="comment-item"]'
+    ],
+    // Username selectors
+    usernames: [
+      '[data-e2e="comment-username"]',
+      '[class*="Username"]',
+      '[class*="username"]',
+      '[class*="user-name"]'
+    ],
+    // Comment text selectors
+    text: [
+      '[data-e2e="comment-text"]',
+      '[class*="CommentText"]',
+      '[class*="comment-text"]',
+      '[class*="chat-text"]',
+      '[class*="message-text"]'
+    ]
+  },
+  twitch: {
+    containers: ['.chat-scrollable-area__message-container'],
+    comments: ['.chat-line__message'],
+    usernames: ['.chat-author__display-name'],
+    text: ['.text-fragment']
+  },
+  youtube: {
+    containers: ['yt-live-chat-item-list-renderer'],
+    comments: ['yt-live-chat-text-message-renderer'],
+    usernames: ['#author-name'],
+    text: ['#message']
+  }
+};
+
+/**
+ * Find the chat container element
+ */
+function findChatContainer() {
+  if (chatContainer && document.contains(chatContainer)) {
+    return chatContainer;
+  }
+
+  console.log('[CHAT:DEBUG] 🔍 Searching for chat container...');
+  
+  const selectors = CHAT_SELECTORS[platform];
+  if (!selectors) {
+    console.log('[CHAT:DEBUG] ❌ No chat selectors for platform:', platform);
+    return null;
+  }
+
+  // Try each container selector
+  for (let i = 0; i < selectors.containers.length; i++) {
+    const selector = selectors.containers[i];
+    try {
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log(`[CHAT:DEBUG] ✅ Found chat container with selector ${i + 1}: "${selector}"`);
+        chatContainer = element;
+        return element;
+      }
+    } catch (e) {
+      console.log(`[CHAT:DEBUG] Selector ${i + 1} error: "${selector}"`, e.message);
+    }
+  }
+
+  // Fallback: Look for elements with many children (likely chat list)
+  console.log('[CHAT:DEBUG] 🎯 Trying heuristic search...');
+  const allDivs = Array.from(document.querySelectorAll('div'));
+  
+  for (const div of allDivs) {
+    const text = div.textContent?.toLowerCase() || '';
+    const childCount = div.children.length;
+    
+    // Look for containers with:
+    // - Many children (10+)
+    // - Chat-related text in nearby elements
+    // - Scrollable (overflow-y)
+    if (childCount >= 10) {
+      const style = window.getComputedStyle(div);
+      const isScrollable = style.overflowY === 'auto' || style.overflowY === 'scroll';
+      
+      if (isScrollable) {
+        console.log('[CHAT:DEBUG] 📦 Found potential chat container (scrollable, ' + childCount + ' children)');
+        chatContainer = div;
+        return div;
+      }
+    }
+  }
+
+  console.log('[CHAT:DEBUG] ❌ No chat container found');
+  return null;
+}
+
+/**
+ * Parse a comment element to extract data
+ */
+function parseCommentElement(element) {
+  const selectors = CHAT_SELECTORS[platform];
+  if (!selectors) return null;
+
+  const comment = {
+    id: null,
+    username: 'Unknown',
+    text: '',
+    timestamp: Date.now(),
+    element: element
+  };
+
+  // Try to find username
+  for (const selector of selectors.usernames) {
+    try {
+      const usernameEl = element.querySelector(selector);
+      if (usernameEl && usernameEl.textContent?.trim()) {
+        comment.username = usernameEl.textContent.trim();
+        break;
+      }
+    } catch (_) {}
+  }
+
+  // Try to find comment text
+  for (const selector of selectors.text) {
+    try {
+      const textEl = element.querySelector(selector);
+      if (textEl && textEl.textContent?.trim()) {
+        comment.text = textEl.textContent.trim();
+        break;
+      }
+    } catch (_) {}
+  }
+
+  // Fallback: Use full text content if specific text not found
+  if (!comment.text && element.textContent) {
+    const fullText = element.textContent.trim();
+    // Remove username from text if it's at the start
+    comment.text = fullText.replace(comment.username, '').trim();
+    // Remove any leading colons or separators
+    comment.text = comment.text.replace(/^[:：\s]+/, '').trim();
+  }
+
+  // Generate ID from username + text + rough timestamp
+  const roughTime = Math.floor(comment.timestamp / 1000); // Second precision
+  comment.id = `${comment.username}_${comment.text.substring(0, 20)}_${roughTime}`;
+
+  // Validate we have meaningful data
+  if (!comment.text || comment.text.length < 1) {
+    return null;
+  }
+
+  return comment;
+}
+
+/**
+ * Check if comment is duplicate
+ */
+function isDuplicateComment(commentId) {
+  if (seenCommentIds.has(commentId)) {
+    return true;
+  }
+  
+  seenCommentIds.add(commentId);
+  
+  // Clean up old IDs (older than duplicate window)
+  if (seenCommentIds.size > 500) {
+    const idsArray = Array.from(seenCommentIds);
+    const keepCount = 300;
+    seenCommentIds = new Set(idsArray.slice(-keepCount));
+  }
+  
+  return false;
+}
+
+/**
+ * Add comment to buffer
+ */
+function addCommentToBuffer(comment) {
+  // Check for duplicates
+  if (isDuplicateComment(comment.id)) {
+    console.debug('[CHAT] Skipping duplicate:', comment.username, comment.text.substring(0, 30));
+    return;
+  }
+
+  // Add to buffer
+  chatBuffer.push(comment);
+  
+  console.log('[CHAT] 💬', comment.username + ':', comment.text);
+
+  // Trim buffer to max size
+  if (chatBuffer.length > CHAT_CONFIG.MAX_BUFFER_SIZE) {
+    chatBuffer = chatBuffer.slice(-CHAT_CONFIG.MAX_BUFFER_SIZE);
+  }
+
+  // Clean old comments (older than buffer duration)
+  const now = Date.now();
+  chatBuffer = chatBuffer.filter(c => 
+    now - c.timestamp < CHAT_CONFIG.BUFFER_DURATION_MS
+  );
+}
+
+/**
+ * Emit chat batch to background script
+ */
+function emitChatBatch() {
+  const now = Date.now();
+  
+  // Rate limiting
+  if (now - lastChatEmitTime < CHAT_CONFIG.EMIT_BATCH_INTERVAL_MS) {
+    return;
+  }
+
+  // Get comments from last 30 seconds
+  const recentComments = chatBuffer.filter(c => 
+    now - c.timestamp < CHAT_CONFIG.BUFFER_DURATION_MS
+  );
+
+  if (recentComments.length === 0) {
+    return;
+  }
+
+  // Calculate chat rate (comments per minute)
+  const durationMinutes = CHAT_CONFIG.BUFFER_DURATION_MS / 60000;
+  const chatRate = Math.round(recentComments.length / durationMinutes);
+
+  const payload = {
+    type: 'CHAT_STREAM_UPDATE',
+    platform,
+    timestamp: now,
+    comments: recentComments.map(c => ({
+      username: c.username,
+      text: c.text,
+      timestamp: c.timestamp
+    })),
+    chatRate: chatRate,
+    commentCount: recentComments.length,
+    windowDuration: CHAT_CONFIG.BUFFER_DURATION_MS
+  };
+
+  safeSendMessage(payload);
+  lastChatEmitTime = now;
+
+  console.log(`[CHAT] 📤 Emitted batch: ${recentComments.length} comments, rate: ${chatRate}/min`);
+}
+
+/**
+ * Handle chat mutations
+ */
+function handleChatMutation(mutations) {
+  console.debug('[CHAT:MUT] Detected', mutations.length, 'mutations');
+
+  const selectors = CHAT_SELECTORS[platform];
+  if (!selectors) return;
+
+  // Find new comment elements in mutations
+  for (const mutation of mutations) {
+    if (mutation.type === 'childList') {
+      // Check added nodes
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+        // Try to match as comment element
+        let isComment = false;
+        
+        for (const selector of selectors.comments) {
+          try {
+            if (node.matches && node.matches(selector)) {
+              isComment = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        // Also check if children match comment selector
+        if (!isComment) {
+          for (const selector of selectors.comments) {
+            try {
+              const children = node.querySelectorAll(selector);
+              if (children.length > 0) {
+                children.forEach(child => {
+                  const comment = parseCommentElement(child);
+                  if (comment) {
+                    addCommentToBuffer(comment);
+                  }
+                });
+                isComment = true;
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Parse if this is a comment element
+        if (isComment) {
+          const comment = parseCommentElement(node);
+          if (comment) {
+            addCommentToBuffer(comment);
+          }
+        }
+      }
+    }
+  }
+
+  // Emit batch periodically
+  emitChatBatch();
+}
+
+/**
+ * Setup MutationObserver for chat
+ */
+function setupChatObserver() {
+  // Disconnect existing observer
+  if (chatObserver) {
+    try {
+      chatObserver.disconnect();
+    } catch (_) {}
+    chatObserver = null;
+  }
+
+  // Find chat container
+  const container = findChatContainer();
+  if (!container) {
+    console.log('[CHAT] ❌ No chat container, will retry...');
+    return false;
+  }
+
+  console.log('[CHAT] ✅ Setting up observer on container');
+
+  try {
+    chatObserver = new MutationObserver((mutations) => {
+      // Debounce handler
+      if (chatMutationDebounce) clearTimeout(chatMutationDebounce);
+      
+      chatMutationDebounce = setTimeout(() => {
+        handleChatMutation(mutations);
+      }, CHAT_CONFIG.MUTATION_DEBOUNCE_MS);
+    });
+
+    chatObserver.observe(container, {
+      childList: true,
+      subtree: true
+    });
+
+    console.log('[CHAT] 👀 Observer active, watching for comments...');
+    return true;
+  } catch (e) {
+    console.error('[CHAT] ❌ Failed to setup observer:', e);
+    return false;
+  }
+}
+
+/**
+ * Start chat tracking
+ */
+function startChatTracking() {
+  if (isChatTracking) {
+    console.log('[CHAT] Already tracking, ignoring duplicate start');
+    return;
+  }
+
+  if (platform !== 'tiktok' && platform !== 'twitch' && platform !== 'youtube') {
+    console.log('[CHAT] Platform not supported for chat tracking:', platform);
+    return;
+  }
+
+  console.log('[CHAT] 🚀 Starting chat stream tracking...');
+  isChatTracking = true;
+
+  // Clear state
+  chatBuffer = [];
+  seenCommentIds = new Set();
+  lastChatEmitTime = 0;
+
+  // Try to setup observer
+  const success = setupChatObserver();
+
+  // If failed, retry periodically
+  if (!success) {
+    console.log('[CHAT] Setting up retry interval...');
+    if (chatRetryInterval) clearInterval(chatRetryInterval);
+    
+    chatRetryInterval = setInterval(() => {
+      console.log('[CHAT] 🔄 Retrying observer setup...');
+      const retry = setupChatObserver();
+      if (retry) {
+        clearInterval(chatRetryInterval);
+        chatRetryInterval = null;
+      }
+    }, CHAT_CONFIG.RETRY_FIND_INTERVAL_MS);
+  }
+
+  // Emit batches periodically (even if no new comments)
+  setInterval(() => {
+    if (isChatTracking) {
+      emitChatBatch();
+    }
+  }, CHAT_CONFIG.EMIT_BATCH_INTERVAL_MS);
+}
+
+/**
+ * Stop chat tracking
+ */
+function stopChatTracking() {
+  console.log('[CHAT] ⏹️ Stopping chat stream tracking');
+  isChatTracking = false;
+
+  if (chatObserver) {
+    try {
+      chatObserver.disconnect();
+    } catch (_) {}
+    chatObserver = null;
+  }
+
+  if (chatRetryInterval) {
+    clearInterval(chatRetryInterval);
+    chatRetryInterval = null;
+  }
+
+  if (chatMutationDebounce) {
+    clearTimeout(chatMutationDebounce);
+    chatMutationDebounce = null;
+  }
+
+  chatBuffer = [];
+  seenCommentIds = new Set();
+}
+
+/**
+ * Manual test function for chat detection
+ */
+window.__SPIKELY_TEST_CHAT__ = function() {
+  console.log('='.repeat(60));
+  console.log('🧪 SPIKELY CHAT DETECTION TEST');
+  console.log('='.repeat(60));
+
+  const container = findChatContainer();
+  
+  if (container) {
+    console.log('✅ SUCCESS! Found chat container');
+    console.log('   Element:', container.tagName);
+    console.log('   Classes:', container.className || '(none)');
+    console.log('   Children count:', container.children.length);
+    console.log('   Current buffer:', chatBuffer.length, 'comments');
+    
+    // Try to parse existing comments
+    const selectors = CHAT_SELECTORS[platform];
+    if (selectors) {
+      let foundComments = 0;
+      
+      for (const selector of selectors.comments) {
+        try {
+          const elements = container.querySelectorAll(selector);
+          console.log(`   Selector "${selector}": found ${elements.length} comments`);
+          
+          if (elements.length > 0 && foundComments === 0) {
+            // Try to parse first 3
+            for (let i = 0; i < Math.min(3, elements.length); i++) {
+              const parsed = parseCommentElement(elements[i]);
+              if (parsed) {
+                console.log(`   Comment ${i + 1}:`, parsed.username, '→', parsed.text.substring(0, 50));
+                foundComments++;
+              }
+            }
+          }
+        } catch (e) {
+          console.log(`   Selector "${selector}": error`, e.message);
+        }
+      }
+      
+      if (foundComments > 0) {
+        console.log('✅ Successfully parsed', foundComments, 'comments');
+      } else {
+        console.log('⚠️ Found container but could not parse comments');
+        console.log('   Try adjusting selectors or inspect a comment element manually');
+      }
+    }
+    
+    console.log('\n📊 Chat tracking status:', isChatTracking ? 'ACTIVE' : 'INACTIVE');
+    
+    if (!isChatTracking) {
+      console.log('💡 Run startChatTracking() to begin tracking');
+    }
+  } else {
+    console.log('❌ FAILED - No chat container found');
+    console.log('\n🔍 Debugging info:');
+    console.log('   Platform:', platform);
+    console.log('   URL:', window.location.href);
+    
+    console.log('\n💡 Suggestions:');
+    console.log('   1. Make sure you\'re on a TikTok Live page');
+    console.log('   2. Open DevTools and inspect the chat area');
+    console.log('   3. Look for a scrollable container with many comments');
+    console.log('   4. Check the console logs above for selector attempts');
+  }
+  
+  console.log('='.repeat(60));
+  return container;
+};
+
+
+// Content script loaded - DOM ready initialization complete
+console.log('🎉🎉🎉 [SPIKELY] CONTENT SCRIPT FULLY LOADED! 🎉🎉🎉');
+console.log('[Spikely] Version: 2.3.0-ROBUST-INJECTION');
+console.log('[Spikely] Platform detected:', platform);
+console.log('[Spikely] 🧪 Manual tests: window.__SPIKELY_TEST__(), window.__SPIKELY_TEST_CHAT__()');
+
+// Expose manual testing functions
+window.__SPIKELY_TEST__ = function() {
+  console.log('='.repeat(60));
+  console.log('🧪 SPIKELY MANUAL VIEWER DETECTION TEST');
+  console.log('='.repeat(60));
+  
+  const node = queryViewerNode();
+  
+  if (node) {
+    const parsed = normalizeAndParse(node);
+    console.log('✅ SUCCESS! Found viewer count element');
+    console.log('   Text content:', node.textContent?.substring(0, 100));
+    console.log('   Parsed value:', parsed);
+    console.log('   Element classes:', node.className || '(none)');
+    console.log('   Parent classes:', node.parentElement?.className || '(none)');
+    console.log('   Cached:', cachedViewerEl === node);
+    
+    // Try to trigger an update
+    if (parsed !== null) {
+      console.log('\n📤 Sending test message to background script...');
+      safeSendMessage({
+        type: 'VIEWER_COUNT_UPDATE',
+        platform,
+        count: parsed,
+        delta: 0,
+        timestamp: Date.now(),
+        source: 'manual_test'
+      });
+      console.log('   Message sent!');
+    }
+  } else {
+    console.log('❌ FAILED - No viewer count element found');
+    console.log('\n🔍 Debugging info:');
+    console.log('   Platform:', platform);
+    console.log('   URL:', window.location.href);
+    console.log('   Is tracking:', isTracking);
+    
+    console.log('\n💡 Suggestions:');
+    console.log('   1. Make sure you\'re on a TikTok Live page');
+    console.log('   2. Open DevTools and inspect the viewer count element');
+    console.log('   3. Look for a number like "2.1K" near the text "Viewers"');
+    console.log('   4. Check the console logs above for detailed search results');
+  }
+  
+  console.log('='.repeat(60));
+  return node;
+};
 
 // Run parser validation tests
 validateParserFix();
@@ -845,4 +1766,5 @@ validateParserFix();
 // Stop timers cleanly on navigation to avoid context errors
 window.addEventListener('pagehide', () => { try { stopTracking(); } catch (_) {} });
 window.addEventListener('beforeunload', () => { try { stopTracking(); } catch (_) {} });
-})();
+
+})(); // END OF IIFE - CRITICAL: This closes the (function(){ at the top

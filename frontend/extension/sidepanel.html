@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spikely v2.1.2-UNIFIED-BACKEND</title>
+  <title>Spikely v2.1.3-VIEWER-FIX</title>
   <!-- Cache-busted CSS -->
-  <link rel="stylesheet" href="sidepanel.css?v=unified212">
+  <link rel="stylesheet" href="sidepanel.css?v=viewer213">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <!-- Inline critical animations to prevent caching issues -->
+  <!-- Inline critical CSS animations to prevent caching issues -->
   <style>
     @keyframes pulse {
       0%, 100% {
@@ -34,6 +34,7 @@
       }
     }
     
+    /* Ensure pulse animation always works */
     .status-pulse-dot {
       animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
     }

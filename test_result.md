@@ -103,157 +103,311 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Spikely Chrome Extension - Priority One UI/UX Fixes
+  Spikely Chrome Extension - Phase 1 Signal Enhancement: Chat Stream Detection
   
-  The user requested completion of all Priority One UI/UX fixes for the Spikely Chrome extension side panel.
-  These fixes address critical visual and clarity issues identified in the UI verification report:
+  GOAL: Implement the most critical engagement signal (chat comments) to enable accurate 
+  action→outcome correlation. This is Priority 1 of the Signal Enhancement roadmap.
   
-  1. Text Truncation - Quotes cut off with ellipses, need expandable tooltips
-  2. Unclear Status Indicator - "Watching for changes..." too subtle, needs animation
-  3. Audio Label Confusion - Need clear Play/Pause state labels
-  4. Unclear Delta Indicators - "±3" and "-1" lack immediate clarity
-  5. Minor Alignment Issues - Vertical misalignments in control panel
-  6. Top Actions Timestamps - "(0s)" format unusual, need relative time
+  FEATURE IMPLEMENTED: Real-time TikTok Live chat stream detection and analysis
   
-  Priority: HIGH - Complete UI/UX fixes before correlation engine work
-  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, CSS
+  CORE FUNCTIONALITY:
+  - MutationObserver-based chat tracking (watches for new comments in DOM)
+  - 30-second rolling buffer of comments (username, text, timestamp)
+  - Duplicate filtering and efficient batching (2s intervals)
+  - Chat rate calculation (comments per minute)
+  - Keyword extraction from chat content
+  - Integration with correlation engine and Claude AI
+  
+  DATA CAPTURED:
+  - Comment text (full message)
+  - Username (who posted)
+  - Timestamp (millisecond precision)
+  - Chat rate (comments/min)
+  - Top keywords (frequency analysis)
+  
+  INTEGRATION POINTS:
+  1. content.js - DOM observation and parsing
+  2. background.js - Message routing
+  3. correlationEngine.js - Buffer management and context extraction
+  4. server.py - Claude prompt enhancement with chat data
+  
+  VALUE: Claude can now reference specific viewer questions and comments in insights:
+  - "Answer 'what song is this'. Name it now"
+  - "Shoutout user789 for fire comment"
+  - "Read top chat question. Respond big"
+  
+  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, FastAPI backend
+  Priority: CRITICAL - Most important single engagement signal
 
 frontend:
-  - task: "CSS Cache Busting + Inline Critical Animations"
+  - task: "Chat Stream Detection - Multi-Tier Selector Strategy"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.html"
+    working: "needs_testing"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: false
+    priority: "critical"
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Added cache-busting query string (?v=2025102101) to CSS link and inlined critical @keyframes animations to prevent caching issues. Ensures animations apply immediately on extension load."
+        comment: |
+          ✅ CRITICAL FEATURE: Real-time chat detection system implemented
+          
+          DETECTION STRATEGY (3-tier):
+          1. Priority selectors: [data-e2e="live-chat-list"], [class*="ChatList"], etc.
+          2. Heuristic search: Find scrollable containers with 10+ children
+          3. Fallback: Manual inspection guidance
+          
+          PARSING CAPABILITIES:
+          - Extract username from multiple selector variations
+          - Extract comment text with fallback to full text content
+          - Generate unique IDs for duplicate detection
+          - Handle TikTok's dynamic class names
+          
+          CONFIGURATION:
+          - 30s rolling buffer (max 200 comments)
+          - 2s batch emission interval
+          - 100ms mutation debounce
+          - 3s retry interval if container not found
+          
+          FILES: +600 lines in content.js (lines 1065-1595)
   
-  - task: "JavaScript Initialization with Retry Logic"
+  - task: "Chat Buffer Management & Keyword Extraction"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
+    working: "needs_testing"
+    file: "/app/frontend/extension/correlationEngine.js"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: false
+    priority: "critical"
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Implemented initializeUIFeatures() with retry logic (5 attempts, 200ms intervals). Added setupTooltips(), applyPulseAnimationFallback(), and startTimestampUpdater() functions. Ensures DOM is ready before initializing UI features."
+        comment: |
+          ✅ Added chat stream integration to correlation engine
+          
+          NEW METHODS:
+          - addChatStream(): Maintains 30s rolling buffer
+          - getChatContext(): Returns chat data for insights
+          - extractChatKeywords(): NLP-style keyword extraction
+          
+          DATA PROVIDED:
+          - Comment count in last 30s
+          - Chat rate (comments/min)
+          - Top 5 keywords (stop words filtered)
+          - Last 10 comments for context
+          
+          INTEGRATION:
+          - Enhanced insight payload with chatData field
+          - Claude receives chat context in every insight request
+          
+          FILES: +150 lines (lines 838-920)
   
-  - task: "Text Truncation with Expandable Tooltips"
+  - task: "Chat Message Routing & Logging"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
+    working: "needs_testing"
+    file: "/app/frontend/extension/background.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Enhanced updateInsight() and renderActions() to add hover tooltips and click-to-expand behavior for truncated text. Full text shown in native tooltip on hover, expands inline on click."
+        comment: |
+          ✅ CHAT_STREAM_UPDATE message handler added
+          
+          FUNCTIONALITY:
+          - Receives batched chat data from content script
+          - Forwards to correlation engine
+          - Broadcasts to side panel for display
+          - Logs sample comments for debugging
+          
+          MESSAGE FORMAT:
+          {
+            type: 'CHAT_STREAM_UPDATE',
+            platform: 'tiktok',
+            comments: [{ username, text, timestamp }, ...],
+            chatRate: 30,
+            commentCount: 15
+          }
+          
+          FILES: +35 lines (lines 301-330)
   
-  - task: "Animated Status Indicator"
+  - task: "Manual Chat Testing Tool"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.html, sidepanel.css"
+    working: "needs_testing"
+    file: "/app/frontend/extension/content.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "Pulse animation for status indicator already exists in CSS. Added inline keyframes in HTML and JavaScript fallback in applyPulseAnimationFallback() to ensure animations work reliably."
-  
-  - task: "Clear Audio State Display"
+        comment: |
+          ✅ Console command for instant chat detection testing
+          
+          Usage: window.__SPIKELY_TEST_CHAT__()
+          
+          OUTPUT:
+          - Chat container found/not found
+          - Element details (tag, classes, children count)
+          - Parsed comment samples (first 3)
+          - Current buffer size
+          - Tracking status
+          - Debug suggestions if failed
+          
+          Makes debugging 10x easier for TikTok DOM changes
+
+backend:
+  - task: "Chat Context Enhancement for Claude Prompts"
     implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
+    working: "needs_testing"
+    file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: false
+    priority: "critical"
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "needs_testing"
         agent: "main"
-        comment: "updateAudioState() function already implemented. States: Stopped (gray dot, 'Audio: Stopped'), Recording (red pulsing dot, 'Audio: Recording'). Clear visual feedback for audio capture state."
-  
-  - task: "Delta Indicator Tooltips"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "updateViewerDeltaDisplay() and setupTooltips() provide hover tooltips for viewer delta, count, and threshold. Color-coded: green (positive), red (negative), gray (zero)."
-  
-  - task: "Improved Timestamp Format"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Action items now use relative time format (just now, 5s ago, 2m ago). Added data-timestamp attributes and startTimestampUpdater() to auto-update every 5 seconds. Full timestamp shown in hover tooltip."
-  
-  - task: "Alignment Fixes"
-    implemented: true
-    working: true
-    file: "/app/frontend/extension/sidepanel.css"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "CSS already contains comprehensive alignment fixes for threshold controls, audio controls, viewer row, and consistent button heights (36px). All elements properly aligned."
+        comment: |
+          ✅ Backend integration for chat-aware insights
+          
+          NEW MODEL:
+          class ChatData(BaseModel):
+              commentCount: int
+              chatRate: int
+              topKeywords: Optional[List[str]]
+              recentComments: Optional[List[str]]
+          
+          CLAUDE PROMPT ENHANCEMENT:
+          Added chat context section:
+          - Comment count in last 30s
+          - Chat rate (comments/min)
+          - Top keywords from chat
+          - Last 3 comments with usernames
+          - Guidance: "Use chat context: Reference specific viewer questions"
+          
+          IMPACT:
+          Claude can now generate insights like:
+          - "Answer 'what song is this'. Name it now"
+          - "Shoutout user789 for fire comment"
+          - "Read top chat question. Respond big"
+          
+          FILES: +30 lines (lines 93-97, 299-320)
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 0
+  version: "2.2.0-CHAT-STREAM"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Manual testing of Chrome extension side panel"
-    - "Verify all 8 Priority One fixes"
+    - "Chat Stream Detection - Multi-Tier Selector Strategy"
+    - "Chat Buffer Management & Keyword Extraction"
+    - "Chat Context Enhancement for Claude Prompts"
   stuck_tasks: []
   test_all: false
-  test_priority: "high_first"
+  test_priority: "critical_first"
 
 agent_communication:
   - agent: "main"
     message: |
-      ✅ All Priority One UI/UX fixes have been implemented:
+      ✅ PHASE 1 SIGNAL ENHANCEMENT: Chat Stream Detection (v1.0) COMPLETE
       
-      1. CSS Cache Busting - Added ?v=2025102101 and inline critical animations
-      2. JS Initialization - Retry logic with 5 attempts, 200ms intervals
-      3. Text Truncation - Hover tooltips + click-to-expand
-      4. Status Animation - Pulse animation with fallback
-      5. Audio State - Clear labels and visual feedback
-      6. Delta Tooltips - Hover tooltips with color coding
-      7. Timestamp Format - Relative time with auto-update
-      8. Alignment - CSS fixes already present
+      🎯 **Achievement:** Implemented the #1 priority engagement signal
       
-      Files Modified:
-      - /app/frontend/extension/sidepanel.html (+45 lines)
-      - /app/frontend/extension/sidepanel.js (+140 lines)
+      This is THE MOST CRITICAL signal for accurate action→outcome correlation.
+      Chat provides direct audience feedback that correlates with viewer changes.
       
-      Documentation Created:
-      - /app/PRIORITY_ONE_FIXES_COMPLETE.md
-      - /app/PRIORITY_ONE_TESTING_GUIDE.md
+      📊 **What Was Built:**
       
-      Next Steps:
-      - Manual testing in Chrome browser
-      - Load extension and verify all features
-      - Check console logs for initialization
-      - Test tooltips, animations, and timestamps
-      - Once verified, proceed to correlation engine work
+      **1. Real-Time Chat Detection (content.js)**
+      - MutationObserver watches for new comments in TikTok Live DOM
+      - 3-tier selector strategy (priority → heuristic → fallback)
+      - Parses username + text + timestamp from each comment
+      - 30-second rolling buffer (max 200 comments)
+      - Duplicate filtering via unique IDs
+      - Batched emission every 2 seconds
+      - Manual test command: window.__SPIKELY_TEST_CHAT__()
+      
+      **2. Chat Buffer & Analytics (correlationEngine.js)**
+      - addChatStream() - Maintains 30s rolling buffer
+      - getChatContext() - Provides chat data for insights
+      - extractChatKeywords() - NLP-style keyword extraction
+      - Stop word filtering + frequency analysis
+      - Returns: commentCount, chatRate, topKeywords, recentComments
+      
+      **3. Message Routing (background.js)**
+      - CHAT_STREAM_UPDATE handler
+      - Forwards to correlation engine
+      - Logs sample comments for debugging
+      
+      **4. Claude Prompt Enhancement (server.py)**
+      - New ChatData model (commentCount, chatRate, topKeywords, recentComments)
+      - Enhanced prompt with chat context section
+      - Claude can now reference viewer questions and comments
+      
+      🎁 **Value Delivered:**
+      
+      **Before:** Claude only saw transcript + viewer count
+      ```json
+      {"emotionalLabel": "topic exhausted", 
+       "nextMove": "Pivot to Q&A. Build excitement"}  // Generic
+      ```
+      
+      **After:** Claude sees what viewers are asking
+      ```json
+      {"emotionalLabel": "song request spike",
+       "nextMove": "Answer 'what song is this'. Name it now"}  // Specific
+      ```
+      
+      📦 **Files Modified:**
+      - /app/frontend/extension/content.js (+600 lines)
+        • Chat config, selectors, detection, parsing
+        • window.__SPIKELY_TEST_CHAT__() test tool
+      
+      - /app/frontend/extension/correlationEngine.js (+150 lines)
+        • addChatStream(), getChatContext(), extractChatKeywords()
+        • Enhanced insight payload with chatData
+      
+      - /app/frontend/extension/background.js (+35 lines)
+        • CHAT_STREAM_UPDATE message handler
+      
+      - /app/backend/server.py (+30 lines)
+        • ChatData model, chatData field, prompt enhancement
+      
+      📚 **Documentation:**
+      - /app/CHAT_STREAM_DETECTION_v1.md (comprehensive technical guide)
+      
+      🧪 **Testing Instructions:**
+      
+      **Quick Test (30 seconds):**
+      1. Go to TikTok Live page
+      2. Open DevTools console (F12)
+      3. Run: window.__SPIKELY_TEST_CHAT__()
+      4. Check if chat container found + comments parsed ✅
+      
+      **Full Test (5 minutes):**
+      1. Load extension → Go to active TikTok Live
+      2. Click "Start Audio" (starts chat tracking)
+      3. Watch console for:
+         [CHAT] 💬 username: comment text
+         [CHAT] 📤 Emitted batch: X comments, rate: Y/min
+         [CHAT:BG:RX] CHAT_STREAM_UPDATE
+         [Correlation] Chat stream updated
+      4. Wait for insight → Check if Claude references chat
+      
+      📊 **Phase 1 Progress:**
+      ✅ Chat Stream Detection (Priority 1) - COMPLETE
+      ❌ Hearts/Gifts Detection (Priority 2) - Not started
+      ❌ Follow Events (Priority 2) - Not started  
+      ❌ Platform Delay Measurement (Priority 3) - Not started
+      ❌ Data Quality Monitoring (Priority 4) - Not started
+      
+      🚀 **Status:** ✅ Ready for manual testing on live TikTok streams
+      
+      **Next Steps:**
+      - Test chat detection on multiple TikTok streams
+      - Verify insights reference viewer comments
+      - Refine selectors if DOM structure changed
+      - Then move to Priority 2: Hearts/Gifts detection

@@ -25,6 +25,8 @@ let losingActions = [];
 let audioProcessor = null;
 
 let isAudioRecording = false;
+let pendingAudioRequestId = null;
+let audioStartWatchdog = null;
 
 // Session statistics tracking
 let sessionStats = {
@@ -104,34 +106,44 @@ function formatTimeAgo(timestamp) {
 /**
  * Update audio state display
  */
+function setStartAudioButton(label, iconOverride) {
+  if (!startAudioBtn) return;
+
+  const iconSpan = startAudioBtn.querySelector('.btn-icon');
+  const textSpan = startAudioBtn.querySelector('.btn-text');
+  const labelTarget = textSpan ?? startAudioBtn;
+
+  labelTarget.textContent = label;
+
+  if (iconSpan && iconOverride !== undefined) {
+    iconSpan.textContent = iconOverride;
+  }
+}
+
 function updateAudioState(recording) {
   isAudioRecording = recording;
-  
+
   const audioBtn = startAudioBtn;
   const statusDot = document.getElementById('audioStatusDot');
   const statusLabel = document.getElementById('audioStatusLabel');
-  const btnIcon = audioBtn?.querySelector('.btn-icon');
-  const btnText = audioBtn?.querySelector('.btn-text');
-  
+
   if (!audioBtn) return;
-  
+
   if (recording) {
     audioBtn.classList.add('recording');
     statusDot?.classList.add('recording');
     statusLabel?.classList.add('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Recording';
-    if (btnIcon) btnIcon.textContent = '⏹️';
-    if (btnText) btnText.textContent = 'Stop Audio';
+    setStartAudioButton('Stop Audio', '⏹️');
     audioBtn.setAttribute('aria-label', 'Stop audio recording');
   } else {
     audioBtn.classList.remove('recording');
     statusDot?.classList.remove('recording');
     statusLabel?.classList.remove('recording');
-    
+
     if (statusLabel) statusLabel.textContent = 'Audio: Stopped';
-    if (btnIcon) btnIcon.textContent = '🎤';
-    if (btnText) btnText.textContent = 'Start Audio';
+    setStartAudioButton('Start Audio', '🎤');
     audioBtn.setAttribute('aria-label', 'Start audio recording');
   }
 }
@@ -688,7 +700,7 @@ function startCooldownTimer(seconds) {
 
 // Listen to messages from background script (viewer updates, transcripts, etc.)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE'];
+  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE', 'AUDIO_CAPTURE_RESULT', 'AUDIO_CAPTURE_STARTED', 'AUDIO_CAPTURE_FAILED'];
   
   if (!message || !message.type || !allowedTypes.includes(message.type)) {
     return;
@@ -703,7 +715,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleMessage(message);
     return;
   }
-  
+
   // Gate ENGINE_STATUS on system started state
   if (message.type === 'ENGINE_STATUS') {
     console.debug('[ENGINE_STATUS:SP:RX]', message.status, message.meta);
@@ -716,6 +728,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
   
+  if (['AUDIO_CAPTURE_RESULT', 'AUDIO_CAPTURE_STARTED', 'AUDIO_CAPTURE_FAILED'].includes(message.type)) {
+    handleMessage(message);
+    return;
+  }
+
   // Other messages only when system is started
   if (isSystemStarted) {
     handleMessage(message);
@@ -866,6 +883,83 @@ function handleMessage(message) {
     case 'COUNTDOWN_UPDATE':
       console.log('[SIDEPANEL] ⏰ COUNTDOWN_UPDATE received:', message.seconds + 's');
       updateCountdown(message.seconds);
+      break;
+    case 'AUDIO_CAPTURE_STARTED':
+      if (message.requestId && pendingAudioRequestId && message.requestId !== pendingAudioRequestId) {
+        console.warn('[SIDEPANEL] ⚠️ Ignoring AUDIO_CAPTURE_STARTED for stale request', message.requestId);
+        break;
+      }
+
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
+
+      console.log('[SIDEPANEL] ✅ AUDIO_CAPTURE_STARTED received');
+      isSystemStarted = true;
+      audioIsCapturing = true;
+      updateAudioState(true);
+
+      if (startAudioBtn) {
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Stop Audio');
+      }
+
+      if (testInsightBtn) {
+        testInsightBtn.style.display = 'inline-block';
+      }
+      break;
+    case 'AUDIO_CAPTURE_FAILED':
+      if (message.requestId && pendingAudioRequestId && message.requestId !== pendingAudioRequestId) {
+        console.warn('[SIDEPANEL] ⚠️ Ignoring AUDIO_CAPTURE_FAILED for stale request', message.requestId);
+        break;
+      }
+
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
+
+      console.warn('[SIDEPANEL] ❌ AUDIO_CAPTURE_FAILED received:', message.error);
+      audioIsCapturing = false;
+      isSystemStarted = false;
+      updateAudioState(false);
+
+      if (startAudioBtn) {
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Try Again', '🎤');
+      }
+
+      if (testInsightBtn) {
+        testInsightBtn.style.display = 'none';
+      }
+
+      const failureMessage = message.error || 'Unknown error. Please retry.';
+      const failureCode = message.code ? `\n\nCode: ${message.code}` : '';
+      alert('⚠️ Audio Capture Failed\n\n' + failureMessage + failureCode);
+      break;
+    case 'AUDIO_CAPTURE_RESULT':
+      if (!message.success) {
+        console.warn('[SIDEPANEL] ⚠️ AUDIO_CAPTURE_RESULT failure:', message.error);
+        if (audioStartWatchdog) {
+          clearTimeout(audioStartWatchdog);
+          audioStartWatchdog = null;
+        }
+        pendingAudioRequestId = null;
+        audioIsCapturing = false;
+        isSystemStarted = false;
+        updateAudioState(false);
+        if (startAudioBtn) {
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Try Again', '🎤');
+        }
+        if (testInsightBtn) {
+          testInsightBtn.style.display = 'none';
+        }
+        alert('⚠️ Audio pipeline error\n\n' + (message.error || 'Unknown error. Please retry.'));
+      }
       break;
     case 'FULL_RESET':
       resetAllData();
@@ -1693,7 +1787,7 @@ if (testInsightBtn) {
 
 // Helper function for screen-share audio fallback
 async function startAudioViaScreenShare() {
-  startAudioBtn.textContent = 'Select tab to share...';
+  setStartAudioButton('Select tab to share...', '🎤');
   try {
     // Fallback to getDisplayMedia
     console.log('[Spikely] getDisplayMedia fallback invoked');
@@ -1721,7 +1815,7 @@ async function startAudioViaScreenShare() {
       deviceId: settings.deviceId
     }));
     
-    startAudioBtn.textContent = 'Connecting...';
+    setStartAudioButton('Connecting...');
     
     // Fetch v3 token from secure relay
     console.log('🎙️ [ASSEMBLYAI v3] Step 1: Requesting temporary token...');
@@ -1798,55 +1892,116 @@ async function startAudioViaScreenShare() {
 if (startAudioBtn) {
   startAudioBtn.addEventListener('click', async () => {
     if (!isSystemStarted) {
-      // Start entire system
-      console.debug('[AUDIO:SP:TX] START_AUDIO_CAPTURE');
+      console.log('[AUDIO:SP] ▶ START click');
+      
+      const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+      console.log('[AUDIO:SP] ⏳ waiting response requestId=' + requestId);
+
+      pendingAudioRequestId = requestId;
+
       startAudioBtn.disabled = true;
-      startAudioBtn.textContent = 'Starting...';
-      
-      // Enable system
-      isSystemStarted = true;
-      
-      // Start viewer tracking
-      sendToActive('START_VIEWER_TRACKING');
-      
-      // Start audio capture
-      chrome.runtime.sendMessage({ type: 'START_AUDIO_CAPTURE' }, async (response) => {
-        console.debug('[AUDIO:SP:RX]', response);
-        
-        if (response?.success) {
-      audioIsCapturing = true;
-      updateAudioState(true);  // Use centralized state update
-      startAudioBtn.disabled = false;
-      console.log('[Spikely Side Panel] ✅ System started');
-      
-      // Show test button when system starts
-      if (testInsightBtn) {
-        testInsightBtn.style.display = 'inline-block';
+      setStartAudioButton('Processing…');
+
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
       }
-    } else {
-          const errMsg = response?.error || 'Unknown error';
-          console.warn('[AUDIO:SP:RX] Failed:', errMsg);
-          
-          // Check if fallback is appropriate
-          if (response?.requiresFallback) {
-            console.log('[AUDIO:SP:UI] Auto-falling back to screen share');
-            try {
-              await startAudioViaScreenShare();
-            } catch (fallbackErr) {
-              // Error already handled in helper
-            }
-          } else {
-            // Show friendly inline error (unrecoverable)
-            console.debug('[AUDIO:SP:UI] Showing inline error:', errMsg);
-            alert('⚠️ Audio Capture Not Available\n\n' + errMsg);
-            updateAudioState(false);  // Use centralized state update
-            startAudioBtn.disabled = false;
-            isSystemStarted = false;
+
+      // 6s client-side watchdog
+      audioStartWatchdog = setTimeout(() => {
+        console.error('[AUDIO:SP] ❌ Client watchdog fired - cancelling processing state');
+        audioStartWatchdog = null;
+        pendingAudioRequestId = null;
+        updateAudioState(false);
+        startAudioBtn.disabled = false;
+        setStartAudioButton('Try Again', '🎤');
+        isSystemStarted = false;
+
+        alert('⚠️ Audio Capture Timed Out\n\nTook longer than 6 seconds. Please:\n1. Make sure TikTok tab is focused\n2. Try "Try Again" button');
+      }, 6000);
+
+      // Send START_AUDIO directly to background
+      chrome.runtime.sendMessage({
+        type: 'START_AUDIO',
+        requestId: requestId,
+        gesture: true,
+        timestamp: Date.now()
+      }, (response) => {
+        if (audioStartWatchdog) {
+          clearTimeout(audioStartWatchdog);
+          audioStartWatchdog = null;
+        }
+
+        if (chrome.runtime.lastError) {
+          console.error('[AUDIO:SP] ❌ FAILED code=RUNTIME_ERROR');
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Try Again', '🎤');
+          isSystemStarted = false;
+          pendingAudioRequestId = null;
+
+          alert('⚠️ Extension Error\n\n' + chrome.runtime.lastError.message);
+          return;
+        }
+
+        if (response?.ok && response?.status === 'pending') {
+          console.log('[AUDIO:SP] ⏳ Pending response received for requestId=' + requestId);
+          startAudioBtn.disabled = true;
+          setStartAudioButton('Awaiting Chrome prompt…');
+          return;
+        }
+
+        if (response?.ok) {
+          console.log('[AUDIO:SP] ✅ STARTED streamId=' + response.streamId);
+
+          isSystemStarted = true;
+          audioIsCapturing = true;
+          updateAudioState(true);
+          startAudioBtn.disabled = false;
+
+          if (testInsightBtn) {
+            testInsightBtn.style.display = 'inline-block';
           }
+
+          pendingAudioRequestId = null;
+
+        } else {
+          const errorCode = response?.code || 'UNKNOWN';
+          const errorMsg = response?.message || 'Unknown error';
+
+          console.error('[AUDIO:SP] ❌ FAILED code=' + errorCode + ' msg=' + errorMsg);
+          
+          updateAudioState(false);
+          startAudioBtn.disabled = false;
+          setStartAudioButton('Focus & Retry', '🎤');
+          isSystemStarted = false;
+          
+          // Map error codes to user messages
+          let userMessage = '';
+          if (errorCode === 'AUDIO_ERR_NOT_ELIGIBLE') {
+            userMessage = 'Open a TikTok Live tab and try again.';
+          } else if (errorCode === 'AUDIO_ERR_NOT_INVOKED') {
+            userMessage = 'Click the TikTok tab once, then press Start.';
+          } else if (errorCode === 'AUDIO_ERR_TIMEOUT') {
+            userMessage = 'Chrome didn\'t grant capture in time.';
+          } else if (errorCode === 'AUDIO_ERR_CHROME_PAGE_BLOCKED') {
+            userMessage = 'Chrome pages can\'t be captured.';
+          } else {
+            userMessage = errorMsg;
+          }
+
+          alert('⚠️ Audio Capture Failed\n\n' + userMessage + '\n\nCode: ' + errorCode);
+          pendingAudioRequestId = null;
         }
       });
+
+      // Do not mark system started until capture begins
     } else {
       // Stop entire system
+      pendingAudioRequestId = null;
+      if (audioStartWatchdog) {
+        clearTimeout(audioStartWatchdog);
+        audioStartWatchdog = null;
+      }
       console.debug('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
       isSystemStarted = false;
       
