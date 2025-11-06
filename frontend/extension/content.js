@@ -324,15 +324,15 @@ function reliableSendMessage(payload, attempt = 1) {
 const OBSERVER_DEBOUNCE_MS = 150; // 120-200ms as specified
 // LVT PATCH: observerInProgress already declared in state variables section
 
-// MutationObserver with reentrant spam prevention
+// LVT PATCH: MutationObserver with duplicate prevention guard
 function bindMutationObserver(element, forceInit = false) {
-  // Prevent re-initialization spam
-  if (domObserver && currentObserverTarget === element && !forceInit) {
+  // LVT PATCH: Prevent duplicate initialization spam with window guard
+  if (!forceInit && window.__spikelyDomObsInit && domObserver && currentObserverTarget === element) {
     console.log('[VIEWER:DBG] observer already bound to this element');
     return;
   }
   
-  // Unbind previous observer
+  // LVT PATCH: Unbind previous observer safely
   if (domObserver) {
     try { 
       domObserver.disconnect();
@@ -341,46 +341,47 @@ function bindMutationObserver(element, forceInit = false) {
     domObserver = null;
   }
   
-  if (!element || !isValidVisibleNode(element)) {
+  if (!element || !isEnhancedValidVisibleNode(element)) { // LVT PATCH: Use enhanced validation
     console.log('[VIEWER:DBG] invalid element for observer binding');
     return;
   }
   
   try {
     currentObserverTarget = element;
+    window.__spikelyDomObsInit = true; // LVT PATCH: Mark observer as initialized
     
     domObserver = new MutationObserver((mutations) => {
-      // Prevent reentrant spam
+      // LVT PATCH: Prevent reentrant spam
       if (observerInProgress) return;
       observerInProgress = true;
       
       console.log(`[VIEWER:DBG] mutation detected: ${mutations.length} changes`);
       
-      // Debounce 150ms
+      // LVT PATCH: Debounce 150ms as specified
       if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
       mutationDebounceTimer = setTimeout(() => {
-        // Validate element still visible and connected
-        if (isValidVisibleNode(element)) {
+        // LVT PATCH: Validate element still visible and connected
+        if (isEnhancedValidVisibleNode(element)) { // LVT PATCH: Enhanced validation
           const count = parseViewerCount(element);
           if (count > 0 && shouldEmitWithJitterFilter(count)) {
             emitViewerUpdate(count);
           }
         } else {
-          // Element became invalid, rebind via detection
+          // LVT PATCH: Element became invalid, rebind via detection
           console.log('[VIEWER:DBG] element invalidated during mutation, rebinding');
           setTimeout(() => {
             const newElement = detectViewerCount();
             if (newElement) {
-              bindMutationObserver(newElement, true);
+              bindMutationObserver(newElement, true); // LVT PATCH: Force rebind
             }
           }, 200);
         }
         
-        observerInProgress = false;
+        observerInProgress = false; // LVT PATCH: Reset reentrant guard
       }, OBSERVER_DEBOUNCE_MS);
     });
     
-    // Observe subtree + childList + characterData as specified
+    // LVT PATCH: Observe subtree + childList + characterData as specified
     domObserver.observe(element, {
       subtree: true,
       childList: true,
@@ -392,7 +393,8 @@ function bindMutationObserver(element, forceInit = false) {
   } catch (e) {
     console.log(`[VIEWER:DBG] observer binding failed: ${e.message}`);
     currentObserverTarget = null;
-    observerInProgress = false;
+    observerInProgress = false; // LVT PATCH: Reset on error
+    window.__spikelyDomObsInit = false; // LVT PATCH: Reset guard on error
   }
 }
 
