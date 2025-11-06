@@ -37,6 +37,7 @@ let currentViewerCount = 0;
 let pollTimer = null;
 let heartbeatTimer = null;
 let lastLogTime = 0;
+let domObserver = null;
 
 // ============================================================================
 // RECURSIVE SHADOW DOM TRAVERSAL
