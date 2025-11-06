@@ -192,8 +192,10 @@ chrome.runtime.onConnect.addListener((port) => {
     });
     
     port.onMessage.addListener((message) => {
-      // Handle port messages same as runtime messages
-      handleViewerCountMessage(message, { tab: port.sender?.tab }, () => {});
+      // Handle port messages by calling main message handler
+      chrome.runtime.onMessage.dispatchEvent(new CustomEvent('message', {
+        detail: { message, sender: { tab: port.sender?.tab }, sendResponse: () => {} }
+      }));
     });
   }
 });
