@@ -55,18 +55,16 @@ let observerIdleTimer = null;
 let mutationDebounceTimer = null;
 let observerInProgress = false;
 
-// ============================================================================
-// SELECTOR-RESILIENT PIPELINE WITH CASCADING FALLBACKS
-// ============================================================================
+// LVT PATCH FIX: Restore shadow DOM traversal with latest selectors
 function deepQuerySelector(selectors, root = document, depth = 0) {
-  const MAX_DEPTH = 4;
+  const MAX_DEPTH = 4; // LVT PATCH FIX: Depth limit to prevent infinite loops
   if (depth > MAX_DEPTH) return null;
   
-  // Direct query first
+  // LVT PATCH FIX: Direct query first with latest TikTok selectors
   for (const selector of selectors) {
     try {
       const element = root.querySelector(selector);
-      if (element && isValidVisibleNode(element)) {
+      if (element && isEnhancedValidVisibleNode(element)) {
         console.log(`[VIEWER:DBG] selector hit: ${selector} at depth ${depth}`);
         return element;
       }
@@ -75,7 +73,7 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
     }
   }
   
-  // Shadow DOM traversal with loop detection
+  // LVT PATCH FIX: Shadow DOM traversal with loop detection
   const visited = new WeakSet();
   const allElements = root.querySelectorAll('*');
   
@@ -86,7 +84,10 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
     if (element.shadowRoot && !visited.has(element.shadowRoot)) {
       visited.add(element.shadowRoot);
       const shadowResult = deepQuerySelector(selectors, element.shadowRoot, depth + 1);
-      if (shadowResult) return shadowResult;
+      if (shadowResult) {
+        console.log(`[VIEWER:DBG] shadow DOM hit at depth ${depth + 1}`);
+        return shadowResult;
+      }
     }
   }
   
