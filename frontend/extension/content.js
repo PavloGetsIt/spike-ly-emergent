@@ -43,11 +43,12 @@ const platformSelectors = {
 let isTracking = false;
 let currentViewerCount = 0;
 let pollTimer = null;
-let heartbeatTimer = null;
 let lastLogTime = 0;
+// FIXED: Removed duplicate domObserver declaration
 let domObserver = null;
 let currentObserverTarget = null;
 let observerIdleTimer = null;
+let mutationDebounceTimer = null;
 let domObserver = null;
 
 // ============================================================================
