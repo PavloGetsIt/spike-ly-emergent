@@ -278,7 +278,7 @@ function reliableSendMessage(payload, attempt = 1) {
 // STABILIZED MUTATIONOBSERVER WITH DEBOUNCING
 // ============================================================================
 const OBSERVER_DEBOUNCE_MS = 150; // 120-200ms as specified
-let observerInProgress = false;
+// LVT PATCH: observerInProgress already declared in state variables section
 
 // MutationObserver with reentrant spam prevention
 function bindMutationObserver(element, forceInit = false) {
