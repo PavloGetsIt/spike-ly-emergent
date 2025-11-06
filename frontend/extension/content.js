@@ -52,22 +52,36 @@ let mutationDebounceTimer = null;
 let domObserver = null;
 
 // ============================================================================
-// RECURSIVE SHADOW DOM TRAVERSAL
+// SELECTOR-RESILIENT PIPELINE WITH CASCADING FALLBACKS
 // ============================================================================
-function deepQuerySelector(selectors, root = document) {
-  // First try direct query
+function deepQuerySelector(selectors, root = document, depth = 0) {
+  const MAX_DEPTH = 4;
+  if (depth > MAX_DEPTH) return null;
+  
+  // Direct query first
   for (const selector of selectors) {
-    const element = root.querySelector(selector);
-    if (element && hasValidViewerCount(element)) {
-      return element;
+    try {
+      const element = root.querySelector(selector);
+      if (element && isValidVisibleNode(element)) {
+        console.log(`[VIEWER:DBG] selector hit: ${selector} at depth ${depth}`);
+        return element;
+      }
+    } catch (e) {
+      console.log(`[VIEWER:DBG] selector failed: ${selector}`);
     }
   }
   
-  // Recursive shadow DOM traversal
+  // Shadow DOM traversal with loop detection
+  const visited = new WeakSet();
   const allElements = root.querySelectorAll('*');
+  
   for (const element of allElements) {
-    if (element.shadowRoot) {
-      const shadowResult = deepQuerySelector(selectors, element.shadowRoot);
+    if (visited.has(element)) continue;
+    visited.add(element);
+    
+    if (element.shadowRoot && !visited.has(element.shadowRoot)) {
+      visited.add(element.shadowRoot);
+      const shadowResult = deepQuerySelector(selectors, element.shadowRoot, depth + 1);
       if (shadowResult) return shadowResult;
     }
   }
@@ -75,17 +89,18 @@ function deepQuerySelector(selectors, root = document) {
   return null;
 }
 
-// ============================================================================
-// RESILIENT VIEWER DETECTION WITH VISIBILITY VALIDATION
-// ============================================================================
+// Enhanced TikTok detection with cascading selectors (from requirements)
 function detectViewerCount() {
   if (platform === 'tiktok') {
     
-    // Enhanced selectors with visibility validation
-    const selectors = [
-      '.viewer-count',
-      'span[data-e2e="live-viewer-count"]',
+    // Cascading fallback selectors (ordered by reliability)
+    const cascadingSelectors = [
       '[data-e2e="live-room-viewers"]',
+      '[data-e2e="live-room-viewer-count"]', 
+      '.live-ui-viewer-count',
+      '.number-of-viewers',
+      '.css-* span',
+      'span:has(svg[width][height])',
       '[data-testid="live-room-viewers"]',
       '[data-e2e*="viewer"]',
       '[class*="ViewerCount"]',
@@ -93,16 +108,17 @@ function detectViewerCount() {
     ];
     
     // Try shadow DOM traversal with validation
-    const element = deepQuerySelector(selectors);
-    if (element && isValidVisibleNode(element)) {
+    const element = deepQuerySelector(cascadingSelectors);
+    if (element) {
       const count = parseViewerCount(element);
       if (count > 0) {
-        bindMutationObserver(element); // Bind directly to this element
+        console.log(`[VIEWER:DBG] detected: ${count} via selector`);
+        bindMutationObserver(element);
         return count;
       }
     }
     
-    // Fallback: Search near LIVE badge with validation
+    // Fallback: LIVE badge proximity search with validation
     const liveElements = Array.from(document.querySelectorAll('*')).filter(el => {
       const text = el.textContent?.trim();
       return text && (text.includes('LIVE') || text.includes('Live')) && isValidVisibleNode(el);
@@ -111,13 +127,14 @@ function detectViewerCount() {
     for (const liveEl of liveElements) {
       const parent = liveEl.closest('div, section, span');
       if (parent) {
-        const numbers = parent.querySelectorAll('span, div');
+        const numbers = parent.querySelectorAll('span, div, strong');
         for (const numEl of numbers) {
           const numText = numEl.textContent?.trim();
           if (numText && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(numText) && isValidVisibleNode(numEl)) {
             const count = parseViewerCount(numText);
             if (count >= CONFIG.VIEWER_MIN_THRESHOLD) {
-              bindMutationObserver(numEl); // Bind to the number element
+              console.log(`[VIEWER:DBG] detected: ${count} via live badge proximity`);
+              bindMutationObserver(numEl);
               return count;
             }
           }
@@ -133,7 +150,9 @@ function detectViewerCount() {
   for (const selector of selectors) {
     const element = document.querySelector(selector);
     if (element && isValidVisibleNode(element) && hasValidViewerCount(element)) {
-      return parseViewerCount(element);
+      const count = parseViewerCount(element);
+      console.log(`[VIEWER:DBG] detected: ${count} via ${platform} selector`);
+      return count;
     }
   }
   
