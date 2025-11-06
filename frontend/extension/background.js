@@ -200,60 +200,6 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
-// Streamlined viewer count message handler
-function handleViewerCountMessage(message, sender, sendResponse) {
-  if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
-    console.log(`[VIEWER:BG] forwarded=${message.count}`);
-    
-    // Cache last viewer value for reconnections
-    lastViewer = {
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.timestamp,
-      tabId: sender.tab?.id || null,
-    };
-    
-    if (sender.tab?.id) {
-      lastLiveTabId = sender.tab.id;
-    }
-
-    // Add to correlation engine
-    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.timestamp);
-
-    // Forward to web app via WebSocket
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'VIEWER_COUNT',
-        platform: message.platform,
-        count: message.count,
-        delta: message.delta ?? 0,
-        timestamp: message.timestamp,
-        rawText: message.rawText,
-        confidence: message.confidence,
-        tabId: sender.tab?.id
-      }));
-    }
-
-    // Forward to sidepanel
-    chrome.runtime.sendMessage({
-      type: 'VIEWER_COUNT',
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.timestamp,
-      source: message.source
-    }, () => { 
-      if (chrome.runtime.lastError) {
-        // Side panel may not be open
-      }
-    });
-
-    sendResponse?.({ success: true });
-    return true;
-  }
-}
-
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle viewer count messages (both VIEWER_COUNT_UPDATE and VIEWER_HEARTBEAT)
