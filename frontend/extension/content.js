@@ -157,6 +157,44 @@ function isValidVisibleNode(element) {
   return true;
 }
 
+
+// ============================================================================
+// HYSTERESIS AND EMISSION CONTROL
+// ============================================================================
+let lastEmittedCount = 0;
+let lastEmitTime = 0;
+const EMIT_MIN_DELTA = 1;
+const EMIT_MIN_INTERVAL = 250; // 250ms minimum between emissions
+
+function shouldEmitUpdate(count) {
+  const now = Date.now();
+  const delta = Math.abs(count - lastEmittedCount);
+  const timeSinceLastEmit = now - lastEmitTime;
+  
+  // Only emit if significant change AND enough time passed
+  return delta >= EMIT_MIN_DELTA && timeSinceLastEmit >= EMIT_MIN_INTERVAL;
+}
+
+function emitViewerUpdate(count) {
+  const now = Date.now();
+  const delta = lastEmittedCount > 0 ? count - lastEmittedCount : 0;
+  
+  lastEmittedCount = count;
+  lastEmitTime = now;
+  currentViewerCount = count;
+  
+  console.log(`[VIEWER:PAGE] value=${count}`);
+  
+  safeSendMessage({
+    type: 'VIEWER_COUNT_UPDATE',
+    platform,
+    count,
+    delta,
+    timestamp: now,
+    source: 'validated'
+  });
+}
+
 // MutationObserver directly on viewer text node
 let currentObserverTarget = null;
 let observerIdleTimer = null;
