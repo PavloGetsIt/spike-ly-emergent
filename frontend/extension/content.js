@@ -273,27 +273,31 @@ function deduplicateCounters(candidates) {
 }
 
 
-// ============================================================================
-// JITTER FILTER AND EMISSION CONTROL
-// ============================================================================
+// LVT PATCH R2: Synchronization logic with 5Hz throttling
 let lastEmittedCount = 0;
 let lastEmitTime = 0;
-const EMIT_MIN_INTERVAL = 250; // 250ms minimum between emissions
+const EMIT_MAX_FREQUENCY = 200; // LVT PATCH R2: 5 Hz max (200ms minimum interval)
 
-// Jitter filter: ignore ±2, accept >2 immediately
+// LVT PATCH R2: Enhanced jitter filter with mutation timestamp tracking
 function shouldEmitWithJitterFilter(count) {
   const now = Date.now();
   const delta = Math.abs(count - lastEmittedCount);
   const timeSinceLastEmit = now - lastEmitTime;
   
-  // Accept anything >2 immediately
+  // LVT PATCH R2: Throttle DOM emission to 5 Hz max
+  if (timeSinceLastEmit < EMIT_MAX_FREQUENCY) {
+    console.log(`[VIEWER:DBG] throttled: ${timeSinceLastEmit}ms < ${EMIT_MAX_FREQUENCY}ms`);
+    return false;
+  }
+  
+  // LVT PATCH R2: Accept anything >2 immediately (large deltas)
   if (delta > 2) {
     console.log(`[VIEWER:DBG] large delta: ${delta}, emitting immediately`);
     return true;
   }
   
-  // Ignore deltas ±2 or smaller unless enough time passed
-  if (delta <= 2 && timeSinceLastEmit < EMIT_MIN_INTERVAL) {
+  // LVT PATCH R2: For smaller deltas, ensure minimum time passed
+  if (delta <= 2 && timeSinceLastEmit < EMIT_MAX_FREQUENCY) {
     console.log(`[VIEWER:DBG] jitter filtered: delta=${delta}, time=${timeSinceLastEmit}ms`);
     return false;
   }
@@ -311,15 +315,15 @@ function emitViewerUpdate(count) {
   
   console.log(`[VIEWER:PAGE] value=${count}`);
   
-  // Use reliable message sending with retry
-  reliableSendMessage({
+  // LVT PATCH R2: Use sendWithRetry for guaranteed delivery
+  sendWithRetry({
     type: 'VIEWER_COUNT_UPDATE',
     platform,
     count,
     delta,
     timestamp: now,
     source: 'validated'
-  });
+  }, 'LVT_UPDATE');
 }
 
 // ============================================================================
