@@ -458,33 +458,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             console.debug('[AUDIO:BG:CAPTURE] Attempt #' + attempt);
             
-            // Enhanced MV3 audio capture with proper fallback
-            if (typeof chrome.tabCapture === 'undefined') {
-              throw new Error('tabCapture API not available - use getDisplayMedia fallback');
-            }
-            
-            // Try modern captureOffscreenTab if available
-            if (chrome.tabCapture.captureOffscreenTab) {
-              stream = await chrome.tabCapture.captureOffscreenTab(tabId, {
-                audio: true,
-                video: false
-              });
-            } else {
-              // Fallback to legacy capture
-              stream = await chrome.tabCapture.capture({
-                audio: true,
-                video: false
-              });
-            }
-            
-            if (stream && stream.getAudioTracks().length > 0) {
-              console.debug('[AUDIO:BG:READY] Audio stream active', { 
-                tracks: stream.getAudioTracks().length,
-                tabId 
-              });
-              break;
-            } else {
-              throw new Error('No audio tracks in captured stream');
+            // Graceful tabCapture fallback (MV3 compatible)
+            try {
+              if (typeof chrome.tabCapture === 'undefined') {
+                throw new Error('tabCapture API not available - fallback required');
+              }
+              
+              // Try modern captureOffscreenTab if available
+              if (chrome.tabCapture.captureOffscreenTab) {
+                stream = await chrome.tabCapture.captureOffscreenTab(tabId, {
+                  audio: true,
+                  video: false
+                });
+              } else {
+                // Legacy capture method
+                stream = await chrome.tabCapture.capture({
+                  audio: true,
+                  video: false
+                });
+              }
+              
+              if (stream && stream.getAudioTracks().length > 0) {
+                console.debug('[AUDIO:BG:READY] Audio stream active via tabCapture');
+                break;
+              } else {
+                throw new Error('No audio tracks in captured stream');
+              }
+              
+            } catch (captureErr) {
+              console.debug(`[AUDIO:BG:FALLBACK] tabCapture failed (attempt ${attempt}): ${captureErr.message}`);
+              
+              // Graceful fallback - signal sidepanel to use getDisplayMedia
+              if (attempt === 3) {
+                sendResponse({ 
+                  success: false, 
+                  error: 'Audio capture requires screen share',
+                  requiresFallback: true
+                });
+                return;
+              }
+              
+              lastError = captureErr;
             }
           } catch (captureErr) {
             lastError = captureErr;
