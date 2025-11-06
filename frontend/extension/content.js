@@ -120,7 +120,7 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
       // LVT PATCH R3: Visibility-safe regex for formats like "173K", "184,490", "1.8k watching"
       const sanitized = text.replace(/[^\d.,KkMm]/g, '');
       if (sanitized && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(sanitized)) {
-        if (isComprehensivelyVisible(node)) { // LVT PATCH R3: Use comprehensive visibility check
+        if (isEnhancedValidVisibleNode(node)) { // LVT PATCH R3: Use comprehensive visibility check
           const count = parseViewerCount(sanitized);
           if (count > CONFIG.VIEWER_MIN_THRESHOLD) {
             console.log("✅ Shadow DOM number found:", text); // LVT PATCH R3: Validation capture log
