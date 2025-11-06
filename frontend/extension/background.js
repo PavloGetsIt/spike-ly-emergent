@@ -254,9 +254,54 @@ function handleViewerCountMessage(message, sender, sendResponse) {
 
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Handle viewer count messages
-  if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
-    return handleViewerCountMessage(message, sender, sendResponse);
+  // Handle viewer count messages (both VIEWER_COUNT_UPDATE and VIEWER_HEARTBEAT)
+  if (message.type === 'VIEWER_COUNT_UPDATE' || message.type === 'VIEWER_HEARTBEAT') {
+    console.log(`[VIEWER:BG] forwarded=${message.count}`);
+    
+    // Cache last viewer value
+    lastViewer = {
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.timestamp,
+      tabId: sender.tab?.id || null,
+    };
+    
+    if (sender.tab?.id) {
+      lastLiveTabId = sender.tab.id;
+    }
+
+    // Add to correlation engine
+    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.timestamp);
+
+    // Forward to web app via WebSocket
+    if (wsConnection?.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({
+        type: 'VIEWER_COUNT',
+        platform: message.platform,
+        count: message.count,
+        delta: message.delta ?? 0,
+        timestamp: message.timestamp,
+        tabId: sender.tab?.id
+      }));
+    }
+
+    // Forward to sidepanel
+    chrome.runtime.sendMessage({
+      type: 'VIEWER_COUNT',
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.timestamp,
+      source: message.source
+    }, () => { 
+      if (chrome.runtime.lastError) {
+        // Side panel may not be open
+      }
+    });
+
+    sendResponse?.({ success: true });
+    return true;
   }
   
   if (message.type === 'POPUP_ACTIVATED') {
