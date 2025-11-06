@@ -163,14 +163,14 @@ async function stopTrackingOnAllTabs() {
   }
 }
 
-// Enhanced port connection handler with cached value flushing
+// Enhanced port connection handler (simplified)
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'viewer-count-port') {
     console.log('[VIEWER:BG] port connected');
     
-    // Flush cached last viewer value on reconnect
+    // Flush cached viewer value on connect
     if (lastViewer && lastViewer.count !== undefined) {
-      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (cached flush)`);
+      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (cached)`);
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT',
         platform: lastViewer.platform,
@@ -178,24 +178,11 @@ chrome.runtime.onConnect.addListener((port) => {
         delta: lastViewer.delta,
         timestamp: Date.now(),
         source: 'cached_flush'
-      }, () => { 
-        if (chrome.runtime.lastError) {
-          // Side panel may not be open
-        }
       });
     }
     
-    // All ports must register port.onDisconnect
     port.onDisconnect.addListener(() => {
       console.log('[VIEWER:BG] port disconnected');
-      // No action needed - content script will auto-reconnect
-    });
-    
-    port.onMessage.addListener((message) => {
-      // Handle port messages by calling main message handler
-      chrome.runtime.onMessage.dispatchEvent(new CustomEvent('message', {
-        detail: { message, sender: { tab: port.sender?.tab }, sendResponse: () => {} }
-      }));
     });
   }
 });
