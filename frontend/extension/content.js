@@ -323,40 +323,12 @@ function emitViewerUpdate(count) {
 }
 
 // ============================================================================
-// LVT PATCH: Hardened message reliability with exponential backoff retry
+// LVT PATCH R2: Use unified sendWithRetry for all message sending
 // ============================================================================
 function reliableSendMessage(payload, attempt = 1) {
-  const MAX_ATTEMPTS = 3;
-  const baseDelay = 50; // LVT PATCH: 50ms, 100ms, 200ms as specified
-  
-  if (!chrome?.runtime?.id) {
-    console.log('[VIEWER:DBG] extension context invalid');
-    return;
-  }
-  
-  try {
-    chrome.runtime.sendMessage(payload, (response) => {
-      if (chrome.runtime.lastError) {
-        const error = chrome.runtime.lastError.message;
-        
-        // LVT PATCH: Retry on "Receiving end does not exist"
-        if (error.includes('Receiving end does not exist') && attempt < MAX_ATTEMPTS) {
-          const delay = baseDelay * Math.pow(2, attempt - 1); // LVT PATCH: Exponential backoff
-          console.log(`[VIEWER:DBG] retry ${attempt}/${MAX_ATTEMPTS} in ${delay}ms: ${error}`);
-          
-          setTimeout(() => {
-            reliableSendMessage(payload, attempt + 1); // LVT PATCH: Recursive retry
-          }, delay);
-        } else if (!error.includes('Extension context invalidated')) {
-          console.log(`[VIEWER:DBG] send failed after ${attempt} attempts: ${error}`);
-        }
-      } else {
-        console.log(`[VIEWER:DBG] sent successfully on attempt ${attempt}`);
-      }
-    });
-  } catch (error) {
-    console.log(`[VIEWER:DBG] send error: ${error.message}`);
-  }
+  // LVT PATCH R2: Delegate to sendWithRetry with appropriate context tag
+  const contextTag = payload.type || "VIEWER_UPDATE";
+  sendWithRetry(payload, contextTag, attempt);
 }
 
 // ============================================================================
