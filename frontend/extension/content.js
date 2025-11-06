@@ -2,12 +2,16 @@
 // SPIKELY CONTENT SCRIPT - RESILIENT SHADOW DOM VIEWER DETECTION
 // ============================================================================
 
+// ============================================================================ 
+// LVT PATCH: Wrap domObserver initialization with guard
+// ============================================================================
 (function(){
   try {
     if (window.__SPIKELY_CONTENT_ACTIVE__) {
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
+    window.__spikelyDomObsInit = false; // LVT PATCH: Guard for duplicate observer
   } catch (_) {}
 
 // Configuration
@@ -44,15 +48,12 @@ let isTracking = false;
 let currentViewerCount = 0;
 let pollTimer = null;
 let lastLogTime = 0;
-// FIXED: Removed duplicate domObserver declaration
+// LVT PATCH: Fixed duplicate domObserver declaration
 let domObserver = null;
 let currentObserverTarget = null;
 let observerIdleTimer = null;
 let mutationDebounceTimer = null;
-
-// Add missing variables for the new system
 let observerInProgress = false;
-let domObserver = null;
 
 // ============================================================================
 // SELECTOR-RESILIENT PIPELINE WITH CASCADING FALLBACKS
