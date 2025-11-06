@@ -238,8 +238,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       });
 
-      sendResponse({ success: true }); // LVT PATCH FIX: Always call sendResponse
-      return true; // LVT PATCH FIX: Return true for async delivery
+      // LVT PATCH R2: Log in background with enhanced format
+      console.log(`[VIEWER:BG] Forwarded viewer count: ${message.count}`);
+      
+      // LVT PATCH R2: Always ensure sendResponse called and return true for async
+      sendResponse({ success: true, received: true });
+      return true;
       
     case 'START_TRACKING':
       // LVT PATCH FIX: Enhanced tracking start with proper response
