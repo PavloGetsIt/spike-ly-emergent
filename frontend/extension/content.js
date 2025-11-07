@@ -477,6 +477,7 @@ function hasValidViewerCount(element) {
   return text && /\d/.test(text) && text.length <= 10;
 }
 
+// LVT PATCH R4: Fixed numeric parser with strict filtering (normalize to 0-200,000 range)
 function parseViewerCount(textOrElement) {
   let text;
   if (typeof textOrElement === 'string') {
@@ -487,18 +488,27 @@ function parseViewerCount(textOrElement) {
     return 0;
   }
   
-  const cleaned = text.toLowerCase().replace(/[\s,]/g, '');
-  const match = cleaned.match(/([\d.]+)([km])?/);
+  // LVT PATCH R4: Strict sanitization - only keep digits, commas, periods, K, M
+  const cleaned = text.toLowerCase().replace(/[^\d.,km]/g, '');
+  const match = cleaned.match(/^(\d+(?:\.\d+)?(?:,\d{3})*?)([km]?)$/);
   if (!match) return 0;
   
-  let num = parseFloat(match[1]);
+  let num = parseFloat(match[1].replace(/,/g, '')); // LVT PATCH R4: Remove commas before parsing
   const suffix = match[2];
   
   if (suffix === 'k') num *= 1000;
   if (suffix === 'm') num *= 1000000;
   
   const result = Math.round(num);
-  return isFinite(result) && result >= 0 ? result : 0;
+  
+  // LVT PATCH R4: Normalize to valid range [0 - 200,000] to prevent ridiculous values
+  if (!isFinite(result) || result < 0) return 0;
+  if (result > 200000) {
+    console.log(`[VIEWER:DBG] capped excessive count: ${result} → 200000`);
+    return 200000;
+  }
+  
+  return result;
 }
 
 // ============================================================================
