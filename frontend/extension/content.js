@@ -308,7 +308,7 @@ function detectViewerCountWithRegistry() {
     if (candidates.length > 0) {
       const best = candidates.sort((a, b) => a.priority - b.priority)[0];
       console.log(`[VIEWER:PAGE:FOUND] Best registry candidate: ${best.count} (${best.source})`); // LVT PATCH R6: Best log
-      bindMutationObserver(best.element);
+      bindPersistentMutationObserver(best.element);
       return best.count;
     }
     
