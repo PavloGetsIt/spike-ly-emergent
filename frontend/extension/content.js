@@ -662,7 +662,7 @@ function parseViewerCount(textOrElement) {
 }
 
 // ============================================================================
-// STABILIZED TRACKING WITH OBSERVER + POLLING FALLBACK
+// LVT PATCH R6: Enhanced tracking with delayed binding and registry access
 // ============================================================================
 function startTracking() {
   if (isTracking) {
@@ -671,28 +671,31 @@ function startTracking() {
   }
   
   isTracking = true;
-  console.log('[VIEWER:PAGE] tracking started');
+  console.log('[VIEWER:PAGE] tracking started with shadow registry access');
   
   if (platform === 'tiktok') {
-    // Try initial detection and bind observer
+    // LVT PATCH R6: Try immediate detection with registry
     const initialCount = detectViewerCountWithRegistry();
     if (initialCount !== null && initialCount > 0) {
+      lastUpdateTime = Date.now(); // LVT PATCH R6: Track update time
       emitViewerUpdate(initialCount);
+    } else {
+      // LVT PATCH R6: Start delayed node binding for React Fiber async mounting
+      startDelayedNodeBinding();
     }
     
-    // Polling fallback (only when MutationObserver is idle)
+    // LVT PATCH R6: Polling fallback (only when observer inactive)
     pollTimer = setInterval(() => {
-      // LVT PATCH R4: Only poll if no active observer or observer inactive
       const observerActive = domObserver && currentObserverTarget && 
-                           isValidVisibleNode(currentObserverTarget); // LVT PATCH R4: Use fixed function name
+                           isValidVisibleNode(currentObserverTarget);
       
       if (!observerActive) {
         console.log('[VIEWER:DBG] polling fallback active');
-        const count = detectViewerCountWithRegistry();
+        const count = detectViewerCountWithRegistry(); // LVT PATCH R6: Use registry access
         if (count !== null && shouldEmitWithJitterFilter(count)) {
+          lastUpdateTime = Date.now(); // LVT PATCH R6: Track update time
           emitViewerUpdate(count);
         } else if (count === null) {
-          // LVT PATCH R4: Throttled missing log
           const now = Date.now();
           if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
             console.log('[VIEWER:PAGE] missing node');
@@ -705,19 +708,19 @@ function startTracking() {
     // Heartbeat every 5s
     setInterval(() => {
       if (isTracking && currentViewerCount > 0) {
-        reliableSendMessage({
+        sendWithRetry({
           type: 'VIEWER_HEARTBEAT',
           platform,
           count: currentViewerCount,
           timestamp: Date.now()
-        });
+        }, 'HEARTBEAT');
       }
     }, CONFIG.HEARTBEAT_INTERVAL_MS);
     
   } else {
     // Non-TikTok platforms: polling with validation
     pollTimer = setInterval(() => {
-      const count = detectViewerCountWithRegistry();
+      const count = detectViewerCountWithRegistry(); // LVT PATCH R6: Use registry for all platforms
       if (count !== null && shouldEmitWithJitterFilter(count)) {
         emitViewerUpdate(count);
       }
