@@ -94,7 +94,7 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
   for (const selector of selectors) {
     try {
       const element = root.querySelector(selector);
-      if (element && isEnhancedValidVisibleNode(element)) {
+      if (element && isValidVisibleNode(element)) {
         console.log(`[VIEWER:DBG] selector hit: ${selector} at depth ${depth}`);
         return element;
       }
