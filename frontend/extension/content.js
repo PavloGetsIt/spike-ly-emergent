@@ -421,7 +421,7 @@ function bindMutationObserver(element, forceInit = false) {
     domObserver = null;
   }
   
-  if (!element || !isEnhancedValidVisibleNode(element)) { // LVT PATCH: Use enhanced validation
+  if (!element || !isValidVisibleNode(element)) { // LVT PATCH: Use enhanced validation
     console.log('[VIEWER:DBG] invalid element for observer binding');
     return;
   }
