@@ -143,74 +143,80 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
 }
 
 // ============================================================================
-// LVT PATCH: Enhanced TikTok shadow DOM selectors for latest DOM structure
+// LVT PATCH R5: Enhanced TikTok detection with specific viewer targeting
 // ============================================================================
 function detectViewerCount() {
   if (platform === 'tiktok') {
     
-    // LVT PATCH: Latest TikTok shadow DOM selectors (from requirements)
-    const latestSelectors = [
-      'div[role="status"] span', // LVT PATCH: Status role selector
-      'tik-tok-viewer[data-count]', // LVT PATCH: Custom element selector  
-      'div[data-e2e="viewers"] span', // LVT PATCH: Viewers data element
-      'div.live-room-web span', // LVT PATCH: Live room web selector
+    console.log('[VIEWER:INIT] Starting TikTok viewer detection...'); // LVT PATCH R5: Init log
+    
+    // LVT PATCH R5: PRIORITY 1 - Target "Viewers · X" pattern directly
+    const viewerLabels = Array.from(document.querySelectorAll('*')).filter(el => {
+      const text = el.textContent?.trim();
+      return text && /viewers?\s*[·•]\s*\d+/i.test(text);
+    });
+    
+    for (const label of viewerLabels) {
+      const text = label.textContent.trim();
+      const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
+      if (match) {
+        const count = parseViewerCount(match[1]);
+        if (count > 0 && isValidVisibleNode(label)) {
+          console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via "Viewers · X" pattern`); // LVT PATCH R5: Found log
+          bindMutationObserver(label);
+          return count;
+        }
+      }
+    }
+    
+    // LVT PATCH R5: PRIORITY 2 - Explicit fallback selectors for known viewer containers
+    const fallbackSelectors = [
+      '[data-e2e*="user-count"]', // LVT PATCH R5: User count selector
+      '[class*="DivNumber"]',     // LVT PATCH R5: Number div selector
+      '[class*="DivViewer"]',     // LVT PATCH R5: Viewer div selector  
+      '[class*="SpanCount"]',     // LVT PATCH R5: Count span selector
       '[data-e2e="live-room-viewers"]',
       '[data-e2e="live-room-viewer-count"]', 
       '.live-ui-viewer-count',
-      '.number-of-viewers',
-      '.css-* span',
-      'span:has(svg[width][height])',
-      '[data-testid="live-room-viewers"]',
-      '[data-e2e*="viewer"]',
-      '[class*="ViewerCount"]',
-      '[class*="LiveAudience"]'
+      '.number-of-viewers'
     ];
     
-    // LVT PATCH: Try shadow DOM traversal with enhanced validation
-    const element = deepQuerySelector(latestSelectors);
-    if (element && isEnhancedValidVisibleNode(element)) { // LVT PATCH: Enhanced validation
+    // LVT PATCH R5: Try shadow DOM traversal with enhanced validation
+    const element = deepQuerySelector(fallbackSelectors);
+    if (element && isValidVisibleNode(element)) {
       const count = parseViewerCount(element);
       if (count > 0) {
-        console.log(`[VIEWER:DBG] detected: ${count} via selector`);
+        console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via fallback selector`); // LVT PATCH R5: Found log
         bindMutationObserver(element);
         return count;
       }
     }
     
-    // LVT PATCH: Enhanced LIVE badge proximity search with deduplication
-    const liveElements = Array.from(document.querySelectorAll('*')).filter(el => {
-      const text = el.textContent?.trim();
-      return text && (text.includes('LIVE') || text.includes('Live')) && isEnhancedValidVisibleNode(el);
+    // LVT PATCH R5: PRIORITY 3 - Search near "Viewers" text for nearby numbers
+    const nearbyViewerSearch = Array.from(document.querySelectorAll('*')).filter(el => {
+      const text = el.textContent?.toLowerCase();
+      return text && text.includes('viewers') && isValidVisibleNode(el);
     });
     
-    const candidates = []; // LVT PATCH: Collect candidates for deduplication
-    
-    for (const liveEl of liveElements) {
-      const parent = liveEl.closest('div, section, span');
+    for (const viewerEl of nearbyViewerSearch) {
+      const parent = viewerEl.closest('div, section, span');
       if (parent) {
         const numbers = parent.querySelectorAll('span, div, strong');
         for (const numEl of numbers) {
           const numText = numEl.textContent?.trim();
-          if (numText && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(numText) && isEnhancedValidVisibleNode(numEl)) {
+          if (numText && /^[0-9,]+(?:\.[0-9]+)?[KkMm]?$/.test(numText) && isValidVisibleNode(numEl)) {
             const count = parseViewerCount(numText);
-            if (count >= CONFIG.VIEWER_MIN_THRESHOLD) {
-              const rect = numEl.getBoundingClientRect();
-              candidates.push({ element: numEl, count, rect, text: numText }); // LVT PATCH: Add to candidates
+            if (count >= CONFIG.VIEWER_MIN_THRESHOLD && count <= 1000000) { // LVT PATCH R5: Reasonable range for viewers
+              console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via viewer proximity`); // LVT PATCH R5: Found log  
+              bindMutationObserver(numEl);
+              return count;
             }
           }
         }
       }
     }
     
-    // LVT PATCH: Deduplicate by bounding box overlap and pick fastest stable candidate
-    if (candidates.length > 0) {
-      const deduped = deduplicateCounters(candidates); // LVT PATCH: Deduplication
-      const bestCandidate = deduped[0]; // Pick first (fastest stable)
-      console.log(`[VIEWER:DBG] detected: ${bestCandidate.count} via live badge proximity`);
-      bindMutationObserver(bestCandidate.element);
-      return bestCandidate.count;
-    }
-    
+    console.log('[VIEWER:PAGE] no valid TikTok viewer count found'); // LVT PATCH R5: Not found log
     return null;
   }
   
@@ -218,9 +224,9 @@ function detectViewerCount() {
   const selectors = platformSelectors[platform] || [];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
-    if (element && isEnhancedValidVisibleNode(element) && hasValidViewerCount(element)) { // LVT PATCH: Enhanced validation
+    if (element && isValidVisibleNode(element) && hasValidViewerCount(element)) {
       const count = parseViewerCount(element);
-      console.log(`[VIEWER:DBG] detected: ${count} via ${platform} selector`);
+      console.log(`[VIEWER:FOUND] ${platform} viewer count: ${count}`); // LVT PATCH R5: Found log
       return count;
     }
   }
