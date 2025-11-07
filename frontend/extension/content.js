@@ -649,7 +649,7 @@ function startTracking() {
   
   if (platform === 'tiktok') {
     // Try initial detection and bind observer
-    const initialCount = detectViewerCount();
+    const initialCount = detectViewerCountWithRegistry();
     if (initialCount !== null && initialCount > 0) {
       emitViewerUpdate(initialCount);
     }
