@@ -691,7 +691,7 @@ function startTracking() {
   } else {
     // Non-TikTok platforms: polling with validation
     pollTimer = setInterval(() => {
-      const count = detectViewerCount();
+      const count = detectViewerCountWithRegistry();
       if (count !== null && shouldEmitWithJitterFilter(count)) {
         emitViewerUpdate(count);
       }
