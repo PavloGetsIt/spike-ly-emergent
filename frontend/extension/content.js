@@ -239,33 +239,30 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
 }
 
 // ============================================================================
-// LVT PATCH R5: Targeted TikTok viewer detection with explicit pattern matching
+// LVT PATCH R6: Enhanced detection with registry access for closed shadow roots
 // ============================================================================
-function detectViewerCount() {
+function detectViewerCountWithRegistry() {
   if (platform === 'tiktok') {
     
-    console.log('[VIEWER:INIT] Starting targeted TikTok viewer detection...'); // LVT PATCH R5: Init log
+    console.log('[VIEWER:INIT] Starting TikTok viewer detection with registry access...'); // LVT PATCH R6: Init log
     
-    // LVT PATCH R5: PRIORITY 1 - Exact "Viewers · X" pattern search (most reliable)
-    console.log('[VIEWER:DBG] Priority 1: Searching for "Viewers · X" pattern...');
+    // LVT PATCH R6: PRIORITY 1 - Exact "Viewers · X" pattern search with registry  
+    console.log('[VIEWER:DBG] Priority 1: Searching main DOM for "Viewers · X" pattern...');
     
     const allElements = Array.from(document.querySelectorAll('*'));
     for (const element of allElements) {
       const text = element.textContent?.trim() || '';
       
-      // LVT PATCH R5: Look for exact TikTok viewer format
+      // LVT PATCH R6: Look for exact TikTok viewer format
       if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
         console.log('[VIEWER:DBG] Found "Viewers" element:', text);
         
-        // LVT PATCH R5: Extract the number after the bullet
         const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
         if (match && isValidVisibleNode(element)) {
-          const countText = match[1];
-          const count = parseViewerCount(countText);
-          
-          console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via "Viewers · X" pattern`); // LVT PATCH R5: Success log
+          const count = parseViewerCount(match[1]);
           
           if (count > 0) {
+            console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via main DOM pattern`); // LVT PATCH R6: Found log
             bindMutationObserver(element);
             return count;
           }
@@ -273,84 +270,81 @@ function detectViewerCount() {
       }
     }
     
-    // LVT PATCH R5: PRIORITY 2 - Look for standalone numbers in viewer context
-    console.log('[VIEWER:DBG] Priority 2: Searching for standalone numbers in viewer context...');
-    
-    for (const element of allElements) {
-      const text = element.textContent?.trim() || '';
-      
-      // LVT PATCH R5: Check for standalone numbers that might be viewer counts
-      if (/^\d+(?:\.\d+)?[KkMm]?$/.test(text) && text.length <= 8) {
-        const parent = element.parentElement;
-        const context = parent?.textContent?.toLowerCase() || '';
-        
-        // LVT PATCH R5: Look for viewer context in parent
-        if (context.includes('viewer') && isValidVisibleNode(element)) {
-          const count = parseViewerCount(text);
-          
-          // LVT PATCH R5: Reasonable range check for viewer counts (10-50000 typical for TikTok Live)
-          if (count >= 10 && count <= 50000) {
-            console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via viewer context`); // LVT PATCH R5: Success log
-            bindMutationObserver(element);
-            return count;
-          }
-        }
-      }
-    }
-    
-    // LVT PATCH R5: PRIORITY 3 - Enhanced shadow DOM search with explicit viewer targeting
-    console.log('[VIEWER:DBG] Priority 3: Enhanced shadow DOM search...');
+    // LVT PATCH R6: PRIORITY 2 - Scan captured shadow root registry
+    console.log('[VIEWER:DBG] Priority 2: Scanning captured shadow root registry...');
     
     const candidates = [];
-    walkShadows(document.documentElement, (node) => {
+    walkShadowsWithRegistry((node) => {
       if ((node.tagName === 'SPAN' || node.tagName === 'DIV') && node.textContent) {
         const text = node.textContent.trim();
         
-        // LVT PATCH R5: Look for TikTok viewer patterns in shadow DOM
+        // LVT PATCH R6: Look for viewer patterns in captured shadow roots
         if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
           const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
           if (match && isValidVisibleNode(node)) {
             const count = parseViewerCount(match[1]);
             if (count > 0) {
-              console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via shadow DOM pattern`); // LVT PATCH R5: Success log
-              candidates.push({ element: node, count, priority: 1 }); // LVT PATCH R5: High priority
+              console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via shadow registry pattern`); // LVT PATCH R6: Found log
+              candidates.push({ element: node, count, priority: 1, source: 'shadow_pattern' });
             }
           }
         }
-        // LVT PATCH R5: Look for contextual numbers
+        // LVT PATCH R6: Look for standalone numbers with viewer context
         else if (/^\d+(?:\.\d+)?[KkMm]?$/.test(text)) {
           const context = node.parentElement?.textContent?.toLowerCase() || '';
           if (context.includes('viewer') && isValidVisibleNode(node)) {
             const count = parseViewerCount(text);
+            // LVT PATCH R6: TikTok Live typical range 10-50,000 viewers
             if (count >= 10 && count <= 50000) {
-              console.log(`[VIEWER:FOUND] TikTok viewer count: ${count} via shadow DOM context`); // LVT PATCH R5: Success log
-              candidates.push({ element: node, count, priority: 2 }); // LVT PATCH R5: Lower priority
+              console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via shadow registry context`); // LVT PATCH R6: Found log
+              candidates.push({ element: node, count, priority: 2, source: 'shadow_context' });
             }
           }
         }
       }
     });
     
-    // LVT PATCH R5: Return highest priority candidate
+    // LVT PATCH R6: Return highest priority candidate from registry scan
     if (candidates.length > 0) {
-      const sorted = candidates.sort((a, b) => a.priority - b.priority); // LVT PATCH R5: Sort by priority
-      const best = sorted[0];
-      console.log(`[VIEWER:FOUND] Best candidate: ${best.count} (priority ${best.priority})`); // LVT PATCH R5: Best candidate log
+      const best = candidates.sort((a, b) => a.priority - b.priority)[0];
+      console.log(`[VIEWER:PAGE:FOUND] Best registry candidate: ${best.count} (${best.source})`); // LVT PATCH R6: Best log
       bindMutationObserver(best.element);
       return best.count;
     }
     
-    console.log('[VIEWER:PAGE] no valid TikTok viewer count found'); // LVT PATCH R5: Failure log
+    // LVT PATCH R6: PRIORITY 3 - Fallback to traditional search
+    console.log('[VIEWER:DBG] Priority 3: Fallback to traditional DOM search...');
+    
+    for (const element of allElements) {
+      const text = element.textContent?.trim() || '';
+      
+      if (/^\d+(?:\.\d+)?[KkMm]?$/.test(text) && text.length <= 8) {
+        const parent = element.parentElement;
+        const context = parent?.textContent?.toLowerCase() || '';
+        
+        if (context.includes('viewer') && isValidVisibleNode(element)) {
+          const count = parseViewerCount(text);
+          
+          if (count >= 10 && count <= 50000) {
+            console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via traditional fallback`); // LVT PATCH R6: Found log
+            bindMutationObserver(element);
+            return count;
+          }
+        }
+      }
+    }
+    
+    console.log('[VIEWER:PAGE] no valid TikTok viewer count found in any scan'); // LVT PATCH R6: Failure log
     return null;
   }
   
-  // Non-TikTok platforms with enhanced validation
+  // Non-TikTok platforms
   const selectors = platformSelectors[platform] || [];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
     if (element && isValidVisibleNode(element) && hasValidViewerCount(element)) {
       const count = parseViewerCount(element);
-      console.log(`[VIEWER:FOUND] ${platform} viewer count: ${count}`); // LVT PATCH R5: Success log
+      console.log(`[VIEWER:PAGE:FOUND] ${platform} viewer count: ${count}`); // LVT PATCH R6: Found log
       return count;
     }
   }
