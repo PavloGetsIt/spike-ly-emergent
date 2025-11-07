@@ -532,9 +532,9 @@ function startTracking() {
     
     // Polling fallback (only when MutationObserver is idle)
     pollTimer = setInterval(() => {
-      // Only poll if no active observer or observer hasn't fired recently
+      // LVT PATCH R4: Only poll if no active observer or observer inactive
       const observerActive = domObserver && currentObserverTarget && 
-                           isValidVisibleNode(currentObserverTarget);
+                           isValidVisibleNode(currentObserverTarget); // LVT PATCH R4: Use fixed function name
       
       if (!observerActive) {
         console.log('[VIEWER:DBG] polling fallback active');
@@ -542,7 +542,7 @@ function startTracking() {
         if (count !== null && shouldEmitWithJitterFilter(count)) {
           emitViewerUpdate(count);
         } else if (count === null) {
-          // Throttled missing log
+          // LVT PATCH R4: Throttled missing log
           const now = Date.now();
           if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
             console.log('[VIEWER:PAGE] missing node');
