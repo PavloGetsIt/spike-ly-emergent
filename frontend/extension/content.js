@@ -662,7 +662,7 @@ function startTracking() {
       
       if (!observerActive) {
         console.log('[VIEWER:DBG] polling fallback active');
-        const count = detectViewerCount();
+        const count = detectViewerCountWithRegistry();
         if (count !== null && shouldEmitWithJitterFilter(count)) {
           emitViewerUpdate(count);
         } else if (count === null) {
