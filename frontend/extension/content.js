@@ -327,7 +327,7 @@ function detectViewerCountWithRegistry() {
           
           if (count >= 10 && count <= 50000) {
             console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via traditional fallback`); // LVT PATCH R6: Found log
-            bindMutationObserver(element);
+            bindPersistentMutationObserver(element);
             return count;
           }
         }
