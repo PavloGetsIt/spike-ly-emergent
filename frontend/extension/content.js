@@ -71,33 +71,114 @@ let mutationDebounceTimer = null;
 let observerInProgress = false;
 
 // ============================================================================
-// LVT PATCH R3: Comprehensive shadow DOM recursion with all nested roots
+// LVT PATCH R6: Comprehensive shadow DOM recursion with all nested roots
 // ============================================================================
 function walkShadows(node, collectCallback, visited = new WeakSet()) {
   if (!node || visited.has(node)) return;
   visited.add(node);
   
-  // LVT PATCH R3: Process current node first
+  // LVT PATCH R6: Process current node first
   if (collectCallback) collectCallback(node);
   
-  // LVT PATCH R3: Recursively traverse shadowRoot if it exists
+  // LVT PATCH R6: Recursively traverse shadowRoot if it exists
   if (node.shadowRoot && !visited.has(node.shadowRoot)) {
     visited.add(node.shadowRoot);
-    console.log(`[VIEWER:DBG] traversing shadow root on ${node.tagName}`); // LVT PATCH R3: Log shadow traversal
+    console.log(`[VIEWER:DBG] traversing shadow root on ${node.tagName}`); // LVT PATCH R6: Log shadow traversal
     
-    // LVT PATCH R3: Walk all elements in this shadow root
+    // LVT PATCH R6: Walk all elements in this shadow root
     const shadowElements = node.shadowRoot.querySelectorAll('*');
     for (const shadowEl of shadowElements) {
       walkShadows(shadowEl, collectCallback, visited);
     }
   }
   
-  // LVT PATCH R3: Walk all child elements recursively
+  // LVT PATCH R6: Walk all child elements recursively
   if (node.children) {
     for (const child of node.children) {
       walkShadows(child, collectCallback, visited);
     }
   }
+}
+
+// ============================================================================
+// LVT PATCH R6: Enhanced shadow + React fiber traversal with registry access
+// ============================================================================
+function walkShadowsWithRegistry(collectCallback, visited = new WeakSet()) {
+  // LVT PATCH R6: Scan all captured shadow roots from registry
+  if (window.__spikely_shadow_registry) {
+    let registryCount = 0;
+    for (const shadowRoot of window.__spikely_shadow_registry) {
+      if (!visited.has(shadowRoot)) {
+        registryCount++;
+        visited.add(shadowRoot);
+        console.log(`[VIEWER:DBG] scanning captured shadow root #${registryCount}`);
+        
+        // LVT PATCH R6: Scan all elements in this captured shadow root
+        const shadowElements = shadowRoot.querySelectorAll('*');
+        for (const el of shadowElements) {
+          collectCallback(el);
+          
+          // LVT PATCH R6: Recursively check for nested shadow roots
+          if (el.shadowRoot && !visited.has(el.shadowRoot)) {
+            window.__spikely_shadow_registry.add(el.shadowRoot);
+            walkShadowsWithRegistry(collectCallback, visited);
+          }
+        }
+      }
+    }
+    console.log(`[VIEWER:DBG] scanned ${registryCount} captured shadow roots from registry`);
+  }
+  
+  // LVT PATCH R6: Also scan document for any new shadow roots
+  walkShadows(document.documentElement, collectCallback, visited);
+}
+
+// LVT PATCH R6: Delayed node binding with recheck loop for React Fiber async mounting  
+let recheckTimer = null;
+let recoveryTimer = null;
+let lastUpdateTime = 0;
+
+function startDelayedNodeBinding() {
+  console.log('[VIEWER:DBG] starting delayed node binding for React Fiber...');
+  
+  // LVT PATCH R6: Recheck loop every 500ms until viewer node found
+  recheckTimer = setInterval(() => {
+    if (!currentObserverTarget) {
+      console.log('[VIEWER:DBG] rechecking for TikTok viewer node...');
+      const count = detectViewerCountWithRegistry();
+      if (count !== null && count > 0) {
+        console.log(`[VIEWER:PAGE:FOUND] located viewer node with count: ${count}`); // LVT PATCH R6: Found log
+        clearInterval(recheckTimer);
+        recheckTimer = null;
+        
+        // LVT PATCH R6: Start observer recovery monitoring  
+        startObserverRecovery();
+      }
+    } else {
+      clearInterval(recheckTimer);
+      recheckTimer = null;
+    }
+  }, CONFIG.RECHECK_INTERVAL_MS);
+}
+
+// LVT PATCH R6: Observer recovery - self-healing if no updates for >2s
+function startObserverRecovery() {
+  if (recoveryTimer) clearTimeout(recoveryTimer);
+  
+  recoveryTimer = setTimeout(() => {
+    const now = Date.now();
+    if (now - lastUpdateTime > CONFIG.RECOVERY_TIMEOUT_MS) {
+      console.log('[VIEWER:DBG] no updates for 2s, triggering observer recovery');
+      currentObserverTarget = null;
+      if (domObserver) {
+        try { domObserver.disconnect(); } catch (_) {}
+        domObserver = null;
+      }
+      
+      // LVT PATCH R6: Re-trigger detection
+      startDelayedNodeBinding();
+    }
+  }, CONFIG.RECOVERY_TIMEOUT_MS);
 }
 
 // LVT PATCH R3: Enhanced shadow DOM traversal with comprehensive collection
