@@ -522,77 +522,103 @@ function reliableSendMessage(payload, attempt = 1) {
 const OBSERVER_DEBOUNCE_MS = 150; // 120-200ms as specified
 // LVT PATCH: observerInProgress already declared in state variables section
 
-// LVT PATCH: MutationObserver with duplicate prevention guard
-function bindMutationObserver(element, forceInit = false) {
-  // LVT PATCH: Prevent duplicate initialization spam with window guard
+// LVT PATCH R6: Persistent MutationObserver with container binding and auto-recovery
+function bindPersistentMutationObserver(element, forceInit = false) {
+  // LVT PATCH R6: Prevent duplicate initialization with enhanced guard
   if (!forceInit && window.__spikelyDomObsInit && domObserver && currentObserverTarget === element) {
-    console.log('[VIEWER:DBG] observer already bound to this element');
+    console.log('[VIEWER:DBG] persistent observer already bound to this element');
     return;
   }
   
-  // LVT PATCH: Unbind previous observer safely
+  // LVT PATCH R6: Unbind previous observer safely
   if (domObserver) {
     try { 
       domObserver.disconnect();
-      console.log('[VIEWER:DBG] unbound previous observer');
+      console.log('[VIEWER:DBG] unbound previous persistent observer');
     } catch (_) {}
     domObserver = null;
   }
   
-  if (!element || !isValidVisibleNode(element)) { // LVT PATCH: Use enhanced validation
-    console.log('[VIEWER:DBG] invalid element for observer binding');
+  if (!element || !isValidVisibleNode(element)) {
+    console.log('[VIEWER:DBG] invalid element for persistent observer binding');
     return;
   }
   
   try {
     currentObserverTarget = element;
-    window.__spikelyDomObsInit = true; // LVT PATCH: Mark observer as initialized
+    window.__spikelyDomObsInit = true;
+    
+    // LVT PATCH R6: Bind to stable parent container (not text node itself)  
+    const container = element.closest('div, section, span') || element.parentElement || element;
+    console.log(`[VIEWER:DBG] binding persistent observer to container: ${container.tagName}`);
     
     domObserver = new MutationObserver((mutations) => {
-      // LVT PATCH: Prevent reentrant spam
       if (observerInProgress) return;
       observerInProgress = true;
       
-      console.log(`[VIEWER:DBG] mutation detected: ${mutations.length} changes`);
+      console.log(`[VIEWER:DBG] persistent observer detected: ${mutations.length} changes`);
       
-      // LVT PATCH: Debounce 150ms as specified
+      // LVT PATCH R6: Debounce and update tracking
       if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
       mutationDebounceTimer = setTimeout(() => {
-        // LVT PATCH: Validate element still visible and connected
-        if (isValidVisibleNode(element)) { // LVT PATCH: Enhanced validation
-          const count = parseViewerCount(element);
-          if (count > 0 && shouldEmitWithJitterFilter(count)) {
-            emitViewerUpdate(count);
+        // LVT PATCH R6: Re-validate target element or find new one
+        let targetElement = element;
+        if (!isValidVisibleNode(element)) {
+          // LVT PATCH R6: Try to find replacement in container
+          const newCandidate = container.querySelector('span, div');
+          if (newCandidate && isValidVisibleNode(newCandidate)) {
+            targetElement = newCandidate;
+            console.log('[VIEWER:DBG] switched to replacement element in container');
+          } else {
+            // LVT PATCH R6: Container lost viewer node, re-trigger detection
+            console.log('[VIEWER:DBG] container lost viewer node, triggering redetection');
+            setTimeout(() => {
+              const newElement = detectViewerCountWithRegistry();
+              if (newElement) {
+                bindPersistentMutationObserver(newElement, true);
+              } else {
+                // LVT PATCH R6: Start delayed binding for React remount
+                startDelayedNodeBinding();
+              }
+            }, 200);
+            
+            observerInProgress = false;
+            return;
           }
-        } else {
-          // LVT PATCH: Element became invalid, rebind via detection
-          console.log('[VIEWER:DBG] element invalidated during mutation, rebinding');
-          setTimeout(() => {
-            const newElement = detectViewerCountWithRegistry();
-            if (newElement) {
-              bindMutationObserver(newElement, true); // LVT PATCH: Force rebind
-            }
-          }, 200);
         }
         
-        observerInProgress = false; // LVT PATCH: Reset reentrant guard
+        // LVT PATCH R6: Parse and emit updates
+        const count = parseViewerCount(targetElement);
+        if (count > 0 && shouldEmitWithJitterFilter(count)) {
+          lastUpdateTime = Date.now(); // LVT PATCH R6: Track for recovery
+          emitViewerUpdate(count);
+          
+          // LVT PATCH R6: Restart recovery timer
+          startObserverRecovery();
+        }
+        
+        observerInProgress = false;
       }, OBSERVER_DEBOUNCE_MS);
     });
     
-    // LVT PATCH: Observe subtree + childList + characterData as specified
-    domObserver.observe(element, {
+    // LVT PATCH R6: Observe container with full mutation tracking
+    domObserver.observe(container, {
       subtree: true,
       childList: true,
-      characterData: true
+      characterData: true,
+      attributes: false // LVT PATCH R6: Focus on content changes only
     });
     
-    console.log('[VIEWER:DBG] observer bound to text node');
+    console.log('[VIEWER:DBG] persistent observer bound to stable container');
+    
+    // LVT PATCH R6: Start recovery monitoring
+    startObserverRecovery();
     
   } catch (e) {
-    console.log(`[VIEWER:DBG] observer binding failed: ${e.message}`);
+    console.log(`[VIEWER:DBG] persistent observer binding failed: ${e.message}`);
     currentObserverTarget = null;
-    observerInProgress = false; // LVT PATCH: Reset on error
-    window.__spikelyDomObsInit = false; // LVT PATCH: Reset guard on error
+    observerInProgress = false;
+    window.__spikelyDomObsInit = false;
   }
 }
 
