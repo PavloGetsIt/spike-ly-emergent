@@ -441,7 +441,7 @@ function bindMutationObserver(element, forceInit = false) {
       if (mutationDebounceTimer) clearTimeout(mutationDebounceTimer);
       mutationDebounceTimer = setTimeout(() => {
         // LVT PATCH: Validate element still visible and connected
-        if (isEnhancedValidVisibleNode(element)) { // LVT PATCH: Enhanced validation
+        if (isValidVisibleNode(element)) { // LVT PATCH: Enhanced validation
           const count = parseViewerCount(element);
           if (count > 0 && shouldEmitWithJitterFilter(count)) {
             emitViewerUpdate(count);
