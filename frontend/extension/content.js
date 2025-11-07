@@ -263,7 +263,7 @@ function detectViewerCountWithRegistry() {
           
           if (count > 0) {
             console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${count} via main DOM pattern`); // LVT PATCH R6: Found log
-            bindMutationObserver(element);
+            bindPersistentMutationObserver(element);
             return count;
           }
         }
