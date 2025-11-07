@@ -568,7 +568,7 @@ function bindMutationObserver(element, forceInit = false) {
           // LVT PATCH: Element became invalid, rebind via detection
           console.log('[VIEWER:DBG] element invalidated during mutation, rebinding');
           setTimeout(() => {
-            const newElement = detectViewerCount();
+            const newElement = detectViewerCountWithRegistry();
             if (newElement) {
               bindMutationObserver(newElement, true); // LVT PATCH: Force rebind
             }
