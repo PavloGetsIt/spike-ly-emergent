@@ -2,8 +2,8 @@
 // SPIKELY CONTENT SCRIPT - RESILIENT SHADOW DOM VIEWER DETECTION
 // ============================================================================
 
-// ============================================================================ 
-// LVT PATCH: Wrap domObserver initialization with guard
+// ============================================================================
+// LVT PATCH R6: Shadow Root Interception Registry (captures closed shadow roots)
 // ============================================================================
 (function(){
   try {
@@ -11,8 +11,21 @@
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
-    window.__spikelyDomObsInit = false; // LVT PATCH: Guard for duplicate observer
+    window.__spikelyDomObsInit = false; // LVT PATCH R6: Guard for duplicate observer
+    window.__spikely_shadow_registry = new WeakSet(); // LVT PATCH R6: Weak reference registry
   } catch (_) {}
+
+// LVT PATCH R6: Intercept ShadowRoot creation to capture closed roots
+const originalAttachShadow = Element.prototype.attachShadow;
+Element.prototype.attachShadow = function(options) {
+  const shadowRoot = originalAttachShadow.call(this, options);
+  
+  // LVT PATCH R6: Store reference to all shadow roots (including closed)
+  window.__spikely_shadow_registry.add(shadowRoot);
+  console.log(`[VIEWER:INIT] captured shadow root on ${this.tagName} (${options.mode})`);
+  
+  return shadowRoot;
+};
 
 // Configuration
 const CONFIG = {
@@ -20,7 +33,9 @@ const CONFIG = {
   HEARTBEAT_INTERVAL_MS: 5000,
   MUTATION_DEBOUNCE_MS: 100,
   LOG_THROTTLE_MS: 5000,
-  VIEWER_MIN_THRESHOLD: 1
+  VIEWER_MIN_THRESHOLD: 1,
+  RECHECK_INTERVAL_MS: 500, // LVT PATCH R6: Delayed node binding interval
+  RECOVERY_TIMEOUT_MS: 2000  // LVT PATCH R6: Observer recovery timeout
 };
 
 // Platform detection
