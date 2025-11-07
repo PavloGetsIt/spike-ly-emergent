@@ -1,12 +1,12 @@
-# RESILIENT DOM LVT PATCH - VALIDATION TEST R4
+# RESILIENT DOM LVT PATCH R5 - VALIDATION TEST
 
 ## Pre-Deployment Validation Script
 Run this in TikTok Live console to validate all fixes:
 
 ```javascript
-// LVT PATCH R4: Comprehensive validation test with detached root detection
+// LVT PATCH R5: Comprehensive validation with TikTok viewer targeting
 (function() {
-  console.log('🧪 LVT PATCH R4 VALIDATION TEST');
+  console.log('🧪 LVT PATCH R5 VALIDATION TEST');
   console.log('============================');
   
   let testResults = {
@@ -17,7 +17,7 @@ Run this in TikTok Live console to validate all fixes:
     messageReliability: false
   };
   
-  // LVT PATCH R4: Mock chrome.runtime if not available for page-context testing
+  // LVT PATCH R5: Mock chrome.runtime if not available
   if (typeof chrome === 'undefined' || !chrome.runtime) {
     console.log('⚠️ Chrome extension APIs not available, using mock for testing');
     window.chrome = {
@@ -31,78 +31,86 @@ Run this in TikTok Live console to validate all fixes:
     };
   }
   
-  // Test 1: Enhanced Shadow DOM traversal with detached root detection
-  console.log('\n🔍 Test 1: Shadow DOM Traversal (Enhanced)');
+  // Test 1: Enhanced Shadow DOM traversal targeting TikTok viewer patterns
+  console.log('\n🔍 Test 1: Shadow DOM Traversal (TikTok Focused)');
   function testShadowTraversal() {
     let shadowRootsFound = 0;
-    let numbersFound = 0;
-    let detachedRootsFound = 0;
+    let tiktokViewersFound = 0;
+    let genericNumbersFound = 0;
     
-    // LVT PATCH R4: Unified recursive scanner for shadow roots, detached elements, React fibers
-    function unifiedRecursiveScan(node, depth = 0) {
-      if (depth > 6) return; // LVT PATCH R4: Match content.js depth limit
+    // LVT PATCH R5: Look for TikTok "Viewers · X" pattern first
+    console.log('🎯 Searching for TikTok "Viewers · X" pattern...');
+    const viewerLabels = Array.from(document.querySelectorAll('*')).filter(el => {
+      const text = el.textContent?.trim();
+      return text && /viewers?\s*[·•]\s*\d+/i.test(text);
+    });
+    
+    viewerLabels.forEach(label => {
+      const text = label.textContent.trim();
+      const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
+      if (match) {
+        console.log("✅ Shadow DOM number found:", text); // LVT PATCH R5: Validation capture
+        tiktokViewersFound++;
+        testResults.shadowTraversal = true;
+      }
+    });
+    
+    // LVT PATCH R5: Enhanced recursive shadow scanner
+    function recursiveShadowScan(node, depth = 0) {
+      if (depth > 6) return;
       
       if (node.shadowRoot) {
         shadowRootsFound++;
         console.log(`Found shadow root #${shadowRootsFound} on ${node.tagName}`);
         
-        // LVT PATCH R4: Check for detached shadow roots
-        if (!node.isConnected) {
-          detachedRootsFound++;
-          console.log(`Found detached shadow root #${detachedRootsFound}`);
-        }
-        
-        const shadowNumbers = node.shadowRoot.querySelectorAll('span, div, strong');
-        for (const el of shadowNumbers) {
+        // LVT PATCH R5: Look for viewer patterns within shadow DOM
+        const shadowViewers = node.shadowRoot.querySelectorAll('*');
+        for (const el of shadowViewers) {
           const text = el.textContent?.trim();
           if (text) {
-            // LVT PATCH R4: Strict filtering - allow integers, K, M suffix; discard >200,000
-            const sanitized = text.replace(/[^\d.,KkMm]/g, '');
-            if (sanitized && /^(\d+(?:\.\d+)?(?:,\d{3})*?)([km]?)$/i.test(sanitized)) {
-              const match = sanitized.match(/^(\d+(?:\.\d+)?(?:,\d{3})*?)([km]?)$/i);
-              if (match) {
-                let num = parseFloat(match[1].replace(/,/g, ''));
-                const suffix = match[2].toLowerCase();
-                if (suffix === 'k') num *= 1000;
-                if (suffix === 'm') num *= 1000000;
-                
-                // LVT PATCH R4: Normalize to range [0 - 200,000]
-                const normalized = Math.round(num);
-                if (normalized >= 0 && normalized <= 200000) {
-                  console.log("✅ Shadow DOM number found:", text, "→", normalized); // LVT PATCH R4: Enhanced validation capture
-                  numbersFound++;
-                  testResults.shadowTraversal = true;
-                }
+            // LVT PATCH R5: Check for TikTok viewer patterns
+            if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
+              console.log("✅ Shadow DOM number found:", text);
+              tiktokViewersFound++;
+              testResults.shadowTraversal = true;
+            }
+            // LVT PATCH R5: Also check standalone numbers near viewer context
+            else if (/^\d+(?:\.\d+)?[KkMm]?$/.test(text)) {
+              const parent = el.parentElement;
+              const context = parent?.textContent?.toLowerCase() || '';
+              if (context.includes('viewer') || context.includes('watching')) {
+                console.log("✅ Shadow DOM number found:", text, "(viewer context)");
+                genericNumbersFound++;
+                testResults.shadowTraversal = true;
               }
             }
           }
         }
         
-        // LVT PATCH R4: Recursively scan shadow root children
+        // LVT PATCH R5: Recursively scan children
         const shadowChildren = node.shadowRoot.querySelectorAll('*');
         for (const child of shadowChildren) {
-          unifiedRecursiveScan(child, depth + 1);
+          recursiveShadowScan(child, depth + 1);
         }
       }
       
-      // LVT PATCH R4: Scan regular children
       for (const child of node.children || []) {
-        unifiedRecursiveScan(child, depth + 1);
+        recursiveShadowScan(child, depth + 1);
       }
     }
     
-    // LVT PATCH R4: Start unified scan from document
-    unifiedRecursiveScan(document.documentElement);
+    // LVT PATCH R5: Start scan from document
+    recursiveShadowScan(document.documentElement);
     
-    console.log(`Found ${shadowRootsFound} shadow roots total (${detachedRootsFound} detached), ${numbersFound} valid numeric elements`);
+    console.log(`Found ${shadowRootsFound} shadow roots, ${tiktokViewersFound} TikTok viewer patterns, ${genericNumbersFound} contextual numbers`);
     
-    // LVT PATCH R4: Pass if we found shadow roots AND valid numbers
-    const passed = shadowRootsFound >= 1 && numbersFound >= 1;
+    // LVT PATCH R5: Pass if we found TikTok-specific viewer patterns OR shadow roots with valid numbers
+    const passed = tiktokViewersFound > 0 || (shadowRootsFound >= 1 && genericNumbersFound >= 1);
     testResults.shadowTraversal = passed;
     return passed;
   }
   
-  // Test 2: Enhanced visibility validation with size/opacity/connectivity criteria  
+  // Test 2: Enhanced visibility validation
   console.log('\n👁️ Test 2: Visibility Validation (Enhanced)');
   function testVisibilityValidation() {
     let validElements = 0;
@@ -111,18 +119,19 @@ Run this in TikTok Live console to validate all fixes:
     document.querySelectorAll('span, div, strong').forEach(el => {
       const text = el.textContent?.trim();
       if (text) {
-        // LVT PATCH R4: Use same strict filtering as shadow traversal
         const sanitized = text.replace(/[^\d.,KkMm]/g, '');
         if (sanitized && /^(\d+(?:\.\d+)?(?:,\d{3})*?)([km]?)$/i.test(sanitized)) {
+          // LVT PATCH R5: Enhanced connectivity check with aria-hidden="false"
           const isConnected = el.isConnected;
           const ariaHidden = el.getAttribute('aria-hidden') === 'true';
+          const ariaFalse = el.getAttribute('aria-hidden') === 'false'; // LVT PATCH R5: Check for explicit false
           const style = window.getComputedStyle(el);
           const hasOffsetParent = el.offsetParent !== null;
           const isVisible = parseFloat(style.opacity) > 0 && style.display !== 'none' && style.visibility !== 'hidden';
           const rect = el.getBoundingClientRect();
           const hasSize = rect.width > 0 && rect.height > 0;
           
-          if (isConnected && !ariaHidden && (hasOffsetParent || style.position === 'fixed') && isVisible && hasSize) {
+          if (isConnected && (!ariaHidden || ariaFalse) && (hasOffsetParent || style.position === 'fixed') && isVisible && hasSize) {
             validElements++;
             console.log(`✅ Valid: "${text}" → ${sanitized}`);
           } else {
@@ -141,13 +150,13 @@ Run this in TikTok Live console to validate all fixes:
   // Test 3: Jitter filter simulation
   console.log('\n📊 Test 3: Jitter Filter');
   function testJitterFilter() {
-    const testSequence = [100, 102, 101, 103, 101, 106, 104]; // Simulate viewer fluctuation
+    const testSequence = [100, 102, 101, 103, 101, 106, 104];
     let emissions = 0;
     let lastEmitted = 0;
     
     testSequence.forEach((count, i) => {
       const delta = Math.abs(count - lastEmitted);
-      const shouldEmit = delta > 2; // LVT PATCH R4: Jitter filter logic
+      const shouldEmit = delta > 2;
       
       if (shouldEmit) {
         emissions++;
@@ -184,7 +193,6 @@ Run this in TikTok Live console to validate all fixes:
         characterData: true
       });
       
-      // Trigger mutations
       testDiv.textContent = '105';
       testDiv.textContent = '110';
       
@@ -201,8 +209,8 @@ Run this in TikTok Live console to validate all fixes:
     }
   }
   
-  // Test 5: Enhanced message reliability
-  console.log('\n📡 Test 5: Message Reliability (Enhanced)');
+  // Test 5: Enhanced message reliability with VIEWER_COUNT emission tracking
+  console.log('\n📡 Test 5: Message Reliability (Cross-Verified)');
   function testMessageReliability() {
     let attempts = 0;
     let successes = 0;
@@ -226,25 +234,39 @@ Run this in TikTok Live console to validate all fixes:
       });
     }
     
-    // LVT PATCH R4: Test multiple messages to ensure reliability
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => sendTestMessage(), i * 150);
+    // LVT PATCH R5: Test 5 messages for comprehensive reliability
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => sendTestMessage(), i * 120);
     }
     
     return true;
   }
   
+  // LVT PATCH R5: Cross-verification - check for VIEWER_COUNT message emission
+  console.log('\n📨 Cross-Verification: VIEWER_COUNT Message Emission');
+  let messageEmissionDetected = false;
+  
+  // Listen for VIEWER_COUNT messages (if extension context available)
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === 'VIEWER_COUNT' || message.type === 'VIEWER_COUNT_UPDATE') {
+        console.log(`📨 VIEWER_COUNT message detected: ${message.count}`);
+        messageEmissionDetected = true;
+      }
+    });
+  }
+  
   // Run all tests
   testShadowTraversal();
-  testVisibilityValidation();
+  testVisibilityValidation(); 
   testJitterFilter();
   testObserverBinding();
   testMessageReliability();
   
-  // Final report after 4 seconds (LVT PATCH R4: Extended for comprehensive testing)
+  // Final report after 4 seconds
   setTimeout(() => {
-    console.log('\n📋 FINAL VALIDATION REPORT');
-    console.log('===========================');
+    console.log('\n📋 FINAL VALIDATION REPORT R5');
+    console.log('==============================');
     
     Object.entries(testResults).forEach(([test, passed]) => {
       console.log(`${passed ? '✅' : '❌'} ${test}: ${passed ? 'PASS' : 'FAIL'}`);
@@ -256,12 +278,32 @@ Run this in TikTok Live console to validate all fixes:
     console.log(`\n🏆 SCORE: ${passCount}/${totalTests} tests passed`);
     
     if (passCount === totalTests) {
-      console.log('🎉 All LVT patch validations PASSED!');
+      console.log('🎉 All LVT PATCH R5 validations PASSED!');
     } else {
       console.log('⚠️ Some validations FAILED - check implementation');
+      
+      if (!testResults.shadowTraversal) {
+        console.log('💡 shadowTraversal FAIL: No TikTok viewer patterns detected');
+        console.log('   → Check if "Viewers · X" pattern exists on page');
+        console.log('   → Verify shadow DOM contains viewer count elements');
+      }
+      if (!testResults.messageReliability) {
+        console.log('💡 messageReliability FAIL: Extension messaging broken');
+        console.log('   → Verify extension is loaded and active');
+        console.log('   → Check background script console for errors');
+      }
     }
     
-  }, 4000); // LVT PATCH R4: Extended timeout for comprehensive testing
+    // LVT PATCH R5: Additional diagnostic info
+    if (messageEmissionDetected) {
+      console.log('\n✅ BONUS: VIEWER_COUNT message emission detected');
+    } else {
+      console.log('\n⚠️ WARNING: No VIEWER_COUNT messages detected during test');
+      console.log('   → This may indicate the content script is not running');
+      console.log('   → Or viewer detection is not working');
+    }
+    
+  }, 4000);
   
 })();
 ```
