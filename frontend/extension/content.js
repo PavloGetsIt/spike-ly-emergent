@@ -853,7 +853,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
-console.log(`[VIEWER:PAGE] loaded on ${platform} - v2.2.1-SHADOW-DOM`);
+console.log(`[VIEWER:PAGE] loaded on ${platform} - v2.2.7-R7-PRELOAD`);
+
+// LVT PATCH R7: Verify preload registry was populated
+setTimeout(() => {
+  const registrySize = window.__spikely_shadow_registry?.size || 0;
+  console.log(`[VIEWER:REGISTRY] preload populated ${registrySize} shadow roots`);
+  
+  if (registrySize === 0) {
+    console.log('[VIEWER:REGISTRY] WARNING: No shadow roots captured, TikTok may use different structure');
+  }
+}, 2000); // LVT PATCH R7: Check after TikTok has time to initialize
 
 // Auto-detect React remount events
 let lastElementCount = 0;
