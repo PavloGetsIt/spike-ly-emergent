@@ -24,6 +24,41 @@ let activeTab = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAY_BASE = 2000;
+
+// LVT PATCH R8: Dynamic early registration for preload hook
+async function registerPreloadHook() {
+  try {
+    // LVT PATCH R8: Register preload script at document_start before TikTok renders
+    await chrome.scripting.registerContentScripts([{
+      id: "spikely_preload_hook",
+      js: ["preloadHook.js"],
+      matches: ["*://www.tiktok.com/*live*"],
+      runAt: "document_start",
+      allFrames: true
+    }]);
+    
+    console.log('[VIEWER:INIT] Dynamic preload hook registered for TikTok Live');
+  } catch (error) {
+    console.error('[VIEWER:INIT] Failed to register preload hook:', error);
+    
+    // LVT PATCH R8: Fallback to manual injection if registration fails
+    try {
+      const tabs = await chrome.tabs.query({ url: "*://www.tiktok.com/*live*" });
+      for (const tab of tabs) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["preloadHook.js"]
+        });
+        console.log(`[VIEWER:INIT] Fallback injection to tab ${tab.id}`);
+      }
+    } catch (fallbackError) {
+      console.error('[VIEWER:INIT] Fallback injection failed:', fallbackError);
+    }
+  }
+}
+
+// LVT PATCH R8: Initialize preload hook on extension startup
+registerPreloadHook();
 let lastViewer = null;
 let lastViewerUpdateAt = 0;
 let audioStatus = { isCapturing: false, tabId: null };
