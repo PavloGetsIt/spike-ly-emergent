@@ -480,37 +480,9 @@ function deduplicateCounters(candidates) {
 }
 
 
-// LVT PATCH R2: Synchronization logic with 5Hz throttling
+// LVT PATCH R7: Enhanced viewer update with recovery monitoring
 let lastEmittedCount = 0;
 let lastEmitTime = 0;
-const EMIT_MAX_FREQUENCY = 200; // LVT PATCH R2: 5 Hz max (200ms minimum interval)
-
-// LVT PATCH R2: Enhanced jitter filter with mutation timestamp tracking
-function shouldEmitWithJitterFilter(count) {
-  const now = Date.now();
-  const delta = Math.abs(count - lastEmittedCount);
-  const timeSinceLastEmit = now - lastEmitTime;
-  
-  // LVT PATCH R2: Throttle DOM emission to 5 Hz max
-  if (timeSinceLastEmit < EMIT_MAX_FREQUENCY) {
-    console.log(`[VIEWER:DBG] throttled: ${timeSinceLastEmit}ms < ${EMIT_MAX_FREQUENCY}ms`);
-    return false;
-  }
-  
-  // LVT PATCH R2: Accept anything >2 immediately (large deltas)
-  if (delta > 2) {
-    console.log(`[VIEWER:DBG] large delta: ${delta}, emitting immediately`);
-    return true;
-  }
-  
-  // LVT PATCH R2: For smaller deltas, ensure minimum time passed
-  if (delta <= 2 && timeSinceLastEmit < EMIT_MAX_FREQUENCY) {
-    console.log(`[VIEWER:DBG] jitter filtered: delta=${delta}, time=${timeSinceLastEmit}ms`);
-    return false;
-  }
-  
-  return true;
-}
 
 function emitViewerUpdate(count) {
   const now = Date.now();
@@ -519,10 +491,12 @@ function emitViewerUpdate(count) {
   lastEmittedCount = count;
   lastEmitTime = now;
   currentViewerCount = count;
+  lastUpdateTime = now; // LVT PATCH R7: Track for recovery monitoring
   
   console.log(`[VIEWER:PAGE] value=${count}`);
+  console.log(`[VIEWER:PAGE:UPDATE] value=${count} delta=${delta}`); // LVT PATCH R7: Enhanced update log
   
-  // LVT PATCH R2: Use sendWithRetry for guaranteed delivery
+  // LVT PATCH R7: Use sendWithRetry for guaranteed delivery
   sendWithRetry({
     type: 'VIEWER_COUNT_UPDATE',
     platform,
