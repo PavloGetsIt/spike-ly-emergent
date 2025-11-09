@@ -587,10 +587,9 @@ function bindPersistentMutationObserver(element, forceInit = false) {
           }
         }
         
-        // LVT PATCH R6: Parse and emit updates
+        // LVT PATCH R7: Parse and emit updates (removed jitter filter)
         const count = parseViewerCount(targetElement);
-        if (count > 0 && shouldEmitWithJitterFilter(count)) {
-          lastUpdateTime = Date.now(); // LVT PATCH R6: Track for recovery
+        if (count > 0) {
           emitViewerUpdate(count);
           
           // LVT PATCH R6: Restart recovery timer
