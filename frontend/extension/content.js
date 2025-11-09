@@ -688,8 +688,11 @@ function parseViewerCount(textOrElement) {
 }
 
 // ============================================================================
-// LVT PATCH R6: Enhanced tracking with delayed binding and registry access
+// LVT PATCH R7: Enhanced tracking with recovery cycle and late observer binding
 // ============================================================================
+let recoveryAttempts = 0;
+const MAX_RECOVERY_ATTEMPTS = 10;
+
 function startTracking() {
   if (isTracking) {
     console.log('[VIEWER:PAGE] already tracking');
@@ -697,37 +700,37 @@ function startTracking() {
   }
   
   isTracking = true;
-  console.log('[VIEWER:PAGE] tracking started with shadow registry access');
+  recoveryAttempts = 0;
+  console.log('[VIEWER:PAGE] tracking started with preload registry access');
   
   if (platform === 'tiktok') {
-    // LVT PATCH R6: Try immediate detection with registry
-    const initialCount = detectViewerCountWithRegistry();
-    if (initialCount !== null && initialCount > 0) {
-      lastUpdateTime = Date.now(); // LVT PATCH R6: Track update time
-      emitViewerUpdate(initialCount);
-    } else {
-      // LVT PATCH R6: Start delayed node binding for React Fiber async mounting
-      startDelayedNodeBinding();
-    }
+    // LVT PATCH R7: Wait for registry to be populated, then try detection
+    setTimeout(() => {
+      attemptViewerDetection();
+    }, 100); // LVT PATCH R7: Small delay for registry population
     
-    // LVT PATCH R6: Polling fallback (only when observer inactive)
+    // LVT PATCH R7: Recovery cycle - continue until VIEWER_COUNT_UPDATE fires
+    const recoveryInterval = setInterval(() => {
+      if (!currentObserverTarget && recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
+        recoveryAttempts++;
+        console.log(`[VIEWER:DBG] recovery attempt #${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS}`);
+        attemptViewerDetection();
+      } else if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+        console.log('[VIEWER:DBG] max recovery attempts reached, stopping recovery');
+        clearInterval(recoveryInterval);
+      } else {
+        clearInterval(recoveryInterval);
+      }
+    }, CONFIG.RECHECK_INTERVAL_MS);
+    
+    // LVT PATCH R7: Polling fallback (reduced frequency when observer active)
     pollTimer = setInterval(() => {
       const observerActive = domObserver && currentObserverTarget && 
                            isValidVisibleNode(currentObserverTarget);
       
       if (!observerActive) {
         console.log('[VIEWER:DBG] polling fallback active');
-        const count = detectViewerCountWithRegistry(); // LVT PATCH R6: Use registry access
-        if (count !== null && shouldEmitWithJitterFilter(count)) {
-          lastUpdateTime = Date.now(); // LVT PATCH R6: Track update time
-          emitViewerUpdate(count);
-        } else if (count === null) {
-          const now = Date.now();
-          if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
-            console.log('[VIEWER:PAGE] missing node');
-            lastLogTime = now;
-          }
-        }
+        attemptViewerDetection();
       }
     }, CONFIG.POLL_INTERVAL_MS);
     
@@ -744,13 +747,30 @@ function startTracking() {
     }, CONFIG.HEARTBEAT_INTERVAL_MS);
     
   } else {
-    // Non-TikTok platforms: polling with validation
+    // Non-TikTok platforms: polling with registry access
     pollTimer = setInterval(() => {
-      const count = detectViewerCountWithRegistry(); // LVT PATCH R6: Use registry for all platforms
+      const count = detectViewerCountWithRegistry();
       if (count !== null && shouldEmitWithJitterFilter(count)) {
         emitViewerUpdate(count);
       }
     }, CONFIG.POLL_INTERVAL_MS);
+  }
+}
+
+// LVT PATCH R7: Attempt viewer detection with registry access and recovery
+function attemptViewerDetection() {
+  const count = detectViewerCountWithRegistry();
+  if (count !== null && count > 0) {
+    lastUpdateTime = Date.now();
+    recoveryAttempts = 0; // LVT PATCH R7: Reset recovery on success
+    emitViewerUpdate(count);
+    startObserverRecovery();
+  } else {
+    const now = Date.now();
+    if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
+      console.log('[VIEWER:PAGE] attempting viewer detection...');
+      lastLogTime = now;
+    }
   }
 }
 
