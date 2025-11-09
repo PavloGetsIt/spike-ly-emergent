@@ -853,17 +853,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
-console.log(`[VIEWER:PAGE] loaded on ${platform} - v2.2.7-R7-PRELOAD`);
+console.log(`[VIEWER:PAGE] loaded on ${platform} - v2.2.8-R8-DYNAMIC-INJECT`);
 
-// LVT PATCH R7: Verify preload registry was populated
+// LVT PATCH R8: Verify preload hook registry after dynamic injection
 setTimeout(() => {
-  const registrySize = window.__spikely_shadow_registry?.size || 0;
-  console.log(`[VIEWER:REGISTRY] preload populated ${registrySize} shadow roots`);
+  const registryExists = !!window.__spikely_shadow_registry;
+  const registrySize = registryExists ? (window.__spikely_shadow_registry.size || 0) : 0;
+  
+  console.log(`[VIEWER:REGISTRY] dynamic injection result: exists=${registryExists}, size=${registrySize}`);
   
   if (registrySize === 0) {
-    console.log('[VIEWER:REGISTRY] WARNING: No shadow roots captured, TikTok may use different structure');
+    console.log('[VIEWER:REGISTRY] WARNING: Dynamic injection may have failed, attempting manual scan');
+    
+    // LVT PATCH R8: Emergency manual shadow root discovery
+    const allElements = document.querySelectorAll('*');
+    let emergencyCount = 0;
+    
+    if (!window.__spikely_shadow_registry) {
+      window.__spikely_shadow_registry = new WeakSet();
+    }
+    
+    for (const element of allElements) {
+      if (element.shadowRoot) {
+        window.__spikely_shadow_registry.add(element.shadowRoot);
+        emergencyCount++;
+        console.log(`[VIEWER:REGISTRY] emergency capture: shadow root #${emergencyCount} on ${element.tagName}`);
+      }
+    }
+    
+    console.log(`[VIEWER:REGISTRY] emergency scan captured ${emergencyCount} shadow roots`);
   }
-}, 2000); // LVT PATCH R7: Check after TikTok has time to initialize
+}, 3000); // LVT PATCH R8: Extended check time for dynamic injection
 
 // Auto-detect React remount events
 let lastElementCount = 0;
