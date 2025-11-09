@@ -27,19 +27,6 @@
     {
       "matches": [
         "*://*.tiktok.com/*/live*",
-        "*://*.tiktok.com/@*/live*", 
-        "*://*.tiktok.com/*live*",
-        "*://*.twitch.tv/*",
-        "*://*.kick.com/*",
-        "*://*.youtube.com/*"
-      ],
-      "js": ["content-preload.js"],
-      "run_at": "document_start",
-      "all_frames": true
-    },
-    {
-      "matches": [
-        "*://*.tiktok.com/*/live*",
         "*://*.tiktok.com/@*/live*",
         "*://*.tiktok.com/*live*",
         "*://*.twitch.tv/*",
