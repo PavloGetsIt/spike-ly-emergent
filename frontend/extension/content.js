@@ -723,7 +723,7 @@ function startTracking() {
     // Non-TikTok platforms: polling with registry access
     pollTimer = setInterval(() => {
       const count = detectViewerCountWithRegistry();
-      if (count !== null && shouldEmitWithJitterFilter(count)) {
+      if (count !== null) {
         emitViewerUpdate(count);
       }
     }, CONFIG.POLL_INTERVAL_MS);
