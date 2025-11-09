@@ -101,36 +101,62 @@ function walkShadows(node, collectCallback, visited = new WeakSet()) {
 }
 
 // ============================================================================
-// LVT PATCH R6: Enhanced shadow + React fiber traversal with registry access
+// LVT PATCH R7: Enhanced registry scanning with retroactive support
 // ============================================================================
 function walkShadowsWithRegistry(collectCallback, visited = new WeakSet()) {
-  // LVT PATCH R6: Scan all captured shadow roots from registry
-  if (window.__spikely_shadow_registry) {
-    let registryCount = 0;
+  let registryScanned = 0;
+  let documentsScanned = 0;
+  
+  // LVT PATCH R7: Scan captured shadow roots from preload registry
+  if (window.__spikely_shadow_registry && window.__spikely_shadow_registry.size > 0) {
+    console.log(`[VIEWER:REGISTRY] scanning ${window.__spikely_shadow_registry.size} captured shadow roots`);
+    
     for (const shadowRoot of window.__spikely_shadow_registry) {
       if (!visited.has(shadowRoot)) {
-        registryCount++;
+        registryScanned++;
         visited.add(shadowRoot);
-        console.log(`[VIEWER:DBG] scanning captured shadow root #${registryCount}`);
+        console.log(`[VIEWER:DBG] scanning captured shadow root #${registryScanned}`);
         
-        // LVT PATCH R6: Scan all elements in this captured shadow root
+        // LVT PATCH R7: Scan all elements in captured shadow root
         const shadowElements = shadowRoot.querySelectorAll('*');
         for (const el of shadowElements) {
           collectCallback(el);
           
-          // LVT PATCH R6: Recursively check for nested shadow roots
+          // LVT PATCH R7: Check for nested shadow roots in captured roots
           if (el.shadowRoot && !visited.has(el.shadowRoot)) {
             window.__spikely_shadow_registry.add(el.shadowRoot);
-            walkShadowsWithRegistry(collectCallback, visited);
           }
         }
       }
     }
-    console.log(`[VIEWER:DBG] scanned ${registryCount} captured shadow roots from registry`);
+  } else {
+    console.log(`[VIEWER:REGISTRY] no captured shadow roots available (size: ${window.__spikely_shadow_registry?.size || 0})`);
   }
   
-  // LVT PATCH R6: Also scan document for any new shadow roots
-  walkShadows(document.documentElement, collectCallback, visited);
+  // LVT PATCH R7: Also scan document for any missed shadow roots
+  function scanDocument(node, depth = 0) {
+    if (depth > 6 || visited.has(node)) return;
+    visited.add(node);
+    
+    if (node.shadowRoot && !visited.has(node.shadowRoot)) {
+      documentsScanned++;
+      visited.add(node.shadowRoot);
+      console.log(`[VIEWER:DBG] scanning document shadow root #${documentsScanned}`);
+      
+      const shadowElements = node.shadowRoot.querySelectorAll('*');
+      for (const el of shadowElements) {
+        collectCallback(el);
+      }
+    }
+    
+    for (const child of node.children || []) {
+      scanDocument(child, depth + 1);
+    }
+  }
+  
+  scanDocument(document.documentElement);
+  
+  console.log(`[VIEWER:REGISTRY] scanned ${registryScanned} registry roots + ${documentsScanned} document roots`);
 }
 
 // LVT PATCH R6: Delayed node binding with recheck loop for React Fiber async mounting  
