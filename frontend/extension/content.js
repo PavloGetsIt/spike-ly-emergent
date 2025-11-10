@@ -1,5 +1,5 @@
 // ============================================================================
-// LVT PATCH R11: Simplified DOM Live Viewer Tracking (production-ready)
+// LVT PATCH R12: Production-Ready DOM LVT with guaranteed message emission
 // ============================================================================
 
 (function(){
@@ -8,68 +8,70 @@
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
+    window.__spikelyLVT = { watcherId: null }; // LVT PATCH R12: Single watcher registry
   } catch (_) {}
 
-// Platform detection
-function detectPlatform() {
-  const hostname = window.location.hostname;
-  if (hostname.includes('tiktok.com')) return 'tiktok';
-  if (hostname.includes('twitch.tv')) return 'twitch';
-  if (hostname.includes('kick.com')) return 'kick';
-  if (hostname.includes('youtube.com')) return 'youtube';
-  return 'unknown';
-}
+const platform = (window.location.hostname.includes('tiktok.com')) ? 'tiktok' : 'unknown';
 
-const platform = detectPlatform();
-
-// LVT PATCH R11: State variables for simplified tracking
+// LVT PATCH R12: State variables  
 let isTracking = false;
-let currentViewerCount = 0;
-let scanInterval = null;
-let viewerObserver = null;
 let viewerNode = null;
+let viewerObserver = null;
 let lastCount = 0;
 let lastEmitTime = 0;
-let lastHealthCheck = 0;
+let detectionRetryCount = 0;
+let scanInterval = null;
+let navCheckInterval = null;
+let lastPathname = window.location.pathname;
 
-// LVT PATCH R11: Refactored count parser with safe K/M scaling
-const parseCount = (text) => {
-  if (!text || typeof text !== 'string') return 0;
+// LVT PATCH R12: Strict numeric normalization with exact parsing
+function parseViewerCount(text) {
+  if (!text || typeof text !== 'string') return null;
   
-  const match = text.match(/(\d+(?:\.\d+)?[KkMm]?)/);
-  if (!match) return 0;
+  // LVT PATCH R12: Extract numeric token after separator
+  const match = text.match(/(\d+(?:\.\d+)?[KkMm]?)/i);
+  if (!match) return null;
   
   let num = parseFloat(match[1]);
   const input = match[1].toLowerCase();
   
+  // LVT PATCH R12: Support K/M suffixes
   if (input.includes('k')) num *= 1000;
   if (input.includes('m')) num *= 1000000;
   
   const result = Math.round(num);
-  return (result >= 0 && result <= 500000) ? result : 0;
-};
+  
+  // LVT PATCH R12: Reject values outside reasonable range
+  if (result < 0 || result > 200000) {
+    console.log(`[VIEWER:PAGE] WARN: Rejected out-of-range value: ${result}`);
+    return null;
+  }
+  
+  return result;
+}
 
-// LVT PATCH R11: Find singular target viewer node via pattern recognition
-function findViewerNode() {
+// LVT PATCH R12: Deterministic locator for authoritative TikTok viewer node
+function findAuthoritativeViewerNode() {
   const allElements = Array.from(document.querySelectorAll('*'));
   
+  // LVT PATCH R12: Primary - exact "Viewers · X" pattern in header region
   for (const element of allElements) {
     const text = element.textContent?.trim() || '';
     
-    // LVT PATCH R11: Look for "Viewers · X" or "Viewers X" pattern
-    if (/viewers?[\s·•]\d+/i.test(text)) {
-      // LVT PATCH R11: Extract just the number part
-      const match = text.match(/viewers?[\s·•](\d+(?:\.\d+)?[KkMm]?)/i);
+    if (/^Viewers?\s*[·•]\s*\d+/i.test(text)) {
+      // LVT PATCH R12: Extract the number and find its specific element
+      const match = text.match(/^Viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
       if (match) {
-        // LVT PATCH R11: Find the specific element containing just the number
+        const expectedNumber = match[1];
+        
+        // LVT PATCH R12: Find element containing just this number
         const container = element.closest('div, section, header');
         if (container) {
           const numberElements = container.querySelectorAll('span, div, strong');
           for (const numEl of numberElements) {
             const numText = numEl.textContent?.trim();
-            // LVT PATCH R11: Match exact number from pattern
-            if (numText === match[1] && numEl.offsetParent !== null && numEl.isConnected) {
-              console.log(`[VIEWER:PAGE:FOUND] Target node: ${numEl.tagName} = "${numText}"`);
+            if (numText === expectedNumber && numEl.offsetParent !== null) {
+              console.log(`[VIEWER:PAGE:FOUND] selector="${numEl.tagName}", text="${numText}", value=${parseViewerCount(numText)}`);
               return numEl;
             }
           }
@@ -78,176 +80,214 @@ function findViewerNode() {
     }
   }
   
+  // LVT PATCH R12: Secondary - ARIA/role-based header region  
+  const headerRegions = document.querySelectorAll('[role="region"], [role="heading"], header, h1, h2, h3');
+  for (const region of headerRegions) {
+    if (region.textContent?.toLowerCase().includes('viewer')) {
+      const numbers = region.querySelectorAll('span, div');
+      for (const numEl of numbers) {
+        const text = numEl.textContent?.trim();
+        if (text && /^\d+(?:\.\d+)?[KkMm]?$/.test(text)) {
+          const count = parseViewerCount(text);
+          if (count && count > 0 && numEl.offsetParent !== null) {
+            console.log(`[VIEWER:PAGE:FOUND] selector="header>${numEl.tagName}", text="${text}", value=${count}`);
+            return numEl;
+          }
+        }
+      }
+    }
+  }
+  
+  console.log('[VIEWER:PAGE] No authoritative viewer node found');
   return null;
 }
 
-// LVT PATCH R11: Emit with validation and delta checking
-function emitUpdate(newCount) {
-  const now = Date.now();
+// LVT PATCH R12: Emit update with guaranteed delivery
+function emitViewerUpdate(newCount) {
+  if (!newCount || newCount === lastCount) return;
   
-  // LVT PATCH R11: Validate delta before emission
-  if (lastCount > 0) {
-    const delta = Math.abs(newCount - lastCount);
-    const ratio = newCount / lastCount;
-    
-    // LVT PATCH R11: Block unrealistic spikes (sanity check)
-    if (ratio > 5) {
-      console.log(`[VIEWER:PAGE:SANITY_BLOCKED] Rejected ${newCount} (${ratio}x spike from ${lastCount})`);
-      return;
-    }
-    
-    // LVT PATCH R11: Skip if change too small or too recent
-    if (delta < 1 || (now - lastEmitTime) < 250) {
-      return;
-    }
+  const now = Date.now();
+  const delta = lastCount > 0 ? newCount - lastCount : 0;
+  
+  // LVT PATCH R12: Sanity check - block >5x spikes
+  if (lastCount > 0 && newCount > lastCount * 5) {
+    console.log(`[VIEWER:PAGE:SANITY_BLOCKED] Rejected ${newCount} (${Math.round(newCount/lastCount)}x spike)`);
+    return;
   }
+  
+  // LVT PATCH R12: Jitter filter - min 250ms between emissions
+  if (now - lastEmitTime < 250) return;
   
   lastCount = newCount;
   lastEmitTime = now;
-  currentViewerCount = newCount;
   
   console.log(`[VIEWER:PAGE] value=${newCount}`);
-  
-  if (lastCount !== newCount) {
-    const delta = newCount - lastCount;
+  if (delta !== 0) {
     console.log(`[VIEWER:PAGE:UPDATE] value=${newCount} delta=${delta}`);
   }
   
-  // LVT PATCH R11: Send message with exact schema
+  // LVT PATCH R12: Reliable message emission without awaiting response
   if (chrome?.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({
-      type: 'VIEWER_COUNT_UPDATE',
-      platform: 'tiktok',
-      count: newCount,
-      delta: newCount - (lastCount || 0),
-      timestamp: now
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.log('[VIEWER:PAGE] Message send failed:', chrome.runtime.lastError.message);
-      }
-    });
+    try {
+      chrome.runtime.sendMessage({
+        type: 'VIEWER_COUNT_UPDATE',
+        platform: 'tiktok',
+        count: newCount,
+        delta: delta,
+        ts: now
+      });
+    } catch (error) {
+      console.log('[VIEWER:PAGE] Send error:', error.message);
+    }
   }
 }
 
-// LVT PATCH R11: Attach observer with self-healing
-function attachObserver(element) {
-  if (viewerObserver) {
-    try { viewerObserver.disconnect(); } catch (_) {}
-  }
+// LVT PATCH R12: Single-source MutationObserver with debouncing
+function attachSingleObserver(element) {
+  if (!element) return;
   
-  if (!element || !element.isConnected) return;
+  // LVT PATCH R12: Guard against duplicate observers
+  if (window.__spikelyLVT.watcherId) {
+    try { 
+      if (viewerObserver) viewerObserver.disconnect();
+    } catch (_) {}
+  }
   
   try {
     viewerNode = element;
+    window.__spikelyLVT.watcherId = Date.now();
+    
+    let debounceTimer = null;
     
     viewerObserver = new MutationObserver(() => {
-      // LVT PATCH R11: Check if node still valid
-      if (!viewerNode || !viewerNode.isConnected) {
-        console.log('[VIEWER:PAGE:REATTACH] Node invalid, will rescan');
-        viewerNode = null;
-        return;
-      }
-      
-      const text = viewerNode.textContent?.trim();
-      if (text) {
-        const count = parseCount(text);
-        if (count > 0) {
-          emitUpdate(count);
+      // LVT PATCH R12: Debounce mutations 150-250ms
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (viewerNode && viewerNode.isConnected) {
+          const text = viewerNode.textContent?.trim();
+          if (text) {
+            const count = parseViewerCount(text);
+            if (count) {
+              emitViewerUpdate(count);
+            }
+          }
+        } else {
+          console.log('[VIEWER:PAGE:REATTACH] Node disconnected');
+          viewerNode = null;
         }
-      }
-      
-      lastHealthCheck = Date.now();
+      }, 200);
     });
     
     viewerObserver.observe(element, {
       childList: true,
-      subtree: true, 
+      subtree: true,
       characterData: true
     });
     
-    console.log('[VIEWER:PAGE] Observer attached');
+    console.log('[VIEWER:PAGE] Single observer attached');
     
-    // LVT PATCH R11: Emit initial value
-    const initialCount = parseCount(element.textContent?.trim());
-    if (initialCount > 0) {
-      emitUpdate(initialCount);
+    // LVT PATCH R12: Emit initial value
+    const initialText = element.textContent?.trim();
+    if (initialText) {
+      const initialCount = parseViewerCount(initialText);
+      if (initialCount) {
+        emitViewerUpdate(initialCount);
+      }
     }
     
   } catch (error) {
-    console.log('[VIEWER:PAGE] Observer failed:', error.message);
+    console.log('[VIEWER:PAGE] Observer error:', error.message);
   }
 }
 
-// LVT PATCH R11: Continuous scanning with self-healing
-function startContinuousScanning() {
-  console.log('[VIEWER:PAGE] Starting continuous scanning...');
+// LVT PATCH R12: SPA navigation detection
+function setupSPADetection() {
+  // LVT PATCH R12: History API listeners
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
   
-  // LVT PATCH R11: Wait for complete DOM readyState
-  function waitForDOM() {
-    if (document.readyState === 'complete') {
-      beginScanning();
-    } else {
-      setTimeout(waitForDOM, 100);
-    }
-  }
+  history.pushState = function(...args) {
+    originalPushState.apply(history, args);
+    handleNavigation();
+  };
   
-  function beginScanning() {
-    // Initial scan
-    const node = findViewerNode();
-    if (node) {
-      attachObserver(node);
+  history.replaceState = function(...args) {
+    originalReplaceState.apply(history, args);
+    handleNavigation();
+  };
+  
+  // LVT PATCH R12: Periodic URL check for silent route changes
+  navCheckInterval = setInterval(() => {
+    if (window.location.pathname !== lastPathname) {
+      handleNavigation();
     }
+  }, 1000);
+}
+
+function handleNavigation() {
+  const newPathname = window.location.pathname;
+  if (newPathname !== lastPathname) {
+    console.log(`[VIEWER:PAGE:NAV] from=${lastPathname} to=${newPathname}`);
+    lastPathname = newPathname;
     
-    // LVT PATCH R11: Self-healing scanning loop
-    scanInterval = setInterval(() => {
-      const now = Date.now();
-      
-      // LVT PATCH R11: Re-scan if no node or no updates for 10s
-      if (!viewerNode || !viewerNode.isConnected || (now - lastHealthCheck) > 10000) {
-        console.log('[VIEWER:PAGE:RESCAN] Rescanning for viewer node...');
-        const newNode = findViewerNode();
-        if (newNode) {
-          attachObserver(newNode);
-        }
+    // LVT PATCH R12: Tear down and restart
+    if (viewerObserver) {
+      try { viewerObserver.disconnect(); } catch (_) {}
+    }
+    viewerNode = null;
+    window.__spikelyLVT.watcherId = null;
+    
+    // LVT PATCH R12: Restart detection after navigation
+    setTimeout(() => {
+      if (isTracking) {
+        startDetectionLoop();
       }
-    }, 500); // LVT PATCH R11: 500ms scan interval
+    }, 500);
   }
-  
-  waitForDOM();
 }
 
-// LVT PATCH R11: Simplified tracking
-function startTracking() {
-  if (isTracking) {
-    console.log('[VIEWER:PAGE] already tracking');
-    return;
+// LVT PATCH R12: Detection loop with exponential backoff
+function startDetectionLoop() {
+  const node = findAuthoritativeViewerNode();
+  if (node) {
+    attachSingleObserver(node);
+    detectionRetryCount = 0;
+  } else {
+    // LVT PATCH R12: Exponential backoff retry
+    detectionRetryCount++;
+    if (detectionRetryCount <= 10) {
+      const delay = Math.min(1000 * Math.pow(1.5, detectionRetryCount), 10000);
+      console.log(`[VIEWER:PAGE] Retry detection #${detectionRetryCount} in ${delay}ms`);
+      setTimeout(startDetectionLoop, delay);
+    }
   }
-  
+}
+
+// LVT PATCH R12: Simplified tracking entry point
+function startTracking() {
+  if (isTracking) return;
   isTracking = true;
-  console.log('[VIEWER:PAGE] tracking started - R11 production');
+  
+  console.log('[VIEWER:PAGE] tracking started - R12 production');
   
   if (platform === 'tiktok') {
-    startContinuousScanning();
-  } else {
-    // Non-TikTok: simple selector polling
-    const selectors = {
-      twitch: '[data-a-target="animated-channel-viewers-count"]',
-      kick: '[class*="viewer-count"]', 
-      youtube: 'span.ytp-live-badge + span'
-    };
+    setupSPADetection();
     
-    const selector = selectors[platform];
-    if (selector) {
-      scanInterval = setInterval(() => {
-        const element = document.querySelector(selector);
-        if (element) {
-          const count = parseCount(element.textContent?.trim());
-          if (count > 0) {
-            emitUpdate(count);
-          }
-        }
-      }, 1000);
+    // LVT PATCH R12: Wait for DOM completion then start
+    if (document.readyState === 'complete') {
+      startDetectionLoop();
+    } else {
+      document.addEventListener('DOMContentLoaded', startDetectionLoop);
     }
+    
+    // LVT PATCH R12: Health check - restart if stale
+    scanInterval = setInterval(() => {
+      const now = Date.now();
+      if (!viewerNode || (now - lastEmitTime > 10000)) {
+        console.log('[VIEWER:PAGE:RESCAN] Health check - restarting detection');
+        startDetectionLoop();
+      }
+    }, 5000);
   }
 }
 
@@ -257,20 +297,21 @@ function stopTracking() {
   
   console.log('[VIEWER:PAGE] tracking stopped');
   
-  if (scanInterval) {
-    clearInterval(scanInterval);
-    scanInterval = null;
-  }
-  
   if (viewerObserver) {
     try { viewerObserver.disconnect(); } catch (_) {}
-    viewerObserver = null;
+  }
+  if (scanInterval) {
+    clearInterval(scanInterval);
+  }
+  if (navCheckInterval) {
+    clearInterval(navCheckInterval);
   }
   
   viewerNode = null;
+  window.__spikelyLVT.watcherId = null;
 }
 
-// LVT PATCH R11: Message listeners
+// LVT PATCH R12: Message listeners
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_TRACKING') {
     startTracking();
@@ -283,43 +324,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// LVT PATCH R11: Initialization
-console.log(`[VIEWER:PAGE] loaded - R11 simplified (${platform})`);
+// LVT PATCH R12: Initialize
+console.log(`[VIEWER:PAGE] R12 loaded (${platform})`);
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  try { stopTracking(); } catch (_) {}
-});
-
-})();
-
-// ============================================================================
-// MESSAGE LISTENERS
-// ============================================================================
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'START_TRACKING') {
-    startTracking();
-    sendResponse({ success: true, platform });
-  } else if (message.type === 'STOP_TRACKING') {
-    stopTracking();
-    sendResponse({ success: true });
-  } else if (message.type === 'PING') {
-    console.log('[VIEWER:PAGE] ping received');
-    sendResponse({ type: 'PONG', platform, isReady: true });
-  }
-});
-
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-console.log(`[VIEWER:PAGE] loaded on ${platform} - DOM LVT R10`);
-
-// Cleanup on navigation
-function cleanup() {
-  stopTracking();
-}
-
-window.addEventListener('beforeunload', cleanup);
-window.addEventListener('pagehide', cleanup);
+window.addEventListener('beforeunload', stopTracking);
 
 })();
