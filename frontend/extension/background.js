@@ -193,45 +193,62 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // LVT PATCH R12: Message listener with DOM LVT support
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'VIEWER_COUNT_UPDATE') {
-    // LVT PATCH R12: Handle DOM LVT messages without port dependency
-    console.log(`[VIEWER:BG] forwarded ${message.count}`);
-    
-    // Cache for sidepanel
-    lastViewer = {
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.ts || message.timestamp || Date.now(),
-      tabId: sender.tab?.id || null,
-    };
-    
-    if (sender.tab?.id) {
-      lastLiveTabId = sender.tab.id;
-    }
-
-    // Add to correlation engine
-    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.ts || message.timestamp || Date.now());
-
-    // Forward to WebSocket
-    if (wsConnection?.readyState === WebSocket.OPEN) {
-      wsConnection.send(JSON.stringify({
-        type: 'VIEWER_COUNT',
+    // LVT PATCH R13: Handle schema v2 with validation and relay
+    try {
+      // LVT PATCH R13: Validate schema and coerce to int
+      const count = parseInt(message.value || message.count);
+      if (isNaN(count) || count < 0) {
+        console.log(`[VIEWER:BG:DROP] reason="invalid_count" received=${message.value || message.count}`);
+        return;
+      }
+      
+      console.log(`[VIEWER:BG] forwarded ${count}`);
+      
+      // Cache for correlation engine and WebSocket
+      lastViewer = {
         platform: message.platform,
-        count: message.count,
+        count: count,
         delta: message.delta ?? 0,
         timestamp: message.ts || message.timestamp || Date.now(),
-        tabId: sender.tab?.id
-      }));
-    }
+        tabId: sender.tab?.id || null,
+      };
+      
+      if (sender.tab?.id) {
+        lastLiveTabId = sender.tab.id;
+      }
 
-    // LVT PATCH R12: Broadcast to all extension views without port dependency
-    chrome.runtime.sendMessage({
-      type: 'VIEWER_COUNT',
-      platform: message.platform,
-      count: message.count,
-      delta: message.delta ?? 0,
-      timestamp: message.ts || message.timestamp || Date.now()
-    });
+      // Add to correlation engine
+      correlationEngine.addViewerCount(count, message.delta ?? 0, message.ts || message.timestamp || Date.now());
+
+      // Forward to WebSocket
+      if (wsConnection?.readyState === WebSocket.OPEN) {
+        wsConnection.send(JSON.stringify({
+          type: 'VIEWER_COUNT',
+          platform: message.platform,
+          count: count,
+          delta: message.delta ?? 0,
+          timestamp: message.ts || message.timestamp || Date.now(),
+          tabId: sender.tab?.id
+        }));
+      }
+
+      // LVT PATCH R13: Reliable broadcast to sidepanel (MV3 safe)
+      chrome.runtime.sendMessage({
+        type: 'VIEWER_COUNT',
+        platform: message.platform,
+        count: count,
+        delta: message.delta ?? 0,
+        timestamp: message.ts || message.timestamp || Date.now()
+      }, () => {
+        // LVT PATCH R13: Ignore "no receiving end" errors when sidepanel closed
+        if (chrome.runtime.lastError) {
+          // Silent - sidepanel may not be open
+        }
+      });
+
+    } catch (error) {
+      console.log(`[VIEWER:BG:DROP] reason="processing_error" error="${error.message}"`);
+    }
 
     sendResponse({ success: true });
     return true;
