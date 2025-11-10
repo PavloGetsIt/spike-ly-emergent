@@ -1,42 +1,14 @@
 // ============================================================================
-// SPIKELY CONTENT SCRIPT - RESILIENT SHADOW DOM VIEWER DETECTION
+// LVT PATCH R10: Simplified DOM Live Viewer Tracking (production-ready)
 // ============================================================================
 
-// ============================================================================
-// LVT PATCH R6: Shadow Root Interception Registry (captures closed shadow roots)
-// ============================================================================
 (function(){
   try {
     if (window.__SPIKELY_CONTENT_ACTIVE__) {
       return;
     }
     window.__SPIKELY_CONTENT_ACTIVE__ = true;
-    window.__spikelyDomObsInit = false; // LVT PATCH R6: Guard for duplicate observer
-    window.__spikely_shadow_registry = new WeakSet(); // LVT PATCH R6: Weak reference registry
   } catch (_) {}
-
-// LVT PATCH R6: Intercept ShadowRoot creation to capture closed roots
-const originalAttachShadow = Element.prototype.attachShadow;
-Element.prototype.attachShadow = function(options) {
-  const shadowRoot = originalAttachShadow.call(this, options);
-  
-  // LVT PATCH R6: Store reference to all shadow roots (including closed)
-  window.__spikely_shadow_registry.add(shadowRoot);
-  console.log(`[VIEWER:INIT] captured shadow root on ${this.tagName} (${options.mode})`);
-  
-  return shadowRoot;
-};
-
-// Configuration
-const CONFIG = {
-  POLL_INTERVAL_MS: 800,
-  HEARTBEAT_INTERVAL_MS: 5000,
-  MUTATION_DEBOUNCE_MS: 100,
-  LOG_THROTTLE_MS: 5000,
-  VIEWER_MIN_THRESHOLD: 1,
-  RECHECK_INTERVAL_MS: 500, // LVT PATCH R6: Delayed node binding interval
-  RECOVERY_TIMEOUT_MS: 2000  // LVT PATCH R6: Observer recovery timeout
-};
 
 // Platform detection
 function detectPlatform() {
@@ -50,25 +22,239 @@ function detectPlatform() {
 
 const platform = detectPlatform();
 
-// Platform-specific selectors
-const platformSelectors = {
-  twitch: ['[data-a-target="animated-channel-viewers-count"]', '.live-indicator-container span'],
-  kick: ['[class*="viewer-count"]', '[class*="ViewerCount"]'],
-  youtube: ['span.ytp-live-badge + span', '.ytp-live .ytp-time-current']
-};
-
-
-// State variables
+// LVT PATCH R10: State variables for simplified tracking
 let isTracking = false;
 let currentViewerCount = 0;
-let pollTimer = null;
-let lastLogTime = 0;
-// LVT PATCH: Fixed duplicate domObserver declaration
-let domObserver = null;
-let currentObserverTarget = null;
-let observerIdleTimer = null;
-let mutationDebounceTimer = null;
-let observerInProgress = false;
+let scanInterval = null;
+let viewerObserver = null;
+let viewerNode = null;
+let lastEmittedCount = 0;
+let lastEmitTime = 0;
+
+// LVT PATCH R10: Parse viewer count with K/M scaling  
+function parseCount(text) {
+  if (!text) return 0;
+  
+  const cleaned = text.toLowerCase().replace(/[^\d.,km]/g, '');
+  const match = cleaned.match(/^(\d+(?:\.\d+)?)([km]?)$/);
+  if (!match) return 0;
+  
+  let num = parseFloat(match[1]);
+  const suffix = match[2];
+  
+  if (suffix === 'k') num *= 1000;
+  if (suffix === 'm') num *= 1000000;
+  
+  const result = Math.round(num);
+  return (result >= 0 && result <= 500000) ? result : 0;
+}
+
+// LVT PATCH R10: Find TikTok viewer node via pattern recognition
+function findTikTokViewerNode() {
+  const allElements = Array.from(document.querySelectorAll('*'));
+  
+  for (const element of allElements) {
+    const text = element.textContent?.trim() || '';
+    
+    // LVT PATCH R10: Look for "Viewers · X" pattern
+    if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
+      const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
+      if (match) {
+        // LVT PATCH R10: Find the actual number element within this container
+        const container = element.closest('div, section, header');
+        if (container) {
+          const numberElements = container.querySelectorAll('span, div, strong');
+          for (const numEl of numberElements) {
+            const numText = numEl.textContent?.trim();
+            if (numText && /^\d+(?:\.\d+)?[KkMm]?$/.test(numText)) {
+              if (numEl.offsetParent !== null && numEl.isConnected) {
+                const count = parseCount(numText);
+                if (count > 0) {
+                  console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node: ${element.tagName} → ${numEl.tagName} = "${numText}" (${count})`);
+                  return numEl;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+// LVT PATCH R10: Emit viewer count with exact schema
+function emitViewerCount(count) {
+  const now = Date.now();
+  const delta = lastEmittedCount > 0 ? count - lastEmittedCount : 0;
+  
+  // LVT PATCH R10: Debounce + jitter filter
+  if (count === lastEmittedCount || (Math.abs(delta) < 1) || (now - lastEmitTime) < 250) {
+    return; // Skip emission
+  }
+  
+  lastEmittedCount = count;
+  lastEmitTime = now;
+  currentViewerCount = count;
+  
+  console.log(`[VIEWER:PAGE] value=${count}`);
+  if (delta !== 0) {
+    console.log(`[VIEWER:PAGE:UPDATE] value=${count} delta=${delta}`);
+  }
+  
+  // LVT PATCH R10: Send message with exact schema
+  if (chrome?.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({
+      type: 'VIEWER_COUNT_UPDATE',
+      platform: 'tiktok',
+      count: count,
+      delta: delta,
+      timestamp: now
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[VIEWER:PAGE] Message failed:', chrome.runtime.lastError.message);
+      }
+    });
+  }
+}
+
+// LVT PATCH R10: Attach observer to viewer node
+function attachViewerObserver(element) {
+  if (viewerObserver) {
+    try { viewerObserver.disconnect(); } catch (_) {}
+  }
+  
+  if (!element || !element.isConnected) return;
+  
+  try {
+    viewerNode = element;
+    
+    viewerObserver = new MutationObserver(() => {
+      if (!viewerNode || !viewerNode.isConnected) {
+        console.log('[VIEWER:PAGE:REATTACH] Viewer node disconnected, rescanning...');
+        viewerNode = null;
+        return;
+      }
+      
+      const text = viewerNode.textContent?.trim();
+      if (text) {
+        const count = parseCount(text);
+        if (count > 0) {
+          emitViewerCount(count);
+        }
+      }
+    });
+    
+    // LVT PATCH R10: Observe node changes
+    viewerObserver.observe(element, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    
+    console.log('[VIEWER:PAGE] Observer attached to viewer node');
+    
+    // LVT PATCH R10: Emit initial value
+    const initialCount = parseCount(element.textContent?.trim());
+    if (initialCount > 0) {
+      emitViewerCount(initialCount);
+    }
+    
+  } catch (error) {
+    console.log('[VIEWER:PAGE] Observer attachment failed:', error.message);
+  }
+}
+
+// LVT PATCH R10: Continuous scanning with self-healing
+function startViewerScanning() {
+  console.log('[VIEWER:PAGE] Starting continuous viewer scanning...');
+  
+  // LVT PATCH R10: Wait for complete DOM, then start scanning
+  function waitForCompleteDOM() {
+    if (document.readyState === 'complete') {
+      beginScanning();
+    } else {
+      setTimeout(waitForCompleteDOM, 100);
+    }
+  }
+  
+  function beginScanning() {
+    // LVT PATCH R10: Initial detection attempt
+    const node = findTikTokViewerNode();
+    if (node) {
+      attachViewerObserver(node);
+    }
+    
+    // LVT PATCH R10: Continuous scanning loop for recovery
+    scanInterval = setInterval(() => {
+      if (!viewerNode || !viewerNode.isConnected) {
+        console.log('[VIEWER:PAGE:RESCAN] Rescanning for viewer node...');
+        const newNode = findTikTokViewerNode();
+        if (newNode) {
+          attachViewerObserver(newNode);
+        }
+      }
+    }, 500); // LVT PATCH R10: 500ms scanning interval
+  }
+  
+  waitForCompleteDOM();
+}
+
+// LVT PATCH R10: Simplified tracking system
+function startTracking() {
+  if (isTracking) {
+    console.log('[VIEWER:PAGE] already tracking');
+    return;
+  }
+  
+  isTracking = true;
+  console.log('[VIEWER:PAGE] tracking started - DOM LVT R10');
+  
+  if (platform === 'tiktok') {
+    startViewerScanning();
+  } else {
+    // Non-TikTok platforms: simple polling
+    const selectors = {
+      twitch: ['[data-a-target="animated-channel-viewers-count"]'],
+      kick: ['[class*="viewer-count"]'],
+      youtube: ['span.ytp-live-badge + span']
+    };
+    
+    const platformSelectors = selectors[platform] || [];
+    scanInterval = setInterval(() => {
+      for (const selector of platformSelectors) {
+        const element = document.querySelector(selector);
+        if (element && element.textContent) {
+          const count = parseCount(element.textContent.trim());
+          if (count > 0) {
+            emitViewerCount(count);
+            break;
+          }
+        }
+      }
+    }, 1000);
+  }
+}
+
+function stopTracking() {
+  if (!isTracking) return;
+  isTracking = false;
+  
+  console.log('[VIEWER:PAGE] tracking stopped');
+  
+  if (scanInterval) {
+    clearInterval(scanInterval);
+    scanInterval = null;
+  }
+  
+  if (viewerObserver) {
+    try { viewerObserver.disconnect(); } catch (_) {}
+    viewerObserver = null;
+  }
+  
+  viewerNode = null;
+}
 
 // ============================================================================
 // LVT PATCH R6: Comprehensive shadow DOM recursion with all nested roots
