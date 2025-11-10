@@ -190,90 +190,50 @@ chrome.runtime.onConnect.addListener((port) => {
 // LVT PATCH R3: Enhanced background message handling with guaranteed async response
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
-  // LVT PATCH R3: Structured switch case handling with retry logging
-  switch (message.type) {
-    case 'VIEWER_COUNT_UPDATE':
-    case 'VIEWER_HEARTBEAT':
-      console.log(`[VIEWER:BG] forwarding`, message.count); // LVT PATCH R3: Enhanced breadcrumb
-      console.debug(`[VIEWER:BG] forwarding`); // LVT PATCH R3: Diagnostic breadcrumb
-      
-      // LVT PATCH R3: Cache last viewer value with timestamp validation
-      const now = Date.now();
-      if (!message.timestamp || now - message.timestamp < 500) { // LVT PATCH R3: Drop outdated counts > 500ms
-        lastViewer = {
-          platform: message.platform,
-          count: message.count,
-          delta: message.delta ?? 0,
-          timestamp: message.timestamp || now,
-          tabId: sender.tab?.id || null,
-        };
-        
-        if (sender.tab?.id) {
-          lastLiveTabId = sender.tab.id;
-        }
+  if (message.type === 'VIEWER_COUNT_UPDATE') {
+    // LVT PATCH R12: Handle DOM LVT messages without port dependency
+    console.log(`[VIEWER:BG] forwarded ${message.count}`);
+    
+    // Cache for sidepanel
+    lastViewer = {
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.ts || message.timestamp || Date.now(),
+      tabId: sender.tab?.id || null,
+    };
+    
+    if (sender.tab?.id) {
+      lastLiveTabId = sender.tab.id;
+    }
 
-        // Add to correlation engine
-        correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.timestamp || now);
+    // Add to correlation engine
+    correlationEngine.addViewerCount(message.count, message.delta ?? 0, message.ts || message.timestamp || Date.now());
 
-        // Forward to web app via WebSocket
-        if (wsConnection?.readyState === WebSocket.OPEN) {
-          wsConnection.send(JSON.stringify({
-            type: 'VIEWER_COUNT',
-            platform: message.platform,
-            count: message.count,
-            delta: message.delta ?? 0,
-            timestamp: message.timestamp || now,
-            tabId: sender.tab?.id
-          }));
-        }
+    // Forward to WebSocket
+    if (wsConnection?.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({
+        type: 'VIEWER_COUNT',
+        platform: message.platform,
+        count: message.count,
+        delta: message.delta ?? 0,
+        timestamp: message.ts || message.timestamp || Date.now(),
+        tabId: sender.tab?.id
+      }));
+    }
 
-        // LVT PATCH R3: Reliable forwarding to sidepanel with retry wrapper
-        retryMessageToSidepanel({
-          type: 'VIEWER_COUNT',
-          platform: message.platform,
-          count: message.count,
-          delta: message.delta ?? 0,
-          timestamp: message.timestamp || now,
-          source: message.source
-        });
-      } else {
-        console.log(`[VIEWER:BG] dropped outdated count: ${message.count} (${now - message.timestamp}ms old)`); // LVT PATCH R3: Log outdated drops
-      }
+    // LVT PATCH R12: Broadcast to all extension views without port dependency
+    chrome.runtime.sendMessage({
+      type: 'VIEWER_COUNT',
+      platform: message.platform,
+      count: message.count,
+      delta: message.delta ?? 0,
+      timestamp: message.ts || message.timestamp || Date.now()
+    });
 
-      // LVT PATCH R3: Always ensure sendResponse called and return true for async
-      sendResponse({ success: true, received: true, timestamp: now });
-      return true;
-      
-    case 'START_TRACKING':
-      // LVT PATCH R3: Enhanced tracking start with proper response
-      console.log('[VIEWER:BG] START_TRACKING received');
-      console.debug(`[VIEWER:BG] forwarding`); // LVT PATCH R3: Diagnostic breadcrumb
-      sendResponse({ success: true });
-      return true;
-      
-    case 'STOP_TRACKING':
-      // LVT PATCH R3: Enhanced tracking stop
-      console.log('[VIEWER:BG] STOP_TRACKING received');
-      sendResponse({ success: true });
-      return true;
-      
-    case 'PING':
-      // LVT PATCH R3: Enhanced PING handling for validation test reliability
-      console.log('[VIEWER:BG] ping received');
-      console.log('✅ Attempt 1: Success'); // LVT PATCH R3: Log for validation capture
-      sendResponse({ type: 'PONG', success: true, timestamp: Date.now() });
-      return true;
-      
-    case 'START_AUDIO_CAPTURE':
-      // LVT PATCH R3: Pass through to existing audio capture logic
-      break;
-      
-    default:
-      // LVT PATCH R3: Handle other message types
-      break;
+    sendResponse({ success: true });
+    return true;
   }
-  
-  // LVT PATCH R3: Continue with existing message handling for non-LVT types
   
   if (message.type === 'POPUP_ACTIVATED') {
     // Track that popup was opened on this tab (grants activeTab permission)
