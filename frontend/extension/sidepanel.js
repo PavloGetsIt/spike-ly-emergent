@@ -801,27 +801,23 @@ function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
     case 'VIEWER_COUNT':
-      console.log(`[VIEWER:SP] rendered=${message.count}`);
+      // LVT PATCH R13: Handle schema v2 and remove 888 placeholder
+      const count = parseInt(message.value || message.count);
+      const delta = parseInt(message.delta) || 0;
       
-      // Handle instant modes
-      if (message.source === 'initial' || message.source === 'cached_flush') {
-        firstCountReceived = true;
-        isInWarmup = false;
-        updateEngineStatus('TRACKING', {});
-        updateViewerCount(message.count, 0);
-        break;
+      if (isNaN(count) || count < 0) {
+        console.log(`[VIEWER:SP:SCHEMA_MISS] got keys=${Object.keys(message)}`);
+        return;
       }
       
-      // Handle normal updates
-      if (isSystemStarted && message.count === 0 && !firstCountReceived) {
-        updateEngineStatus('COLLECTING', { reason: 'Waiting for viewer changes...' });
-      } else {
-        firstCountReceived = true;
-        isInWarmup = false;
-        updateEngineStatus('TRACKING', {});
-      }
+      console.log(`[VIEWER:SP] updated ${count}`);
       
-      updateViewerCount(message.count, message.delta || 0);
+      // LVT PATCH R13: Update UI immediately, no 888 fallback
+      firstCountReceived = true;
+      isInWarmup = false;
+      updateEngineStatus('TRACKING', {});
+      updateViewerCount(count, delta);
+      
       break;
     case 'TRANSCRIPT':
       // Forward transcript through WebSocket to webapp
