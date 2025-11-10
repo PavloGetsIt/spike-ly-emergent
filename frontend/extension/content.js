@@ -286,21 +286,6 @@ window.addEventListener('beforeunload', cleanup);
 window.addEventListener('pagehide', cleanup);
 
 })();
-    
-    // LVT PATCH R6: Walk all elements in this shadow root
-    const shadowElements = node.shadowRoot.querySelectorAll('*');
-    for (const shadowEl of shadowElements) {
-      walkShadows(shadowEl, collectCallback, visited);
-    }
-  }
-  
-  // LVT PATCH R6: Walk all child elements recursively
-  if (node.children) {
-    for (const child of node.children) {
-      walkShadows(child, collectCallback, visited);
-    }
-  }
-}
 
 // ============================================================================
 // LVT PATCH R7: Enhanced registry scanning with retroactive support
