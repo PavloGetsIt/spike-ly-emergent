@@ -190,6 +190,8 @@ chrome.runtime.onConnect.addListener((port) => {
 // LVT PATCH R3: Enhanced background message handling with guaranteed async response
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
+// LVT PATCH R12: Message listener with DOM LVT support
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'VIEWER_COUNT_UPDATE') {
     // LVT PATCH R12: Handle DOM LVT messages without port dependency
     console.log(`[VIEWER:BG] forwarded ${message.count}`);
