@@ -260,8 +260,6 @@ function stopTracking() {
 // MESSAGE LISTENERS
 // ============================================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!node || visited.has(node)) return;
-  visited.add(node);
   
   // LVT PATCH R6: Process current node first
   if (collectCallback) collectCallback(node);
