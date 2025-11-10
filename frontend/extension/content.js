@@ -286,11 +286,6 @@ window.addEventListener('beforeunload', cleanup);
 window.addEventListener('pagehide', cleanup);
 
 })();
-  
-  // LVT PATCH R6: Recursively traverse shadowRoot if it exists
-  if (node.shadowRoot && !visited.has(node.shadowRoot)) {
-    visited.add(node.shadowRoot);
-    console.log(`[VIEWER:DBG] traversing shadow root on ${node.tagName}`); // LVT PATCH R6: Log shadow traversal
     
     // LVT PATCH R6: Walk all elements in this shadow root
     const shadowElements = node.shadowRoot.querySelectorAll('*');
