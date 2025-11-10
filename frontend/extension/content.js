@@ -265,53 +265,98 @@ function deepQuerySelector(selectors, root = document, depth = 0) {
 }
 
 // ============================================================================
-// LVT PATCH R8: Enhanced detection with late observer + traversal recovery
+// LVT PATCH R9: Robust TikTok viewer node detection with hardened fallbacks
 // ============================================================================
-function detectViewerCountWithRegistry() {
-  if (platform === 'tiktok') {
+
+let viewerNode = null;
+let viewerObserver = null;
+let lastEmittedCount = 0;
+let lastEmitTime = 0;
+let detectionRetryCount = 0;
+const MAX_DETECTION_RETRIES = 10;
+
+// LVT PATCH R9: Hardened detection routine with ordered fallback strategies
+function detectTikTokViewerNode() {
+  console.log('[VIEWER:PAGE] Starting TikTok viewer node detection...');
+  
+  // LVT PATCH R9: (a) Direct DOM pattern search for "Viewers · X"
+  const allElements = Array.from(document.querySelectorAll('*'));
+  
+  for (const element of allElements) {
+    const text = element.textContent?.trim() || '';
     
-    console.log('[VIEWER:INIT] Starting TikTok viewer detection with dynamic registry...');
+    // LVT PATCH R9: Look for "Viewers" or "viewers" patterns
+    if (text.includes('Viewers') || text.includes('viewers')) {
+      // LVT PATCH R9: Search for nearby numeric elements
+      const parent = element.closest('div, section, header');
+      if (parent) {
+        const numbers = parent.querySelectorAll('span, div, strong');
+        for (const numEl of numbers) {
+          const numText = numEl.textContent?.trim();
+          if (numText && /^\d+(?:\.\d+)?[KkMm]?$/.test(numText)) {
+            if (isValidViewerElement(numEl)) {
+              const count = parseAndValidateCount(numText);
+              if (count !== null) {
+                console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node selected via pattern search (${element.tagName}>${numEl.tagName}): "${numText}"`);
+                return numEl;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // LVT PATCH R9: (b) TikTok-specific attributes/roles
+  const tiktokSelectors = [
+    '[data-e2e*="viewer"]',
+    '[data-e2e*="live-room"]', 
+    '[data-e2e*="audience"]',
+    '[class*="viewer-count"]',
+    '[class*="ViewerCount"]'
+  ];
+  
+  for (const selector of tiktokSelectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const element of elements) {
+      if (element.textContent && /^\d+(?:\.\d+)?[KkMm]?$/.test(element.textContent.trim())) {
+        if (isValidViewerElement(element)) {
+          const count = parseAndValidateCount(element.textContent.trim());
+          if (count !== null) {
+            console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node selected via selector "${selector}": "${element.textContent.trim()}"`);
+            return element;
+          }
+        }
+      }
+    }
+  }
+  
+  // LVT PATCH R9: (c) Shadow registry fallback
+  if (window.__spikely_shadow_registry) {
+    const allElements = document.querySelectorAll('*');
+    let shadowHosts = 0;
     
-    // LVT PATCH R8: PRIORITY 1 - Registry-based traversal (access captured closed roots)
-    console.log('[VIEWER:DBG] Priority 1: Registry-based shadow traversal...');
-    
-    const candidates = [];
-    let registryScanned = 0;
-    
-    // LVT PATCH R8: Scan captured registry (manual iteration since WeakSet not iterable)
-    if (window.__spikely_shadow_registry) {
-      const allElements = document.querySelectorAll('*');
-      
-      for (const element of allElements) {
-        if (element.shadowRoot) {
-          registryScanned++;
-          console.log(`[VIEWER:DBG] scanning potential registry shadow root #${registryScanned}`);
-          
-          const shadowElements = element.shadowRoot.querySelectorAll('span, div, strong');
-          for (const el of shadowElements) {
-            const text = el.textContent?.trim();
-            if (text) {
-              // LVT PATCH R8: Look for TikTok viewer patterns in registry
-              if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
-                const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
-                if (match && isValidVisibleNode(el)) {
-                  const count = parseViewerCount(match[1]);
-                  if (count > 0) {
-                    console.log(`[VIEWER:PAGE:FOUND] selector=${element.tagName}>${el.tagName} value=${count}`); // LVT PATCH R8: Found log
-                    candidates.push({ element: el, count, priority: 1, source: 'registry_pattern' });
-                  }
-                }
-              } 
-              // LVT PATCH R8: Look for contextual numbers in registry  
-              else if (/^\d+(?:\.\d+)?[KkMm]?$/.test(text)) {
-                const context = el.parentElement?.textContent?.toLowerCase() || '';
-                if ((context.includes('viewer') || context.includes('watching')) && isValidVisibleNode(el)) {
-                  const count = parseViewerCount(text);
-                  if (count >= 10 && count <= 50000) {
-                    console.log(`[VIEWER:PAGE:FOUND] selector=${element.tagName}>${el.tagName} value=${count}`); // LVT PATCH R8: Found log
-                    candidates.push({ element: el, count, priority: 2, source: 'registry_context' });
-                  }
-                }
+    for (const element of allElements) {
+      if (element.shadowRoot && window.__spikely_shadow_registry.has(element)) {
+        shadowHosts++;
+        
+        const shadowElements = element.shadowRoot.querySelectorAll('span, div, strong');
+        for (const shadowEl of shadowElements) {
+          const text = shadowEl.textContent?.trim();
+          if (text && /^\d+(?:\.\d+)?[KkMm]?$/.test(text)) {
+            // LVT PATCH R9: Check if parent context includes viewer-related terms
+            const context = shadowEl.parentElement?.textContent?.toLowerCase() || '';
+            const contextWords = ['viewer', 'viewers', 'watching'];
+            const excludeWords = ['cookie', 'policy', 'settings', 'follow', 'likes', 'fans', 'gift', 'coins'];
+            
+            const hasViewerContext = contextWords.some(word => context.includes(word));
+            const hasExcludeContext = excludeWords.some(word => context.includes(word));
+            
+            if (hasViewerContext && !hasExcludeContext && isValidViewerElement(shadowEl)) {
+              const count = parseAndValidateCount(text);
+              if (count !== null) {
+                console.log(`[VIEWER:PAGE:FOUND] TikTok viewer node selected via shadow registry: "${text}"`);
+                return shadowEl;
               }
             }
           }
@@ -319,38 +364,61 @@ function detectViewerCountWithRegistry() {
       }
     }
     
-    console.log(`[VIEWER:DBG] registry scan: ${registryScanned} shadow roots checked, ${candidates.length} candidates`);
-    
-    // LVT PATCH R8: PRIORITY 2 - Traditional DOM pattern search  
-    if (candidates.length === 0) {
-      console.log('[VIEWER:DBG] Priority 2: Traditional DOM pattern search...');
-      
-      const allElements = Array.from(document.querySelectorAll('*'));
-      for (const element of allElements) {
-        const text = element.textContent?.trim() || '';
-        
-        if (/viewers?\s*[·•]\s*\d+/i.test(text)) {
-          const match = text.match(/viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
-          if (match && isValidVisibleNode(element)) {
-            const count = parseViewerCount(match[1]);
-            if (count > 0) {
-              console.log(`[VIEWER:PAGE:FOUND] selector=${element.tagName} value=${count}`); // LVT PATCH R8: Found log
-              candidates.push({ element, count, priority: 1, source: 'dom_pattern' });
-            }
-          }
-        }
+    console.log(`[VIEWER:PAGE] Shadow registry fallback scanned ${shadowHosts} shadow hosts`);
+  }
+  
+  console.log('[VIEWER:PAGE] No valid TikTok viewer node found');
+  return null;
+}
+
+// LVT PATCH R9: Validate element is suitable for viewer tracking
+function isValidViewerElement(element) {
+  if (!element || !element.isConnected) return false;
+  if (element.getAttribute('aria-hidden') === 'true') return false;
+  
+  const style = window.getComputedStyle(element);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (parseFloat(style.opacity) === 0) return false;
+  
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return false;
+  
+  return true;
+}
+
+// LVT PATCH R9: Parse and validate count with sanity constraints
+function parseAndValidateCount(text) {
+  if (!text) return null;
+  
+  const cleaned = text.toLowerCase().replace(/[^\d.,km]/g, '');
+  const match = cleaned.match(/^(\d+(?:\.\d+)?)([km]?)$/);
+  if (!match) return null;
+  
+  let num = parseFloat(match[1]);
+  const suffix = match[2];
+  
+  if (suffix === 'k') num *= 1000;
+  if (suffix === 'm') num *= 1000000;
+  
+  const result = Math.round(num);
+  
+  // LVT PATCH R9: Sanity constraints - discard invalid values
+  if (result <= 0 || result > 500000) return null;
+  
+  return result;
+}
+
+// LVT PATCH R9: Wrapper function to maintain compatibility with existing code
+function detectViewerCountWithRegistry() {
+  if (platform === 'tiktok') {
+    const node = detectTikTokViewerNode();
+    if (node) {
+      const count = parseAndValidateCount(node.textContent?.trim());
+      if (count !== null) {
+        bindPersistentMutationObserver(node);
+        return count;
       }
     }
-    
-    // LVT PATCH R8: Return best candidate and bind observer
-    if (candidates.length > 0) {
-      const best = candidates.sort((a, b) => a.priority - b.priority)[0];
-      console.log(`[VIEWER:PAGE:FOUND] best candidate: ${best.count} via ${best.source}`);
-      bindPersistentMutationObserver(best.element);
-      return best.count;
-    }
-    
-    console.log('[VIEWER:PAGE] no valid TikTok viewer count found in registry or DOM');
     return null;
   }
   
