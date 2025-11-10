@@ -257,9 +257,9 @@ function stopTracking() {
 }
 
 // ============================================================================
-// LVT PATCH R6: Comprehensive shadow DOM recursion with all nested roots
+// MESSAGE LISTENERS
 // ============================================================================
-function walkShadows(node, collectCallback, visited = new WeakSet()) {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!node || visited.has(node)) return;
   visited.add(node);
   
