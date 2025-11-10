@@ -539,8 +539,7 @@ function deduplicateCounters(candidates) {
 
 
 // LVT PATCH R7: Enhanced viewer update with recovery monitoring
-let lastEmittedCount = 0;
-let lastEmitTime = 0;
+// Note: lastEmittedCount and lastEmitTime now declared in R9 section above
 
 function emitViewerUpdate(count) {
   const now = Date.now();
