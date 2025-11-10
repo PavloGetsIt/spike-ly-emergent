@@ -260,9 +260,32 @@ function stopTracking() {
 // MESSAGE LISTENERS
 // ============================================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  
-  // LVT PATCH R6: Process current node first
-  if (collectCallback) collectCallback(node);
+  if (message.type === 'START_TRACKING') {
+    startTracking();
+    sendResponse({ success: true, platform });
+  } else if (message.type === 'STOP_TRACKING') {
+    stopTracking();
+    sendResponse({ success: true });
+  } else if (message.type === 'PING') {
+    console.log('[VIEWER:PAGE] ping received');
+    sendResponse({ type: 'PONG', platform, isReady: true });
+  }
+});
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+console.log(`[VIEWER:PAGE] loaded on ${platform} - DOM LVT R10`);
+
+// Cleanup on navigation
+function cleanup() {
+  stopTracking();
+}
+
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('pagehide', cleanup);
+
+})();
   
   // LVT PATCH R6: Recursively traverse shadowRoot if it exists
   if (node.shadowRoot && !visited.has(node.shadowRoot)) {
