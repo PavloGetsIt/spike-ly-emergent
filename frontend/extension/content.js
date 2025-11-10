@@ -807,10 +807,8 @@ function parseViewerCount(textOrElement) {
 }
 
 // ============================================================================
-// LVT PATCH R7: Enhanced tracking with recovery cycle and late observer binding
+// LVT PATCH R9: Simplified tracking with robust detection and observer binding
 // ============================================================================
-let recoveryAttempts = 0;
-const MAX_RECOVERY_ATTEMPTS = 10;
 
 function startTracking() {
   if (isTracking) {
@@ -819,77 +817,71 @@ function startTracking() {
   }
   
   isTracking = true;
-  recoveryAttempts = 0;
-  console.log('[VIEWER:PAGE] tracking started with preload registry access');
+  console.log('[VIEWER:PAGE] tracking started for DOM LVT');
   
   if (platform === 'tiktok') {
-    // LVT PATCH R7: Wait for registry to be populated, then try detection
-    setTimeout(() => {
-      attemptViewerDetection();
-    }, 100); // LVT PATCH R7: Small delay for registry population
-    
-    // LVT PATCH R7: Recovery cycle - continue until VIEWER_COUNT_UPDATE fires
-    const recoveryInterval = setInterval(() => {
-      if (!currentObserverTarget && recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
-        recoveryAttempts++;
-        console.log(`[VIEWER:DBG] recovery attempt #${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS}`);
-        attemptViewerDetection();
-      } else if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
-        console.log('[VIEWER:DBG] max recovery attempts reached, stopping recovery');
-        clearInterval(recoveryInterval);
-      } else {
-        clearInterval(recoveryInterval);
-      }
-    }, CONFIG.RECHECK_INTERVAL_MS);
-    
-    // LVT PATCH R7: Polling fallback (reduced frequency when observer active)
-    pollTimer = setInterval(() => {
-      const observerActive = domObserver && currentObserverTarget && 
-                           isValidVisibleNode(currentObserverTarget);
+    // LVT PATCH R9: Start viewer node detection immediately
+    const node = detectTikTokViewerNode();
+    if (node) {
+      bindViewerObserver(node);
       
-      if (!observerActive) {
-        console.log('[VIEWER:DBG] polling fallback active');
-        attemptViewerDetection();
+      // LVT PATCH R9: Emit initial value
+      const initialCount = parseAndValidateCount(node.textContent?.trim());
+      if (initialCount !== null) {
+        emitViewerCountUpdate(initialCount);
       }
-    }, CONFIG.POLL_INTERVAL_MS);
+    } else {
+      // LVT PATCH R9: Schedule retry detection if not found initially
+      scheduleViewerDetection();
+    }
     
-    // Heartbeat every 5s
+    // LVT PATCH R9: Simplified heartbeat for correlation engine
     setInterval(() => {
       if (isTracking && currentViewerCount > 0) {
-        sendWithRetry({
+        chrome.runtime.sendMessage({
           type: 'VIEWER_HEARTBEAT',
-          platform,
+          platform: 'tiktok',
           count: currentViewerCount,
           timestamp: Date.now()
-        }, 'HEARTBEAT');
+        });
       }
     }, CONFIG.HEARTBEAT_INTERVAL_MS);
     
   } else {
-    // Non-TikTok platforms: polling with registry access
+    // Non-TikTok platforms: use existing logic
     pollTimer = setInterval(() => {
-      const count = detectViewerCountWithRegistry();
-      if (count !== null) {
-        emitViewerUpdate(count);
+      const selectors = platformSelectors[platform] || [];
+      for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element && isValidViewerElement(element)) {
+          const count = parseAndValidateCount(element.textContent?.trim());
+          if (count !== null && shouldEmitUpdate(count)) {
+            emitViewerCountUpdate(count);
+            break;
+          }
+        }
       }
     }, CONFIG.POLL_INTERVAL_MS);
   }
 }
 
-// LVT PATCH R7: Attempt viewer detection with registry access and recovery
-function attemptViewerDetection() {
-  const count = detectViewerCountWithRegistry();
-  if (count !== null && count > 0) {
-    lastUpdateTime = Date.now();
-    recoveryAttempts = 0; // LVT PATCH R7: Reset recovery on success
-    emitViewerUpdate(count);
-    startObserverRecovery();
-  } else {
-    const now = Date.now();
-    if (now - lastLogTime > CONFIG.LOG_THROTTLE_MS) {
-      console.log('[VIEWER:PAGE] attempting viewer detection...');
-      lastLogTime = now;
-    }
+function stopTracking() {
+  if (!isTracking) return;
+  isTracking = false;
+  
+  console.log('[VIEWER:PAGE] tracking stopped');
+  
+  if (viewerObserver) {
+    try { viewerObserver.disconnect(); } catch (_) {}
+    viewerObserver = null;
+  }
+  
+  viewerNode = null;
+  detectionRetryCount = 0;
+  
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 }
 
