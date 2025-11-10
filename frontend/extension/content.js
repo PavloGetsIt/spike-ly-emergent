@@ -538,30 +538,119 @@ function deduplicateCounters(candidates) {
 }
 
 
-// LVT PATCH R7: Enhanced viewer update with recovery monitoring
-// Note: lastEmittedCount and lastEmitTime now declared in R9 section above
+// ============================================================================
+// LVT PATCH R9: MutationObserver wiring with production message schema
+// ============================================================================
 
-function emitViewerUpdate(count) {
+function bindViewerObserver(element) {
+  if (viewerObserver) {
+    try { viewerObserver.disconnect(); } catch (_) {}
+  }
+  
+  if (!element || !isValidViewerElement(element)) return;
+  
+  try {
+    viewerNode = element;
+    
+    viewerObserver = new MutationObserver(() => {
+      if (!viewerNode || !isValidViewerElement(viewerNode)) {
+        console.log('[VIEWER:PAGE:LOST] Viewer node became invalid, redetecting...');
+        viewerNode = null;
+        scheduleViewerDetection();
+        return;
+      }
+      
+      // LVT PATCH R9: Re-parse viewer node's numeric value
+      const text = viewerNode.textContent?.trim();
+      if (text) {
+        const count = parseAndValidateCount(text);
+        if (count !== null && shouldEmitUpdate(count)) {
+          emitViewerCountUpdate(count);
+        }
+      }
+    });
+    
+    // LVT PATCH R9: Observe characterData, childList, and subtree
+    viewerObserver.observe(element, {
+      characterData: true,
+      childList: true,
+      subtree: true
+    });
+    
+    console.log('[VIEWER:PAGE] MutationObserver attached to viewer node');
+    
+  } catch (error) {
+    console.log('[VIEWER:PAGE] Failed to bind observer:', error.message);
+  }
+}
+
+// LVT PATCH R9: Jitter filter - only emit on significant changes or time elapsed
+function shouldEmitUpdate(newCount) {
+  const now = Date.now();
+  const delta = Math.abs(newCount - lastEmittedCount);
+  const timeSinceLastEmit = now - lastEmitTime;
+  
+  // LVT PATCH R9: Apply jitter filter
+  return delta >= 2 || timeSinceLastEmit >= 5000;
+}
+
+// LVT PATCH R9: Emit viewer count with production message schema
+function emitViewerCountUpdate(count) {
   const now = Date.now();
   const delta = lastEmittedCount > 0 ? count - lastEmittedCount : 0;
   
   lastEmittedCount = count;
   lastEmitTime = now;
   currentViewerCount = count;
-  lastUpdateTime = now; // LVT PATCH R7: Track for recovery monitoring
   
   console.log(`[VIEWER:PAGE] value=${count}`);
-  console.log(`[VIEWER:PAGE:UPDATE] value=${count} delta=${delta}`); // LVT PATCH R7: Enhanced update log
+  if (delta !== 0) {
+    console.log(`[VIEWER:PAGE:UPDATE] value=${count} delta=${delta}`);
+  }
   
-  // LVT PATCH R7: Use sendWithRetry for guaranteed delivery
-  sendWithRetry({
+  // LVT PATCH R9: Send message with exact schema expected by background/sidepanel
+  const message = {
     type: 'VIEWER_COUNT_UPDATE',
-    platform,
-    count,
-    delta,
-    timestamp: now,
-    source: 'validated'
-  }, 'LVT_UPDATE');
+    platform: 'tiktok',
+    source: 'dom-lvt', 
+    count: count,
+    timestamp: now
+  };
+  
+  if (chrome?.runtime?.sendMessage) {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[VIEWER:PAGE] Message send failed:', chrome.runtime.lastError.message);
+      }
+    });
+  }
+}
+
+// LVT PATCH R9: Schedule detection with retry logic
+function scheduleViewerDetection() {
+  if (detectionRetryCount >= MAX_DETECTION_RETRIES) {
+    console.log('[VIEWER:PAGE] Max detection retries reached');
+    return;
+  }
+  
+  detectionRetryCount++;
+  console.log(`[VIEWER:PAGE] Scheduling detection retry #${detectionRetryCount}/${MAX_DETECTION_RETRIES}`);
+  
+  setTimeout(() => {
+    const node = detectTikTokViewerNode();
+    if (node) {
+      detectionRetryCount = 0; // Reset on success
+      bindViewerObserver(node);
+      
+      // LVT PATCH R9: Emit initial value
+      const initialCount = parseAndValidateCount(node.textContent?.trim());
+      if (initialCount !== null) {
+        emitViewerCountUpdate(initialCount);
+      }
+    } else if (detectionRetryCount < MAX_DETECTION_RETRIES) {
+      scheduleViewerDetection(); // Continue retrying
+    }
+  }, 1000); // LVT PATCH R9: 1s retry interval
 }
 
 // ============================================================================
