@@ -191,23 +191,23 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'VIEWER_COUNT_UPDATE') {
-    // LVT PATCH R14: Handle DOM LVT with clear logging
+    // LVT PATCH R15: Handle DOM LVT with explicit error logging
     try {
-      const count = parseInt(message.value || message.count);
-      if (isNaN(count) || count < 0) {
-        console.log(`[LVT:R14][BG] invalid count received: ${message.value || message.count}`);
+      const value = parseInt(message.value);
+      if (isNaN(value) || value < 0 || value > 200000) {
+        console.log(`[BG:R15] invalid value received: ${message.value}`);
         sendResponse({ success: false });
         return true;
       }
       
-      console.log(`[LVT:R14][BG] received VIEWER_COUNT_UPDATE from tab ${sender.tab?.id} value=${count}`);
+      console.log(`[BG:R15] forwarding value=${value}`);
       
       // Cache for correlation engine
       lastViewer = {
-        platform: message.platform || 'tiktok',
-        count: count,
-        delta: message.delta ?? 0,
-        timestamp: message.ts || Date.now(),
+        platform: 'tiktok',
+        count: value,
+        delta: 0,
+        timestamp: Date.now(),
         tabId: sender.tab?.id || null,
       };
       
@@ -216,31 +216,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       // Add to correlation engine
-      correlationEngine.addViewerCount(count, message.delta ?? 0, message.ts || Date.now());
+      correlationEngine.addViewerCount(value, 0, Date.now());
 
       // Forward to WebSocket
       if (wsConnection?.readyState === WebSocket.OPEN) {
         wsConnection.send(JSON.stringify({
           type: 'VIEWER_COUNT',
-          platform: message.platform || 'tiktok',
-          count: count,
-          timestamp: message.ts || Date.now(),
+          platform: 'tiktok',
+          count: value,
+          timestamp: Date.now(),
           tabId: sender.tab?.id
         }));
       }
 
-      // LVT PATCH R14: Forward to sidepanel as LVT_VIEWER_COUNT_UPDATE
+      // LVT PATCH R15: Relay to sidepanel
       chrome.runtime.sendMessage({
-        type: 'LVT_VIEWER_COUNT_UPDATE',
-        platform: message.platform || 'tiktok',
-        count: count,
-        delta: message.delta ?? 0,
-        timestamp: message.ts || Date.now()
+        type: 'VIEWER_COUNT_UPDATE',
+        value: value,
+        schema: 'v1'
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log(`[LVT:R14][BG] sidepanel forward warning: ${chrome.runtime.lastError.message}`);
+          console.log(`[BG:R15] sidepanel send warning: ${chrome.runtime.lastError.message}`);
         } else {
-          console.log(`[LVT:R14][BG] forwarded to sidepanel`);
+          console.log(`[BG:R15] sent to sidepanel`);
         }
       });
 
@@ -248,10 +246,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
       
     } catch (error) {
-      console.log(`[LVT:R14][BG] processing error: ${error.message}`);
+      console.log(`[BG:R15] processing error: ${error.message}`);
       sendResponse({ success: false });
       return true;
     }
+  }
+  
+  // LVT PATCH R15: Add explicit error handling for dynamic injection
+  if (message.type === 'START_TRACKING') {
+    (async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        sendResponse({ success: false, error: 'No active tab' });
+        return;
+      }
+      
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['lvtContent.js']
+        });
+        console.log(`[BG:R15] dynamic inject success (tab=${tab.id})`);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.log(`[BG:R15] dynamic inject failed (tab=${tab.id}) err=${error.message}`);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
   }
   
   if (message.type === 'POPUP_ACTIVATED') {
