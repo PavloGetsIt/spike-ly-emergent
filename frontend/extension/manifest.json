@@ -9,7 +9,7 @@
   },
   "web_accessible_resources": [{
     "resources": ["pcm-processor.js", "lvtContent.js"],
-    "matches": ["<all_urls>"]
+    "matches": ["https://*.tiktok.com/*"]
   }],
   "host_permissions": [
     "*://*.tiktok.com/*",
