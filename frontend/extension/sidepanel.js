@@ -799,24 +799,39 @@ function connectToWebSocket() {
 // Handle incoming messages
 function handleMessage(message) {
   switch (message.type) {
-    case 'VIEWER_COUNT_UPDATE':
-    case 'VIEWER_COUNT':
-      // LVT PATCH R13: Handle schema v2 and remove 888 placeholder
-      const count = parseInt(message.value || message.count);
+    case 'LVT_VIEWER_COUNT_UPDATE':
+      // LVT PATCH R14: Handle dedicated LVT updates
+      const count = parseInt(message.count);
       const delta = parseInt(message.delta) || 0;
       
       if (isNaN(count) || count < 0) {
-        console.log(`[VIEWER:SP:SCHEMA_MISS] got keys=${Object.keys(message)}`);
+        console.log(`[LVT:R14][SP] invalid count received: ${message.count}`);
         return;
       }
       
-      console.log(`[VIEWER:SP] updated ${count}`);
+      console.log(`[LVT:R14][SP] viewer count updated to ${count}`);
       
-      // LVT PATCH R13: Update UI immediately, no 888 fallback
+      // LVT PATCH R14: Update UI immediately, no placeholder logic
       firstCountReceived = true;
       isInWarmup = false;
       updateEngineStatus('TRACKING', {});
       updateViewerCount(count, delta);
+      
+      break;
+      
+    case 'VIEWER_COUNT_UPDATE':
+    case 'VIEWER_COUNT':
+      // LVT PATCH R14: Legacy handler for backward compatibility
+      const legacyCount = parseInt(message.value || message.count);
+      const legacyDelta = parseInt(message.delta) || 0;
+      
+      if (isNaN(legacyCount) || legacyCount < 0) {
+        console.log(`[LVT:R14][SP] legacy invalid count: ${message.value || message.count}`);
+        return;
+      }
+      
+      console.log(`[LVT:R14][SP] legacy viewer count updated to ${legacyCount}`);
+      updateViewerCount(legacyCount, legacyDelta);
       
       break;
     case 'TRANSCRIPT':
