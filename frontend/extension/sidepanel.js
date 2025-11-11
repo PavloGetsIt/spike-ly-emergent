@@ -799,39 +799,36 @@ function connectToWebSocket() {
 // Handle incoming messages
 function handleMessage(message) {
   switch (message.type) {
-    case 'LVT_VIEWER_COUNT_UPDATE':
-      // LVT PATCH R14: Handle dedicated LVT updates
-      const count = parseInt(message.count);
-      const delta = parseInt(message.delta) || 0;
+    case 'VIEWER_COUNT_UPDATE':
+      // LVT PATCH R15: Handle DOM LVT with schema v1
+      const value = parseInt(message.value);
       
-      if (isNaN(count) || count < 0) {
-        console.log(`[LVT:R14][SP] invalid count received: ${message.count}`);
+      if (isNaN(value) || value < 0) {
+        console.log(`[SP:R15] invalid value received: ${message.value}`);
         return;
       }
       
-      console.log(`[LVT:R14][SP] viewer count updated to ${count}`);
+      console.log(`[SP:R15] recv value=${value}`);
       
-      // LVT PATCH R14: Update UI immediately, no placeholder logic
+      // LVT PATCH R15: Update UI immediately, no 888 placeholder
       firstCountReceived = true;
       isInWarmup = false;
       updateEngineStatus('TRACKING', {});
-      updateViewerCount(count, delta);
+      updateViewerCount(value, 0);
       
       break;
       
-    case 'VIEWER_COUNT_UPDATE':
+    case 'LVT_VIEWER_COUNT_UPDATE':
     case 'VIEWER_COUNT':
-      // LVT PATCH R14: Legacy handler for backward compatibility
+      // LVT PATCH R15: Legacy handlers for backward compatibility
       const legacyCount = parseInt(message.value || message.count);
-      const legacyDelta = parseInt(message.delta) || 0;
       
       if (isNaN(legacyCount) || legacyCount < 0) {
-        console.log(`[LVT:R14][SP] legacy invalid count: ${message.value || message.count}`);
         return;
       }
       
-      console.log(`[LVT:R14][SP] legacy viewer count updated to ${legacyCount}`);
-      updateViewerCount(legacyCount, legacyDelta);
+      console.log(`[SP:R15] legacy recv value=${legacyCount}`);
+      updateViewerCount(legacyCount, message.delta || 0);
       
       break;
     case 'TRANSCRIPT':
