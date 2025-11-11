@@ -187,24 +187,22 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
-// LVT PATCH R3: Enhanced background message handling with guaranteed async response
+// LVT PATCH R13: Clean message listener with proper structure
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
-// LVT PATCH R12: Message listener with DOM LVT support
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'VIEWER_COUNT_UPDATE') {
-    // LVT PATCH R13: Handle schema v2 with validation and relay
+    // LVT PATCH R13: Handle DOM LVT messages with schema v2
     try {
-      // LVT PATCH R13: Validate schema and coerce to int
       const count = parseInt(message.value || message.count);
       if (isNaN(count) || count < 0) {
         console.log(`[VIEWER:BG:DROP] reason="invalid_count" received=${message.value || message.count}`);
-        return;
+        sendResponse({ success: false });
+        return true;
       }
       
       console.log(`[VIEWER:BG] forwarded ${count}`);
       
-      // Cache for correlation engine and WebSocket
+      // Cache for correlation engine  
       lastViewer = {
         platform: message.platform,
         count: count,
@@ -232,7 +230,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }));
       }
 
-      // LVT PATCH R13: Reliable broadcast to sidepanel (MV3 safe)
+      // LVT PATCH R13: Broadcast to sidepanel
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT',
         platform: message.platform,
@@ -240,9 +238,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         delta: message.delta ?? 0,
         timestamp: message.ts || message.timestamp || Date.now()
       }, () => {
-        // LVT PATCH R13: Ignore "no receiving end" errors when sidepanel closed
         if (chrome.runtime.lastError) {
-          // Silent - sidepanel may not be open
+          // Sidepanel may not be open
         }
       });
 
