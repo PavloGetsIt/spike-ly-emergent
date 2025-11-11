@@ -191,23 +191,23 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'VIEWER_COUNT_UPDATE') {
-    // LVT PATCH R13: Handle DOM LVT messages with schema v2
+    // LVT PATCH R14: Handle DOM LVT with clear logging
     try {
       const count = parseInt(message.value || message.count);
       if (isNaN(count) || count < 0) {
-        console.log(`[VIEWER:BG:DROP] reason="invalid_count" received=${message.value || message.count}`);
+        console.log(`[LVT:R14][BG] invalid count received: ${message.value || message.count}`);
         sendResponse({ success: false });
         return true;
       }
       
-      console.log(`[VIEWER:BG] forwarded ${count}`);
+      console.log(`[LVT:R14][BG] received VIEWER_COUNT_UPDATE from tab ${sender.tab?.id} value=${count}`);
       
-      // Cache for correlation engine  
+      // Cache for correlation engine
       lastViewer = {
-        platform: message.platform,
+        platform: message.platform || 'tiktok',
         count: count,
         delta: message.delta ?? 0,
-        timestamp: message.ts || message.timestamp || Date.now(),
+        timestamp: message.ts || Date.now(),
         tabId: sender.tab?.id || null,
       };
       
@@ -216,39 +216,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       // Add to correlation engine
-      correlationEngine.addViewerCount(count, message.delta ?? 0, message.ts || message.timestamp || Date.now());
+      correlationEngine.addViewerCount(count, message.delta ?? 0, message.ts || Date.now());
 
       // Forward to WebSocket
       if (wsConnection?.readyState === WebSocket.OPEN) {
         wsConnection.send(JSON.stringify({
           type: 'VIEWER_COUNT',
-          platform: message.platform,
+          platform: message.platform || 'tiktok',
           count: count,
-          delta: message.delta ?? 0,
-          timestamp: message.ts || message.timestamp || Date.now(),
+          timestamp: message.ts || Date.now(),
           tabId: sender.tab?.id
         }));
       }
 
-      // LVT PATCH R13: Broadcast to sidepanel
+      // LVT PATCH R14: Forward to sidepanel as LVT_VIEWER_COUNT_UPDATE
       chrome.runtime.sendMessage({
-        type: 'VIEWER_COUNT',
-        platform: message.platform,
+        type: 'LVT_VIEWER_COUNT_UPDATE',
+        platform: message.platform || 'tiktok',
         count: count,
         delta: message.delta ?? 0,
-        timestamp: message.ts || message.timestamp || Date.now()
-      }, () => {
+        timestamp: message.ts || Date.now()
+      }, (response) => {
         if (chrome.runtime.lastError) {
-          // Sidepanel may not be open
+          console.log(`[LVT:R14][BG] sidepanel forward warning: ${chrome.runtime.lastError.message}`);
+        } else {
+          console.log(`[LVT:R14][BG] forwarded to sidepanel`);
         }
       });
 
+      sendResponse({ success: true });
+      return true;
+      
     } catch (error) {
-      console.log(`[VIEWER:BG:DROP] reason="processing_error" error="${error.message}"`);
+      console.log(`[LVT:R14][BG] processing error: ${error.message}`);
+      sendResponse({ success: false });
+      return true;
     }
-
-    sendResponse({ success: true });
-    return true;
   }
   
   if (message.type === 'POPUP_ACTIVATED') {
