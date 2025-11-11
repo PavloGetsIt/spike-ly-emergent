@@ -191,11 +191,11 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === 'VIEWER_COUNT_UPDATE') {
-    // LVT PATCH R15: Handle DOM LVT with explicit error logging
+    // LVT PATCH R15: Handle DOM LVT message relay
     try {
       const value = parseInt(message.value);
-      if (isNaN(value) || value < 0 || value > 200000) {
-        console.log(`[BG:R15] invalid value received: ${message.value}`);
+      if (isNaN(value) || value < 0 || value > 5000000) {
+        console.log(`[BG:R15] invalid value: ${message.value}`);
         sendResponse({ success: false });
         return true;
       }
@@ -229,14 +229,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }));
       }
 
-      // LVT PATCH R15: Relay to sidepanel
+      // LVT PATCH R15: Broadcast to sidepanel
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT_UPDATE',
-        value: value,
-        schema: 'v1'
+        value: value
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log(`[BG:R15] sidepanel send warning: ${chrome.runtime.lastError.message}`);
+          // Sidepanel may not be open
         } else {
           console.log(`[BG:R15] sent to sidepanel`);
         }
@@ -250,30 +249,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false });
       return true;
     }
-  }
-  
-  // LVT PATCH R15: Add explicit error handling for dynamic injection
-  if (message.type === 'START_TRACKING') {
-    (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) {
-        sendResponse({ success: false, error: 'No active tab' });
-        return;
-      }
-      
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['lvtContent.js']
-        });
-        console.log(`[BG:R15] dynamic inject success (tab=${tab.id})`);
-        sendResponse({ success: true });
-      } catch (error) {
-        console.log(`[BG:R15] dynamic inject failed (tab=${tab.id}) err=${error.message}`);
-        sendResponse({ success: false, error: error.message });
-      }
-    })();
-    return true;
   }
   
   if (message.type === 'POPUP_ACTIVATED') {
