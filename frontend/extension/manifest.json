@@ -28,7 +28,14 @@
       "matches": [
         "*://*.tiktok.com/*/live*",
         "*://*.tiktok.com/@*/live*",
-        "*://*.tiktok.com/*live*",
+        "*://*.tiktok.com/*live*"
+      ],
+      "js": ["lvtContent.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
         "*://*.twitch.tv/*",
         "*://*.kick.com/*",
         "*://*.youtube.com/*"
