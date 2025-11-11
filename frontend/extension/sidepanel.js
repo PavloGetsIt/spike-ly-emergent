@@ -800,17 +800,17 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      // LVT PATCH R15: Handle DOM LVT with schema v1
+      // LVT PATCH R15: Handle DOM LVT with clean schema
       const value = parseInt(message.value);
       
       if (isNaN(value) || value < 0) {
-        console.log(`[SP:R15] invalid value received: ${message.value}`);
+        console.log(`[SP:R15] invalid value: ${message.value}`);
         return;
       }
       
       console.log(`[SP:R15] recv value=${value}`);
       
-      // LVT PATCH R15: Update UI immediately, no 888 placeholder
+      // LVT PATCH R15: Update UI immediately, no placeholder logic
       firstCountReceived = true;
       isInWarmup = false;
       updateEngineStatus('TRACKING', {});
@@ -820,7 +820,7 @@ function handleMessage(message) {
       
     case 'LVT_VIEWER_COUNT_UPDATE':
     case 'VIEWER_COUNT':
-      // LVT PATCH R15: Legacy handlers for backward compatibility
+      // LVT PATCH R15: Legacy compatibility handlers
       const legacyCount = parseInt(message.value || message.count);
       
       if (isNaN(legacyCount) || legacyCount < 0) {
