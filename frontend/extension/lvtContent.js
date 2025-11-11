@@ -1,32 +1,25 @@
 // ============================================================================
-// LVT PATCH R15: Minimal TikTok DOM LVT Content Script 
+// LVT PATCH R15: Authoritative TikTok DOM LVT Content Script
 // ============================================================================
 
 (function() {
   'use strict';
   
-  // LVT PATCH R15: Guard against double injection
+  // LVT PATCH R15: Boot guard
   if (window.__spikelyLVT_R15) {
     return;
   }
 
+  window.__spikelyLVT_R15 = true;
   console.log('[LVT:R15] booted');
 
-  // LVT PATCH R15: Permissive TikTok host check with DOM probe
-  const isTikTok = window.location.hostname.includes('tiktok.com');
-  if (!isTikTok) {
-    return;
-  }
+  // State
+  let viewerNode = null;
+  let observer = null;
+  let lastValue = 0;
+  let retryCount = 0;
 
-  window.__spikelyLVT_R15 = {
-    initialized: Date.now(),
-    viewerNode: null,
-    observer: null,
-    lastValue: 0,
-    retryCount: 0
-  };
-
-  // LVT PATCH R15: Parser with case-insensitive K/M support
+  // LVT PATCH R15: Parser with K/M suffix support
   function parseViewerCount(text) {
     if (!text) return null;
     
@@ -41,30 +34,36 @@
     
     const result = Math.round(num);
     
-    // LVT PATCH R15: Sanity gate
-    if (result <= 0 || result > 200000) return null;
+    // LVT PATCH R15: Sanity bounds
+    if (result <= 0 || result > 5000000) {
+      console.log(`[LVT:R15] SANITY_BLOCKED candidate=${result}`);
+      return null;
+    }
     
     return result;
   }
 
-  // LVT PATCH R15: Find viewer node with pattern detection
+  // LVT PATCH R15: Find authoritative viewer node
   function findViewerNode() {
     const allElements = Array.from(document.querySelectorAll('*'));
     
     for (const element of allElements) {
       const text = element.textContent?.trim();
+      
+      // LVT PATCH R15: Primary - header text matching "Viewers · {X}"
       if (text && /Viewers?\s*[·•]\s*\d+/i.test(text)) {
         const match = text.match(/Viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
         if (match) {
           const expectedNumber = match[1];
           
-          // Find the specific number element  
+          // Find the specific element containing this number
           const container = element.closest('div, section, header');
           if (container) {
             const numberElements = container.querySelectorAll('span, div, strong');
             for (const numEl of numberElements) {
               if (numEl.textContent?.trim() === expectedNumber && 
-                  numEl.offsetParent !== null && numEl.isConnected) {
+                  numEl.offsetParent !== null && 
+                  numEl.isConnected) {
                 return numEl;
               }
             }
@@ -76,36 +75,35 @@
     return null;
   }
 
-  // LVT PATCH R15: Emit with schema v1
+  // LVT PATCH R15: Emit viewer count update
   function emitUpdate(value) {
-    if (value === window.__spikelyLVT_R15.lastValue) return;
+    if (value === lastValue) return;
     
-    window.__spikelyLVT_R15.lastValue = value;
-    
+    lastValue = value;
     console.log(`[LVT:R15] emit value=${value}`);
     
     if (chrome?.runtime?.sendMessage) {
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT_UPDATE',
-        value: value,
-        schema: 'v1'
+        value: value
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log(`[LVT:R15] send failed: ${chrome.runtime.lastError.message}`);
+          console.log(`[LVT:R15] send error: ${chrome.runtime.lastError.message}`);
         }
       });
     }
   }
 
-  // LVT PATCH R15: Attach observer and emit initial
-  function attachObserver(node) {
+  // LVT PATCH R15: Attach watcher
+  function attachWatcher(node) {
     if (!node) return;
     
-    window.__spikelyLVT_R15.viewerNode = node;
+    viewerNode = node;
+    console.log('[LVT:R15] viewer node detected');
     
     // Disconnect existing observer
-    if (window.__spikelyLVT_R15.observer) {
-      window.__spikelyLVT_R15.observer.disconnect();
+    if (observer) {
+      observer.disconnect();
     }
     
     // Emit initial value
@@ -117,70 +115,83 @@
       }
     }
     
-    // Set up new observer
-    window.__spikelyLVT_R15.observer = new MutationObserver(() => {
-      const text = node.textContent?.trim();
-      if (text) {
-        const value = parseViewerCount(text);
-        if (value !== null && value !== window.__spikelyLVT_R15.lastValue) {
-          emitUpdate(value);
+    // LVT PATCH R15: MutationObserver with debounce
+    let debounceTimer = null;
+    
+    observer = new MutationObserver(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (viewerNode && viewerNode.isConnected) {
+          const text = viewerNode.textContent?.trim();
+          if (text) {
+            const value = parseViewerCount(text);
+            if (value !== null) {
+              emitUpdate(value);
+            }
+          }
+        } else {
+          // Node disconnected, rebind
+          console.log('[LVT:R15] rebinding...');
+          viewerNode = null;
+          startDetection();
         }
-      }
+      }, 250);
     });
     
-    window.__spikelyLVT_R15.observer.observe(node, {
+    observer.observe(node, {
       childList: true,
       characterData: true,
       subtree: true
     });
   }
 
-  // LVT PATCH R15: Detection loop with retry and SPA handling
+  // LVT PATCH R15: Detection with retry
   function startDetection() {
     const node = findViewerNode();
     
     if (node) {
-      console.log(`[LVT:R15] viewer node detected`);
-      attachObserver(node);
-      window.__spikelyLVT_R15.retryCount = 0;
+      attachWatcher(node);
+      retryCount = 0;
     } else {
-      window.__spikelyLVT_R15.retryCount++;
-      if (window.__spikelyLVT_R15.retryCount <= 15) {
+      retryCount++;
+      if (retryCount <= 15) {
         setTimeout(startDetection, 1000);
       }
     }
   }
 
   // LVT PATCH R15: SPA navigation handling
-  function handleSPANavigation() {
-    console.log(`[LVT:R15] rebinding...`);
+  function handleNavigation() {
+    console.log('[LVT:R15] rebinding...');
     
-    if (window.__spikelyLVT_R15.observer) {
-      window.__spikelyLVT_R15.observer.disconnect();
+    if (observer) {
+      observer.disconnect();
+      observer = null;
     }
     
-    window.__spikelyLVT_R15.viewerNode = null;
-    window.__spikelyLVT_R15.retryCount = 0;
+    viewerNode = null;
+    retryCount = 0;
     
-    setTimeout(startDetection, 500);
+    setTimeout(startDetection, 1000);
   }
 
-  // LVT PATCH R15: Setup SPA listeners
-  window.addEventListener('popstate', handleSPANavigation);
+  // LVT PATCH R15: Hook SPA navigation
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
   
-  // Lightweight header mutation observer for SPA detection
-  const headerObserver = new MutationObserver(() => {
-    if (!window.__spikelyLVT_R15.viewerNode || !window.__spikelyLVT_R15.viewerNode.isConnected) {
-      handleSPANavigation();
-    }
-  });
+  history.pushState = function(...args) {
+    originalPushState.apply(history, args);
+    handleNavigation();
+  };
   
-  // Observe document for major changes
-  if (document.body) {
-    headerObserver.observe(document.body, { childList: true, subtree: false });
-  }
+  history.replaceState = function(...args) {
+    originalReplaceState.apply(history, args);
+    handleNavigation();
+  };
+  
+  window.addEventListener('popstate', handleNavigation);
 
-  // LVT PATCH R15: Start detection after DOM ready
+  // LVT PATCH R15: Start detection
   if (document.readyState === 'complete') {
     setTimeout(startDetection, 100);
   } else {
@@ -189,14 +200,9 @@
     });
   }
 
-  // LVT PATCH R15: Cleanup on unload
+  // LVT PATCH R15: Cleanup
   window.addEventListener('beforeunload', () => {
-    if (window.__spikelyLVT_R15?.observer) {
-      window.__spikelyLVT_R15.observer.disconnect();
-    }
-    if (headerObserver) {
-      headerObserver.disconnect();
-    }
+    if (observer) observer.disconnect();
   });
 
 })();
