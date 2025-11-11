@@ -26,13 +26,11 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.tiktok.com/*/live*",
-        "*://*.tiktok.com/@*/live*",
-        "*://*.tiktok.com/*live*"
+        "https://www.tiktok.com/*"
       ],
       "js": ["lvtContent.js"],
       "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": false
     },
     {
       "matches": [
