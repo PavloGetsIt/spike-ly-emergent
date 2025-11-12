@@ -29,11 +29,15 @@
         "https://www.tiktok.com/*/live",
         "https://www.tiktok.com/live/*",
         "https://www.tiktok.com/@*/live*",
-        "https://www.tiktok.com/*live*"
+        "https://www.tiktok.com/*live*",
+        "https://www.tiktok.com/@*/live",
+        "https://www.tiktok.com/live",
+        "https://www.tiktok.com/*/live/*",
+        "https://www.tiktok.com/@*/live/*"
       ],
       "js": ["lvtContent.js"],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": true
     },
     {
       "matches": [
