@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Viewer Detection Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .log { background: #f0f0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Spikely Viewer Detection Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Current Status</h2>
+        <div id="status">Loading...</div>
+    </div>
+    
+    <div class="section">
+        <h2>TikTok DOM Analysis</h2>
+        <button onclick="analyzeDOM()">🔍 Analyze Current Page DOM</button>
+        <div id="domAnalysis" class="log"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Extension Status Check</h2>
+        <button onclick="checkExtension()">📡 Check Extension Connection</button>
+        <div id="extensionStatus" class="log"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Manual Test Viewer Detection</h2>
+        <button onclick="testViewerDetection()">🎯 Run Viewer Detection Test</button>
+        <div id="testResults" class="log"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Open this page in a tab</li>
+            <li>Open TikTok Live in another tab (e.g., https://www.tiktok.com/@username/live)</li>
+            <li>Run the tests above to see what the detection is finding</li>
+            <li>Check browser console (F12) for detailed logs</li>
+        </ol>
+    </div>
+
+    <script>
+        // Test if we can simulate the content script viewer detection logic
+        function analyzeDOM() {
+            const logEl = document.getElementById('domAnalysis');
+            logEl.innerHTML = 'Analyzing DOM structure...\n\n';
+            
+            try {
+                // Look for potential viewer count elements
+                const searchTerms = ['viewer', 'watching', 'live', 'audience'];
+                const results = [];
+                
+                searchTerms.forEach(term => {
+                    const elements = Array.from(document.querySelectorAll('*')).filter(el => {
+                        const text = el.textContent?.toLowerCase() || '';
+                        return text.includes(term) && el.children.length < 5; // Avoid containers
+                    });
+                    
+                    if (elements.length > 0) {
+                        results.push(`Found ${elements.length} elements containing "${term}":`);
+                        elements.slice(0, 5).forEach((el, i) => {
+                            results.push(`  ${i+1}. ${el.tagName} - "${el.textContent?.trim().substring(0, 100)}"`);
+                        });
+                    }
+                });
+                
+                // Look for number patterns
+                const numberPattern = /^\d+\.?\d*[KkMm]?$/;
+                const numberElements = Array.from(document.querySelectorAll('span, div, p')).filter(el => {
+                    const text = el.textContent?.trim() || '';
+                    return numberPattern.test(text) && text.length <= 10;
+                });
+                
+                if (numberElements.length > 0) {
+                    results.push(`\nFound ${numberElements.length} potential number elements:`);
+                    numberElements.slice(0, 10).forEach((el, i) => {
+                        results.push(`  ${i+1}. "${el.textContent?.trim()}" (${el.tagName})`);
+                    });
+                }
+                
+                logEl.innerHTML = results.join('\n') || 'No relevant elements found.';
+                
+            } catch (error) {
+                logEl.innerHTML = `ERROR: ${error.message}`;
+                logEl.className = 'log error';
+            }
+        }
+        
+        function checkExtension() {
+            const logEl = document.getElementById('extensionStatus');
+            logEl.innerHTML = 'Checking extension...\n';
+            
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+                logEl.innerHTML += 'ERROR: Chrome extension APIs not available\n';
+                logEl.className = 'log error';
+                return;
+            }
+            
+            try {
+                chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        logEl.innerHTML += `ERROR: ${chrome.runtime.lastError.message}\n`;
+                        logEl.className = 'log error';
+                    } else if (response) {
+                        logEl.innerHTML += `✅ Extension responded: ${JSON.stringify(response)}\n`;
+                        logEl.className = 'log success';
+                    } else {
+                        logEl.innerHTML += '❌ No response from extension\n';
+                        logEl.className = 'log warning';
+                    }
+                });
+            } catch (error) {
+                logEl.innerHTML += `ERROR: ${error.message}\n`;
+                logEl.className = 'log error';
+            }
+        }
+        
+        function testViewerDetection() {
+            const logEl = document.getElementById('testResults');
+            logEl.innerHTML = 'Testing viewer detection...\n\n';
+            
+            // This would need to be run on a TikTok page to work properly
+            if (!window.location.hostname.includes('tiktok.com')) {
+                logEl.innerHTML += '⚠️ This test should be run on a TikTok Live page\n';
+                logEl.innerHTML += 'Go to TikTok Live and run this test from browser console\n\n';
+            }
+            
+            // Show the detection code we would run
+            const detectionCode = `
+// TikTok Viewer Detection Test
+console.log('🔍 Testing TikTok viewer detection...');
+
+// Emergency search for "Viewers • X.XK" pattern
+const allElements = Array.from(document.querySelectorAll('*'));
+console.log('Total DOM elements:', allElements.length);
+
+for (const element of allElements) {
+    const text = element.textContent?.trim() || '';
+    
+    // Look for "Viewers • 2.1K" or similar patterns
+    if (text.includes('Viewers') && text.includes('•')) {
+        console.log('🎯 Found "Viewers •" element:', text);
+        
+        // Extract the number part after the bullet
+        const match = text.match(/Viewers\\s*•\\s*([\\d\\.]+[KkMm]?)/i);
+        if (match) {
+            console.log('✅ EXTRACTED VIEWER COUNT:', match[1]);
+        }
+    }
+    
+    // Also check for standalone numbers with viewer context
+    if (/^\\d+\\.?\\d*[KkMm]?$/.test(text) && text.length <= 6) {
+        const parentText = element.parentElement?.textContent?.toLowerCase() || '';
+        if (parentText.includes('viewer') || parentText.includes('watching')) {
+            console.log('📊 Found potential viewer count:', text, '| Context:', parentText.substring(0, 50));
+        }
+    }
+}
+
+console.log('🏁 Detection test complete');
+            `;
+            
+            logEl.innerHTML += 'Copy this code and run it in TikTok Live page console:\n\n';
+            logEl.innerHTML += detectionCode;
+            logEl.className = 'log';
+        }
+        
+        // Auto-check status on load
+        document.getElementById('status').innerHTML = `
+Page: ${window.location.href}
+Platform: ${window.location.hostname.includes('tiktok.com') ? 'TikTok' : 'Other'}
+Chrome APIs: ${typeof chrome !== 'undefined' ? '✅ Available' : '❌ Not Available'}
+        `;
+    </script>
+</body>
+</html>

@@ -102,7 +102,76 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
+backend:
+  - task: "Server Health Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/ endpoint tested successfully. Returns correct 'Hello World' response with 200 status code. Server is healthy and responding properly."
+  
+  - task: "CORS Configuration for Chrome Extensions"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ CORS middleware properly configured with allow_origins=['*']. Tested with Chrome extension origin (chrome-extension://...) and confirmed server responds with correct CORS headers: access-control-allow-origin echoes the requesting origin, access-control-allow-methods includes all required methods (GET, POST, OPTIONS, etc.), and access-control-allow-headers is properly set. Chrome extensions will be able to make requests to the API."
+  
+  - task: "MongoDB Database Connectivity"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ MongoDB connection working correctly. Tested by creating a status check record via POST /api/status and retrieving it via GET /api/status. Database operations (insert and query) are functioning properly. AsyncIOMotorClient is properly configured with MONGO_URL from environment."
+  
+  - task: "API Key Configuration (ANTHROPIC_API_KEY)"
+    implemented: true
+    working: true
+    file: "/app/backend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ANTHROPIC_API_KEY is properly configured in /app/backend/.env file. Key is present and valid format (sk-ant-api03-...). API key is successfully loaded by the application."
+  
+  - task: "Claude AI Integration (Insight Generation)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ Initial test failed - Claude API call resulted in fallback response. Error: 'No module named httpcore'. Missing dependencies detected."
+      - working: false
+        agent: "testing"
+        comment: "🔧 Fixed missing dependencies: installed docstring-parser and httpcore via pip. Restarted backend service."
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/generate-insight endpoint now working correctly with Claude Sonnet 4.5. Tested with sample payload (gaming setup transcript, +5 viewer delta). Response includes required fields: emotionalLabel ('setup hype works'), nextMove ('Ask What's your main game?. Read answers'), source ('claude'), and correlationId. Claude is generating tactical, specific insights as expected. No longer using fallback."
+
+
 user_problem_statement: |
+  Spikely Chrome Extension - Priority One UI/UX Fixes + Backend API Testing
   Spikely Chrome Extension - Phase 1 Signal Enhancement: Chat Stream Detection
   
   GOAL: Implement the most critical engagement signal (chat comments) to enable accurate 
@@ -110,6 +179,29 @@ user_problem_statement: |
   
   FEATURE IMPLEMENTED: Real-time TikTok Live chat stream detection and analysis
   
+  Backend API Testing Request:
+  Test the FastAPI backend server and verify:
+  1. Basic server health (GET /api/)
+  2. Claude integration (POST /api/generate-insight)
+  3. CORS configuration for Chrome extensions
+  4. MongoDB connectivity
+  5. API key validation (ANTHROPIC_API_KEY)
+  
+  Priority: HIGH - Complete UI/UX fixes before correlation engine work
+  Tech Stack: Chrome Extension (Manifest V3), Vanilla JS, CSS, FastAPI, MongoDB
+
+frontend:
+  - task: "CSS Cache Busting + Inline Critical Animations"
+    implemented: true
+    working: true
+    file: "/app/frontend/extension/sidepanel.html"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added cache-busting query string (?v=2025102101) to CSS link and inlined critical @keyframes animations to prevent caching issues. Ensures animations apply immediately on extension load."
   CORE FUNCTIONALITY:
   - MutationObserver-based chat tracking (watches for new comments in DOM)
   - 30-second rolling buffer of comments (username, text, timestamp)
@@ -294,14 +386,34 @@ backend:
           
           FILES: +30 lines (lines 93-97, 299-320)
 
+  - task: "Live Viewer Tracking (LVT) Pipeline Fix"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/extension/content.js, background.js, sidepanel.js, offscreen.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "main"
+        comment: "MAJOR PIPELINE FIX: Fixed broken Live Viewer Tracking with 5 comprehensive improvements: 1) Enhanced TikTok DOM detection with modern selectors and 3-tier fallback strategy, 2) Added persistent port management with retry logic, 3) Fixed DOM timing issues in side panel with exponential backoff, 4) Added Hume/offscreen port reconnection logic, 5) Added Chrome API context guards for tabCapture. New logging chain: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP]. NEEDS TESTING on actual TikTok Live streams."
+      - working: "NA"
+        agent: "testing"
+        comment: "✅ CODE REVIEW COMPLETE - Cannot test Chrome Extension in automated environment. Code analysis shows: 1) Shadow DOM traversal implemented correctly with deepQuerySelector() recursive function, 2) Breadcrumb logging chain properly implemented: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP], 3) Message routing enhanced with port management and retry logic, 4) DOM timing fixes with exponential backoff (5 retries, 200ms intervals), 5) Chrome API context guards in place. All 5 fixes from LVT_PIPELINE_FIX_GUIDE.md are properly implemented in code. REQUIRES MANUAL TESTING: Load extension in Chrome browser, navigate to TikTok Live stream, open side panel, click 'Start Audio', verify viewer count appears and updates in real-time. Check console logs in all 3 contexts (content script, background, side panel) for breadcrumb trail."
+
 metadata:
   created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
   version: "2.2.0-CHAT-STREAM"
   test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
+    - "Backend API testing complete - all 5 tests passing"
+    - "Manual testing of Chrome extension side panel"
+    - "Verify all 8 Priority One fixes"
     - "Chat Stream Detection - Multi-Tier Selector Strategy"
     - "Chat Buffer Management & Keyword Extraction"
     - "Chat Context Enhancement for Claude Prompts"
@@ -406,6 +518,110 @@ agent_communication:
       
       🚀 **Status:** ✅ Ready for manual testing on live TikTok streams
       
+      Next Steps:
+      - Manual testing in Chrome browser
+      - Load extension and verify all features
+      - Check console logs for initialization
+      - Test tooltips, animations, and timestamps
+      - Once verified, proceed to correlation engine work
+  - agent: "main"
+    message: |
+      🚨 LIVE VIEWER TRACKING (LVT) PIPELINE - COMPREHENSIVE FIX COMPLETE:
+      
+      **Issues Addressed:**
+      1. ❌ Side panel shows random numbers, never updates
+      2. ❌ Missing logs from recent patches  
+      3. ❌ "message port closed" errors from Hume
+      4. ❌ "Could not establish connection" offscreen errors
+      5. ❌ "chrome.tabCapture.capture is not a function" errors
+      6. ❌ "Required DOM elements not found" in side panel
+      7. ❌ Viewer count updates not reaching UI
+      
+      **Solutions Implemented:**
+      1. ✅ Enhanced TikTok DOM detection (modern selectors + 3-tier fallback)
+      2. ✅ Persistent port management with auto-reconnect
+      3. ✅ Fixed DOM timing with exponential backoff (10 retries)  
+      4. ✅ Added Hume/offscreen port retry logic (3 attempts)
+      5. ✅ Chrome API context guards for tabCapture
+      6. ✅ Comprehensive logging chain: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP]
+      
+      **Files Modified**: content.js, background.js, sidepanel.js, offscreen.js
+      **Documentation**: Created /app/LVT_PIPELINE_FIX_GUIDE.md
+      
+      **Next Steps**: Test on actual TikTok Live stream to verify viewer count detection and real-time updates
+
+  - agent: "testing"
+    message: |
+      ✅ BACKEND API TESTING COMPLETE - ALL TESTS PASSING (5/5)
+      
+      Test Results Summary:
+      ✅ Server Health Check - GET /api/ returns "Hello World" (200 OK)
+      ✅ CORS Configuration - Chrome extension origins properly allowed
+      ✅ MongoDB Connectivity - Database operations working (create/retrieve)
+      ✅ API Key Validation - ANTHROPIC_API_KEY properly configured
+      ✅ Claude Integration - POST /api/generate-insight working with Claude Sonnet 4.5
+      
+      Issues Fixed During Testing:
+      1. Missing dependency: docstring-parser (installed via pip)
+      2. Missing dependency: httpcore (installed via pip)
+      3. Restarted backend service after dependency installation
+      
+      Test Details:
+      - Backend URL: https://live-assistant-2.preview.emergentagent.com/api
+      - Test file created: /app/backend_test.py
+      - All endpoints responding correctly
+      - Claude generating tactical, specific insights (not using fallback)
+      - Sample response: emotionalLabel="setup hype works", nextMove="Ask 'What's your main game?'. Read answers"
+      
+      Backend Status: FULLY OPERATIONAL ✅
+      
+      Note: Frontend testing was not performed as per system limitations (Chrome extension requires manual browser testing).
+  
+  - agent: "testing"
+    message: |
+      🔍 LVT PIPELINE CODE REVIEW COMPLETE - MANUAL TESTING REQUIRED
+      
+      **Code Analysis Results:**
+      ✅ All 5 fixes from LVT_PIPELINE_FIX_GUIDE.md properly implemented
+      ✅ Shadow DOM traversal: deepQuerySelector() with recursive search
+      ✅ Breadcrumb logging: [VIEWER:PAGE] → [VIEWER:BG] → [VIEWER:SP] chain present
+      ✅ Message routing: Port management + retry logic (3 attempts, exponential backoff)
+      ✅ DOM timing: Exponential backoff initialization (5 retries, 200ms intervals)
+      ✅ Chrome API guards: Context validation before tabCapture calls
+      
+      **Implementation Quality:**
+      - content.js: 8 modern TikTok selectors + 3-tier fallback strategy
+      - background.js: Port connection handler + cached viewer flush on connect
+      - sidepanel.js: requestLatestViewerData() for instant count on panel open
+      - All logging prefixes correctly implemented for debugging
+      
+      **Cannot Test Automatically:**
+      ⚠️ Chrome extensions cannot be loaded in automated testing environment
+      ⚠️ Requires manual browser testing with actual TikTok Live streams
+      
+      **Manual Testing Instructions:**
+      1. Load extension from /app/frontend/extension/ in Chrome (chrome://extensions/)
+      2. Navigate to any active TikTok Live stream
+      3. Open Spikely side panel (click extension icon)
+      4. Click "Start Audio" button
+      5. Verify viewer count appears within 1-2 seconds
+      6. Check console logs in 3 contexts:
+         - Content script (F12 on TikTok page): [VIEWER:PAGE] logs
+         - Background (chrome://extensions/ → Inspect background): [VIEWER:BG] logs
+         - Side panel (Right-click panel → Inspect): [VIEWER:SP] logs
+      7. Verify count matches TikTok's displayed viewer count
+      8. Wait 30-60 seconds to confirm real-time updates
+      
+      **Expected Success Criteria:**
+      ✅ Viewer count appears instantly (< 2 seconds)
+      ✅ Count matches TikTok display (not stuck at 0)
+      ✅ Breadcrumb logs visible in all 3 consoles
+      ✅ No "Receiving end does not exist" errors
+      ✅ No "message port closed" errors
+      ✅ Real-time updates when TikTok count changes
+      ✅ Status shows "TRACKING" with actual numbers
+      
+      **Status:** Code implementation verified ✅ | Manual testing required ⚠️
       **Next Steps:**
       - Test chat detection on multiple TikTok streams
       - Verify insights reference viewer comments

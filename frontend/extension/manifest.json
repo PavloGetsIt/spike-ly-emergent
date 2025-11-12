@@ -8,8 +8,8 @@
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "web_accessible_resources": [{
-    "resources": ["pcm-processor.js"],
-    "matches": ["<all_urls>"]
+    "resources": ["pcm-processor.js", "lvtContent.js"],
+    "matches": ["https://*.tiktok.com/*"]
   }],
   "host_permissions": [
     "*://*.tiktok.com/*",
@@ -23,6 +23,29 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.tiktok.com/*/live",
+        "https://www.tiktok.com/live/*",
+        "https://www.tiktok.com/@*/live*",
+        "https://www.tiktok.com/*live*"
+      ],
+      "js": ["lvtContent.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://*.twitch.tv/*",
+        "*://*.kick.com/*",
+        "*://*.youtube.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "content_scripts": [{
     "matches": [
       "https://*.tiktok.com/*",

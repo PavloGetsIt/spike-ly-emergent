@@ -240,6 +240,94 @@ async function stopTrackingOnAllTabs() {
   }
 }
 
+// Enhanced port connection handler (simplified)
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'viewer-count-port') {
+    console.log('[VIEWER:BG] port connected');
+    
+    // Flush cached viewer value on connect
+    if (lastViewer && lastViewer.count !== undefined) {
+      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (cached)`);
+      chrome.runtime.sendMessage({
+        type: 'VIEWER_COUNT',
+        platform: lastViewer.platform,
+        count: lastViewer.count,
+        delta: lastViewer.delta,
+        timestamp: Date.now(),
+        source: 'cached_flush'
+      });
+    }
+    
+    port.onDisconnect.addListener(() => {
+      console.log('[VIEWER:BG] port disconnected');
+    });
+  }
+});
+
+// LVT PATCH R13: Clean message listener with proper structure
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  
+  if (message.type === 'VIEWER_COUNT_UPDATE') {
+    // LVT PATCH R15: Handle DOM LVT message relay
+    try {
+      const value = parseInt(message.value);
+      if (isNaN(value) || value < 0 || value > 5000000) {
+        console.log(`[BG:R15] invalid value: ${message.value}`);
+        sendResponse({ success: false });
+        return true;
+      }
+      
+      console.log(`[BG:R15] forwarding value=${value}`);
+      
+      // Cache for correlation engine
+      lastViewer = {
+        platform: 'tiktok',
+        count: value,
+        delta: 0,
+        timestamp: Date.now(),
+        tabId: sender.tab?.id || null,
+      };
+      
+      if (sender.tab?.id) {
+        lastLiveTabId = sender.tab.id;
+      }
+
+      // Add to correlation engine
+      correlationEngine.addViewerCount(value, 0, Date.now());
+
+      // Forward to WebSocket
+      if (wsConnection?.readyState === WebSocket.OPEN) {
+        wsConnection.send(JSON.stringify({
+          type: 'VIEWER_COUNT',
+          platform: 'tiktok',
+          count: value,
+          timestamp: Date.now(),
+          tabId: sender.tab?.id
+        }));
+      }
+
+      // LVT PATCH R15: Broadcast to sidepanel
+      chrome.runtime.sendMessage({
+        type: 'VIEWER_COUNT_UPDATE',
+        value: value
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          // Sidepanel may not be open
+        } else {
+          console.log(`[BG:R15] sent to sidepanel`);
+        }
+      });
+
+      sendResponse({ success: true });
+      return true;
+      
+    } catch (error) {
+      console.log(`[BG:R15] processing error: ${error.message}`);
+      sendResponse({ success: false });
+      return true;
+    }
+  }
+  
 // Listen for messages from content scripts and side panel
 const canRegisterRuntimeListener =
   typeof chrome !== 'undefined' &&
@@ -490,10 +578,30 @@ if (!canRegisterRuntimeListener) {
     return true;
   } else if (message.type === 'GET_LATEST_VIEWER') {
     sendResponse({ last: lastViewer });
+  } else if (message.type === 'GET_LATEST_VIEWER') {
+    // Provide latest viewer data to newly opened side panel
+    if (lastViewer && lastViewer.count !== undefined) {
+      console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (get_latest)`);
+      sendResponse({ 
+        viewer: lastViewer,
+        success: true 
+      });
+    } else {
+      sendResponse({ 
+        viewer: null,
+        success: false 
+      });
+    }
+    return true;
   } else if (message.type === 'GET_CONNECTION_STATUS') {
     sendResponse({ 
       connected: wsConnection?.readyState === WebSocket.OPEN 
     });
+  } else if (message.type === 'PING') {
+    // LVT PATCH: Enhanced PING handling with proper async response
+    console.log('[VIEWER:BG] ping received');
+    sendResponse?.({ type: 'PONG', success: true, timestamp: Date.now() }); // LVT PATCH: Enhanced response
+    return true; // LVT PATCH: Return true for async delivery
   } else if (message.type === 'START_AUDIO') {
     // SINGLE SOURCE OF TRUTH FOR AUDIO CAPTURE (MV3)
     const requestId = message.requestId;
@@ -1138,19 +1246,47 @@ if (!canRegisterRuntimeListener) {
           try {
             console.debug('[AUDIO:BG:CAPTURE] Attempt #' + attempt);
             
-            stream = await chrome.tabCapture.capture({
-              audio: true,
-              video: false
-            });
-            
-            if (stream && stream.getAudioTracks().length > 0) {
-              console.debug('[AUDIO:BG:READY] Audio stream active', { 
-                tracks: stream.getAudioTracks().length,
-                tabId 
-              });
-              break;
-            } else {
-              throw new Error('No audio tracks in captured stream');
+            // Graceful tabCapture fallback (MV3 compatible)
+            try {
+              if (typeof chrome.tabCapture === 'undefined') {
+                throw new Error('tabCapture API not available - fallback required');
+              }
+              
+              // Try modern captureOffscreenTab if available
+              if (chrome.tabCapture.captureOffscreenTab) {
+                stream = await chrome.tabCapture.captureOffscreenTab(tabId, {
+                  audio: true,
+                  video: false
+                });
+              } else {
+                // Legacy capture method
+                stream = await chrome.tabCapture.capture({
+                  audio: true,
+                  video: false
+                });
+              }
+              
+              if (stream && stream.getAudioTracks().length > 0) {
+                console.debug('[AUDIO:BG:READY] Audio stream active via tabCapture');
+                break;
+              } else {
+                throw new Error('No audio tracks in captured stream');
+              }
+              
+            } catch (captureErr) {
+              console.debug(`[AUDIO:BG:FALLBACK] tabCapture failed (attempt ${attempt}): ${captureErr.message}`);
+              
+              // Graceful fallback - signal sidepanel to use getDisplayMedia
+              if (attempt === 3) {
+                sendResponse({ 
+                  success: false, 
+                  error: 'Audio capture requires screen share',
+                  requiresFallback: true
+                });
+                return;
+              }
+              
+              lastError = captureErr;
             }
           } catch (captureErr) {
             lastError = captureErr;
@@ -1199,6 +1335,11 @@ if (!canRegisterRuntimeListener) {
               reasons: ['USER_MEDIA'],
               justification: 'Audio capture for transcription'
             });
+          }
+          
+          // CONTEXT GUARD: Only call tabCapture in background script
+          if (typeof chrome.tabCapture === 'undefined') {
+            throw new Error('tabCapture API not available in this context');
           }
           
           // Get stream ID for offscreen
@@ -1496,19 +1637,39 @@ if (!canRegisterRuntimeListener) {
             }
           }
           
-          // Send to offscreen document for Hume AI processing
+          // Send to offscreen document for Hume AI processing with retry logic
           const resp = await new Promise((resolve) => {
-            chrome.runtime.sendMessage({
-              type: 'HUME_ANALYZE_FETCH',
-              audioBase64: message.audioBase64
-            }, (r) => {
-              if (chrome.runtime.lastError) {
-                console.error('[Background] Hume message error:', chrome.runtime.lastError.message);
-                resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
-              } else {
-                resolve(r);
-              }
-            });
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            function attemptSend() {
+              chrome.runtime.sendMessage({
+                type: 'HUME_ANALYZE_FETCH',
+                audioBase64: message.audioBase64
+              }, (r) => {
+                if (chrome.runtime.lastError) {
+                  console.error('[Background] Hume message error (attempt', retryCount + 1, '):', chrome.runtime.lastError.message);
+                  
+                  // Check if it's a "port closed" error and retry
+                  if (chrome.runtime.lastError.message.includes('message port closed') || 
+                      chrome.runtime.lastError.message.includes('Could not establish connection')) {
+                    
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      console.log(`[Background] Retrying Hume message (${retryCount}/${maxRetries}) in 500ms...`);
+                      setTimeout(attemptSend, 500 * retryCount); // Exponential backoff
+                      return;
+                    }
+                  }
+                  
+                  resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
+                } else {
+                  resolve(r);
+                }
+              });
+            }
+            
+            attemptSend();
           });
           
           if (DEBUG_HUME && resp) {

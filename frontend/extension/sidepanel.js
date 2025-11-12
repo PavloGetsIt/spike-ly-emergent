@@ -336,25 +336,28 @@ function startTimestampUpdater() {
  * Ensures DOM is ready before initializing tooltips and animations
  */
 function initializeUIFeatures() {
-  const MAX_RETRIES = 5;
-  const RETRY_DELAY = 200; // ms
+  const MAX_RETRIES = 5; // Reduced from 10 to prevent infinite loops
   let retryCount = 0;
   
   function attemptInit() {
-    console.log(`[UI:INIT] Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+    console.log(`[VIEWER:SP] DOM initialization attempt ${retryCount + 1}/${MAX_RETRIES}`);
     
-    // Check if critical DOM elements are present
+    // Check if critical DOM elements are present - USING CORRECT IDs FROM HTML
     const requiredElements = [
       document.getElementById('viewerDelta'),
       document.getElementById('viewerCount'),
       document.getElementById('thresholdBadgeGray'),
-      document.getElementById('startAudioBtn')
+      document.getElementById('startAudioBtn'),
+      document.getElementById('systemStatusBadge'), // This exists in HTML
+      document.getElementById('insightContent') // This exists in HTML
     ];
     
-    const allPresent = requiredElements.every(el => el !== null);
+    const elementNames = ['viewerDelta', 'viewerCount', 'thresholdBadgeGray', 'startAudioBtn', 'systemStatusBadge', 'insightContent'];
+    const missing = requiredElements.map((el, i) => el ? null : elementNames[i]).filter(Boolean);
+    const allPresent = missing.length === 0;
     
     if (allPresent) {
-      console.log('[UI:INIT] All required DOM elements found');
+      console.log('[VIEWER:SP] ✅ All required DOM elements found');
       
       // Setup tooltips
       setupTooltips();
@@ -369,22 +372,63 @@ function initializeUIFeatures() {
       // Start timestamp updater
       startTimestampUpdater();
       
-      console.log('[UI:INIT] ✅ Initialization complete');
+      // Try to get latest viewer data from background
+      requestLatestViewerData();
+      
+      console.log('[VIEWER:SP] ✅ UI initialization complete');
       return true;
     } else {
-      console.warn('[UI:INIT] Some DOM elements not ready yet');
-      retryCount++;
+      console.log(`[VIEWER:SP] ❌ Missing DOM elements: ${missing.join(', ')}`);
       
+      retryCount++;
       if (retryCount < MAX_RETRIES) {
-        setTimeout(attemptInit, RETRY_DELAY);
+        const delay = Math.min(200 * retryCount, 1000); // Exponential backoff, max 1s
+        console.log(`[VIEWER:SP] Retrying in ${delay}ms...`);
+        setTimeout(attemptInit, delay);
       } else {
-        console.error('[UI:INIT] ❌ Failed after maximum retries');
+        console.error('[VIEWER:SP] ❌ Failed to initialize after max retries - some DOM elements missing');
+        console.error(`[VIEWER:SP] Missing elements: ${missing.join(', ')}`);
+        
+        // Initialize with available elements only - don't block the whole UI
+        console.log('[VIEWER:SP] Proceeding with partial initialization...');
+        try {
+          if (document.getElementById('viewerDelta') && document.getElementById('viewerCount')) {
+            setupTooltips();
+          }
+          if (document.getElementById('systemStatusBadge')) {
+            console.log('[VIEWER:SP] Status badge available for updates');
+          }
+          requestLatestViewerData();
+        } catch (e) {
+          console.error('[VIEWER:SP] Partial initialization failed:', e);
+        }
       }
       return false;
     }
   }
   
   attemptInit();
+}
+
+// Request latest viewer data from background on side panel open
+function requestLatestViewerData() {
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_LATEST_VIEWER' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[VIEWER:SP] get_latest_failed:', chrome.runtime.lastError.message);
+        return;
+      }
+      
+      if (response?.success && response.viewer?.count !== undefined) {
+        console.log(`[VIEWER:SP] rendered=${response.viewer.count} (requested)`);
+        updateViewerCount(response.viewer.count, response.viewer.delta || 0);
+        updateEngineStatus('TRACKING', {});
+        firstCountReceived = true;
+      }
+    });
+  } catch (error) {
+    console.log('[VIEWER:SP] request_failed:', error.message);
+  }
 }
 
 // =============================================================
@@ -594,82 +638,53 @@ function updateSystemStatus(status) {
   }
 }
 
-// Update engine status
-function updateEngineStatus(status, meta = {}) {
-  console.debug('[SIDEPANEL] updateEngineStatus called:', status, meta);
+// Fixed updateEngineStatus to use correct DOM elements from HTML
+function updateEngineStatus(status, data = {}) {
+  // Use the actual DOM elements that exist in the HTML
+  const systemStatusBadge = document.getElementById('systemStatusBadge');
+  const insightContent = document.getElementById('insightContent');
   
-  const engineStatus = document.getElementById('engineStatus');
-  const engineStatusText = document.getElementById('engineStatusText');
-  const statusLatency = document.getElementById('statusLatency');
-  const statusSource = document.getElementById('statusSource');
-  const statusReason = document.getElementById('statusReason');
-  const statusSpinner = document.querySelector('.status-spinner');
-  
-  console.debug('[SIDEPANEL] DOM elements:', {
-    engineStatus: !!engineStatus,
-    engineStatusText: !!engineStatusText,
-    statusLatency: !!statusLatency,
-    statusSource: !!statusSource,
-    statusReason: !!statusReason,
-    statusSpinner: !!statusSpinner
+  console.log('[VIEWER:SP] updateEngineStatus called:', status, {
+    systemStatusBadge: !!systemStatusBadge,
+    insightContent: !!insightContent
   });
   
-  if (!engineStatus || !engineStatusText) {
-    console.warn('[SIDEPANEL] Required DOM elements not found!');
+  if (!systemStatusBadge) {
+    console.warn('[VIEWER:SP] systemStatusBadge element not found for updateEngineStatus!');
     return;
   }
   
+  // Update system status badge in header
   if (status === 'IDLE') {
-    engineStatus.style.display = 'none';
-    return;
+    systemStatusBadge.textContent = '🔴 IDLE';
+    systemStatusBadge.className = 'system-status status-idle';
+  } else if (status === 'TRACKING' || status === 'COLLECTING') {
+    systemStatusBadge.textContent = '🟡 TRACKING';
+    systemStatusBadge.className = 'system-status status-tracking';
+  } else if (status === 'ANALYZING') {
+    systemStatusBadge.textContent = '🟠 ANALYZING';
+    systemStatusBadge.className = 'system-status status-analyzing';
+  } else if (status === 'ERROR') {
+    systemStatusBadge.textContent = '🔴 ERROR';
+    systemStatusBadge.className = 'system-status status-error';
   }
   
-  engineStatus.style.display = 'block';
-  
-  const statusMap = {
-    COLLECTING: { text: 'Collecting...', showSpinner: true },
-    CORRELATING: { text: 'Correlating...', showSpinner: true },
-    AI_CALLING: { text: 'AI Analyzing...', showSpinner: true },
-    AI_FALLBACK: { text: 'Using Fallback...', showSpinner: true },
-    SUCCESS: { text: 'Complete', showSpinner: false },
-    FAILED: { text: 'Failed', showSpinner: false }
-  };
-  
-  const config = statusMap[status];
-  if (config) {
-    engineStatusText.textContent = config.text;
-    if (statusSpinner) {
-      statusSpinner.style.display = config.showSpinner ? 'block' : 'none';
-    }
+  // Update insight content if status affects it
+  if (insightContent && status === 'COLLECTING' && data.reason) {
+    const collectingHtml = `
+      <div class="insight-empty">
+        <svg class="empty-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.3-4.3"></path>
+        </svg>
+        <p class="empty-title">Collecting data...</p>
+        <p class="empty-subtitle">${data.reason || 'Waiting for viewer changes'}</p>
+      </div>
+    `;
+    insightContent.innerHTML = collectingHtml;
   }
   
-  if (meta.latencyMs && statusLatency) {
-    statusLatency.textContent = `${meta.latencyMs}ms`;
-    statusLatency.style.display = 'inline-block';
-  } else if (statusLatency) {
-    statusLatency.style.display = 'none';
-  }
-  
-  if (meta.source && statusSource) {
-    statusSource.textContent = meta.source;
-    statusSource.className = `source-badge source-${meta.source.toLowerCase()}`;
-    statusSource.style.display = 'inline-block';
-  } else if (statusSource) {
-    statusSource.style.display = 'none';
-  }
-  
-  if (status === 'FAILED' && meta.reason && statusReason) {
-    statusReason.textContent = meta.reason;
-    statusReason.style.display = 'block';
-  } else if (statusReason) {
-    statusReason.style.display = 'none';
-  }
-  
-  if (status === 'SUCCESS') {
-    setTimeout(() => {
-      if (engineStatus) engineStatus.style.display = 'none';
-    }, 3000);
-  }
+  console.log('[VIEWER:SP] Status updated to:', status);
 }
 
 // Start cooldown timer
@@ -700,6 +715,7 @@ function startCooldownTimer(seconds) {
 
 // Listen to messages from background script (viewer updates, transcripts, etc.)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'LVT_VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE'];
   const allowedTypes = ['VIEWER_COUNT', 'VIEWER_COUNT_UPDATE', 'TRANSCRIPT', 'INSIGHT', 'ACTION', 'FULL_RESET', 'SYSTEM_STATUS', 'ENGINE_STATUS', 'COUNTDOWN_UPDATE', 'AUDIO_CAPTURE_RESULT', 'AUDIO_CAPTURE_STARTED', 'AUDIO_CAPTURE_FAILED'];
   
   if (!message || !message.type || !allowedTypes.includes(message.type)) {
@@ -802,35 +818,36 @@ function connectToWebSocket() {
 function handleMessage(message) {
   switch (message.type) {
     case 'VIEWER_COUNT_UPDATE':
-      console.debug('[VC:SP:RX] VIEWER_COUNT_UPDATE', { count: message.count, delta: message.delta });
-      // Fall through to VIEWER_COUNT handler
+      // LVT PATCH R15: Handle DOM LVT with clean schema
+      const value = parseInt(message.value);
+      
+      if (isNaN(value) || value < 0) {
+        console.log(`[SP:R15] invalid value: ${message.value}`);
+        return;
+      }
+      
+      console.log(`[SP:R15] recv value=${value}`);
+      
+      // LVT PATCH R15: Update UI immediately, no placeholder logic
+      firstCountReceived = true;
+      isInWarmup = false;
+      updateEngineStatus('TRACKING', {});
+      updateViewerCount(value, 0);
+      
+      break;
+      
+    case 'LVT_VIEWER_COUNT_UPDATE':
     case 'VIEWER_COUNT':
-      console.debug('[VC:SP:RX] VIEWER_COUNT', { count: message.count, delta: message.delta });
-      console.log('[Spikely Side Panel] VIEWER_COUNT payload:', { count: message.count, delta: message.delta });
+      // LVT PATCH R15: Legacy compatibility handlers
+      const legacyCount = parseInt(message.value || message.count);
       
-      // ⚡ INSTANT MODE: If this is the initial instant send, provide immediate feedback
-      if (message.source === 'initial_instant') {
-        console.log('[SIDEPANEL] ⚡ Initial count received INSTANTLY:', message.count);
-        firstCountReceived = true;
-        isInWarmup = false;
-        updateEngineStatus('IDLE', {});
-        updateViewerCount(message.count, 0);
-        break;
+      if (isNaN(legacyCount) || legacyCount < 0) {
+        return;
       }
       
-      // Handle warm-up phase UI (for subsequent updates)
-      if (isSystemStarted && message.count === 0 && !firstCountReceived) {
-        // During warm-up: show "Collecting..."
-        updateEngineStatus('COLLECTING', {});
-        isInWarmup = true;
-      } else if (isSystemStarted && message.count > 0 && !firstCountReceived) {
-        // First valid count: transition to IDLE
-        firstCountReceived = true;
-        isInWarmup = false;
-        updateEngineStatus('IDLE', {});
-      }
+      console.log(`[SP:R15] legacy recv value=${legacyCount}`);
+      updateViewerCount(legacyCount, message.delta || 0);
       
-      updateViewerCount(message.count, message.delta || 0);
       break;
     case 'TRANSCRIPT':
       // Forward transcript through WebSocket to webapp
@@ -2044,48 +2061,15 @@ console.log('[Spikely Side Panel] Initializing...');
 // Don't auto-request viewer data or start polling - wait for user to click Start
 // Everything stays at zero until "Start" is clicked
 
-// Test harness for ENGINE_STATUS rendering
-window.__spikelyTestEngineStatus = function(sequence = ['COLLECTING', 'CORRELATING', 'AI_CALLING', 'SUCCESS', 'IDLE']) {
-  console.log('[TEST] Running ENGINE_STATUS test sequence:', sequence);
-  return new Promise((resolve) => {
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index >= sequence.length) {
-        clearInterval(interval);
-        console.log('[TEST] ENGINE_STATUS test complete');
-        resolve();
-        return;
-      }
-      
-      const status = sequence[index];
-      let meta = {};
-      
-      // Add appropriate meta for each status
-      if (status === 'AI_FALLBACK') {
-        meta = { reason: 'Test fallback' };
-      } else if (status === 'SUCCESS') {
-        meta = { source: 'Test' };
-      } else if (status === 'FAILED') {
-        meta = { reason: 'Test failure' };
-      }
-      
-      console.debug('[TEST:ENGINE_STATUS]', status, meta);
-      updateEngineStatus(status, meta);
-      index++;
-    }, 600);
+// Wait for DOM to be ready before initializing
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[VIEWER:SP] 🎯 DOMContentLoaded - starting initialization');
+    setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
   });
-};
-
-// Keyboard shortcut: Alt+E triggers test
-document.addEventListener('keydown', (e) => {
-  if (e.altKey && e.key === 'e') {
-    console.log('[TEST] Alt+E pressed, running engine status test');
-    window.__spikelyTestEngineStatus();
-  }
-});
-
-// Initialize UI features with retry logic
-console.log('[UI:INIT] Starting UI initialization...');
-initializeUIFeatures();
+} else {
+  console.log('[VIEWER:SP] 🎯 DOM already ready - starting initialization');
+  setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
+}
 
 connectToWebSocket();

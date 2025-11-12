@@ -313,15 +313,32 @@ async function sendToHumeAI(audioSamples) {
     }
     const base64Audio = btoa(binary);
     
-    // Send to background for centralized gating
-    chrome.runtime.sendMessage({
-      type: 'HUME_ANALYZE',
-      audioBase64: base64Audio
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Offscreen] sendMessage error:', chrome.runtime.lastError);
-        return;
-      }
+    // Send to background for centralized gating with retry on port errors
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    function attemptHumeMessage() {
+      chrome.runtime.sendMessage({
+        type: 'HUME_ANALYZE',
+        audioBase64: base64Audio
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Offscreen] sendMessage error (attempt', retryCount + 1, '):', chrome.runtime.lastError);
+          
+          // Retry on port/connection errors
+          if ((chrome.runtime.lastError.message.includes('message port closed') || 
+               chrome.runtime.lastError.message.includes('Could not establish connection')) && 
+              retryCount < maxRetries) {
+            
+            retryCount++;
+            console.log(`[Offscreen] Retrying Hume message (${retryCount}/${maxRetries}) in 1s...`);
+            setTimeout(attemptHumeMessage, 1000);
+            return;
+          }
+          
+          console.error('[Offscreen] Failed to send Hume message after', retryCount + 1, 'attempts');
+          return;
+        }
       
       if (!response?.ok) {
         if (response?.reason === 'cooldown') {
@@ -340,6 +357,8 @@ async function sendToHumeAI(audioSamples) {
         console.log('[Offscreen] ✅ Hume analysis accepted');
       }
     });
+    
+    attemptHumeMessage(); // Start the attempt chain
   } catch (error) {
     console.error('[Offscreen] ❌ Hume preparation error:', error);
     humeCooldownUntil = Date.now() + 5000;
