@@ -131,8 +131,11 @@ async function startTrackingOnActiveTabs() {
     chrome.tabs.sendMessage(tab.id, { type: 'START_TRACKING' }, (response) => {
       if (chrome.runtime.lastError) {
         console.warn(`[Spikely] sendMessage failed on tab ${tab.id}, injecting content script and retrying...`, chrome.runtime.lastError);
-        // Fallback: manually inject content script then retry
-        chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] })
+        // Fallback: manually inject appropriate content script then retry
+        const tabUrl = tab.url || '';
+        const scriptFile = /tiktok\.com/i.test(tabUrl) ? 'lvtContent.js' : 'content.js';
+
+        chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [scriptFile] })
           .then(() => {
             chrome.tabs.sendMessage(tab.id, { type: 'START_TRACKING' }, (resp2) => {
               if (chrome.runtime.lastError) {
