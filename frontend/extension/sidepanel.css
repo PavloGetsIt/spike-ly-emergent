@@ -1232,6 +1232,18 @@ body {
 
 /* ==================== UI FIXES: ANIMATIONS & ENHANCEMENTS ==================== */
 
+/* Fix 5: Ensure consistent button heights for alignment */
+.test-btn,
+.reset-btn,
+.audio-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fix 1: Pulsing Animation */
+
 /* Fix 1: Pulsing Status Indicator */
 .status-pulse-dot {
   width: 8px;
@@ -1324,6 +1336,20 @@ body {
 
 .cooldown-timer.analyzing .status-pulse-dot::before {
   background: #3b82f6;
+}
+
+.cooldown-timer.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.cooldown-timer.error .status-pulse-dot {
+  background: #ef4444;
+  animation: none;
+}
+
+.cooldown-timer.error .status-pulse-dot::before {
+  display: none;
 }
 
 /* Fix 2: Audio Status Indicator */

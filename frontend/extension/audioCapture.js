@@ -4,6 +4,7 @@
 class AudioCaptureManager {
   constructor() {
     this.isCapturing = false;
+    this.currentStreamId = null;
   }
 
   // Start capturing audio from tab
@@ -103,12 +104,14 @@ class AudioCaptureManager {
       }
 
       this.isCapturing = true;
+      this.currentStreamId = streamId;
       console.log('[Audio Capture] ✅ Audio capture started via offscreen document');
-      
-      return { success: true };
+
+      return { success: true, streamId };
     } catch (error) {
       console.error('[Audio Capture] ❌ Failed to start capture:', error);
       this.stopCapture();
+      this.currentStreamId = null;
       return { success: false, error: error.message };
     }
   }
@@ -116,8 +119,9 @@ class AudioCaptureManager {
   // Stop capturing audio
   stopCapture() {
     console.log('[Audio Capture] Stopping capture');
-    
+
     this.isCapturing = false;
+    this.currentStreamId = null;
 
     // Tell offscreen document to stop
     chrome.runtime.sendMessage({

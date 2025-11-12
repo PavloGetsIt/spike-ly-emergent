@@ -46,10 +46,178 @@ class CorrelationEngine {
     this.currentGoal = 'engagement';     // FORCED for interactive content
     this.lastDetectedActivity = 'general';
     
+    // Viewer DOM detection state
+    this.viewerDetectionState = {
+      isScanning: false,
+      lastFoundElement: null,
+      scanInterval: null,
+      retryCount: 0
+    };
+    
     console.log('[Correlation] 🎯 Engine initialized with default threshold:', this.minDelta);
     console.log('[Correlation] 🎯 Dynamic insights mode enabled');
     console.log('[Correlation] 🎯 Template fallback system loaded: 30 templates');
     console.log('[Correlation] 🎯 FORCED NICHE: justChatting | GOAL: engagement');
+  }
+  
+  // ==================== ROBUST VIEWER DOM DETECTION ====================
+  
+  // Start self-healing viewer detection with MutationObserver
+  startViewerDetection() {
+    if (this.viewerDetectionState.isScanning) {
+      console.log('[Correlation] 👁️ Viewer detection already running');
+      return;
+    }
+    
+    console.log('[Correlation] 👁️ Starting robust viewer detection...');
+    this.viewerDetectionState.isScanning = true;
+    
+    // Try to find viewer element immediately
+    this.findViewerElement();
+    
+    // Start self-healing scan every 2 seconds
+    this.viewerDetectionState.scanInterval = setInterval(() => {
+      this.findViewerElement();
+    }, 2000);
+  }
+  
+  // Stop viewer detection
+  stopViewerDetection() {
+    console.log('[Correlation] 👁️ Stopping viewer detection');
+    this.viewerDetectionState.isScanning = false;
+    
+    if (this.viewerDetectionState.scanInterval) {
+      clearInterval(this.viewerDetectionState.scanInterval);
+      this.viewerDetectionState.scanInterval = null;
+    }
+  }
+  
+  // Multi-strategy viewer element detection
+  findViewerElement() {
+    console.log('[Correlation] 🔍 Scanning for viewer count...');
+    
+    // Check if cached element still valid
+    if (this.viewerDetectionState.lastFoundElement && 
+        document.contains(this.viewerDetectionState.lastFoundElement)) {
+      const text = this.viewerDetectionState.lastFoundElement.textContent?.trim();
+      const parsed = this.parseViewerText(text);
+      if (parsed > 0) {
+        console.log('[Correlation] ✅ Using cached element:', parsed);
+        return { element: this.viewerDetectionState.lastFoundElement, count: parsed };
+      }
+    }
+    
+    // Strategy 1: Primary selector - Look for "Viewers • X" pattern
+    const allElements = Array.from(document.querySelectorAll('*'));
+    
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/viewers?\s*[•·:]\s*[\d,]+(\.\d+)?[kmb]?/i.test(text)) {
+        const match = text.match(/viewers?\s*[•·:]\s*([\d,]+(?:\.\d+)?[kmb]?)/i);
+        if (match) {
+          const parsed = this.parseViewerText(match[1]);
+          if (parsed > 0) {
+            console.log('[Correlation] ✅ Strategy 1 success:', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: Secondary selector - TikTok-specific attributes
+    const tiktokSelectors = [
+      '[data-e2e*="viewer"]',
+      '[data-testid*="viewer"]', 
+      'div[class*="viewer"] span',
+      'span[class*="count"]'
+    ];
+    
+    for (const selector of tiktokSelectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const parsed = this.parseViewerText(el.textContent);
+          if (parsed > 50) { // Filter small numbers
+            console.log('[Correlation] ✅ Strategy 2 success:', selector, parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      } catch (e) {
+        // Skip invalid selectors
+      }
+    }
+    
+    // Strategy 3: Text-node proximity search
+    for (const el of allElements) {
+      const text = el.textContent?.trim() || '';
+      
+      if (/^[\d,]+(\.\d+)?[kmb]?$/i.test(text) && text.length <= 10) {
+        const parentText = el.parentElement?.textContent?.toLowerCase() || '';
+        
+        if (parentText.includes('viewer') || parentText.includes('live') || parentText.includes('watching')) {
+          const parsed = this.parseViewerText(text);
+          if (parsed > 50) {
+            console.log('[Correlation] ✅ Strategy 3 success (proximity):', parsed);
+            this.viewerDetectionState.lastFoundElement = el;
+            this.setupMutationObserver(el);
+            return { element: el, count: parsed };
+          }
+        }
+      }
+    }
+    
+    console.log('[Correlation] ❌ No viewer element found, retry', ++this.viewerDetectionState.retryCount);
+    return null;
+  }
+  
+  // Parse viewer count text (handles K/M/B suffixes)
+  parseViewerText(text) {
+    if (!text) return 0;
+    
+    const cleaned = text.toLowerCase().replace(/[,\s]/g, '');
+    const match = cleaned.match(/^([\d.]+)([kmb])?$/);
+    if (!match) return 0;
+    
+    let num = parseFloat(match[1]);
+    const suffix = match[2];
+    
+    if (suffix === 'k') num *= 1000;
+    else if (suffix === 'm') num *= 1000000;
+    else if (suffix === 'b') num *= 1000000000;
+    
+    return Math.round(num);
+  }
+  
+  // Setup MutationObserver on found element
+  setupMutationObserver(element) {
+    // Remove existing observer
+    if (this.viewerObserver) {
+      this.viewerObserver.disconnect();
+    }
+    
+    const container = element.parentElement || element;
+    
+    this.viewerObserver = new MutationObserver((mutations) => {
+      console.log('[Correlation] 👁️ DOM mutation detected, rescanning...');
+      
+      // Re-scan after DOM changes
+      setTimeout(() => {
+        this.findViewerElement();
+      }, 100);
+    });
+    
+    this.viewerObserver.observe(container, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    
+    console.log('[Correlation] 👁️ MutationObserver setup on viewer container');
   }
   
   // Update niche preferences from UI
@@ -836,6 +1004,89 @@ class CorrelationEngine {
     }
   }
 
+  // Add chat stream data to buffer
+  addChatStream(comments, chatRate, timestamp) {
+    // Initialize chat buffer if not exists
+    if (!this.chatBuffer) {
+      this.chatBuffer = [];
+    }
+
+    const now = Date.now();
+
+    // Add comments to buffer
+    comments.forEach(comment => {
+      this.chatBuffer.push({
+        username: comment.username,
+        text: comment.text,
+        timestamp: comment.timestamp
+      });
+    });
+
+    // Keep only last 30 seconds
+    this.chatBuffer = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    // Store chat rate
+    this.lastChatRate = chatRate;
+    this.lastChatUpdate = now;
+
+    console.log(`[Correlation] Chat stream updated: ${comments.length} new comments, rate: ${chatRate}/min, buffer: ${this.chatBuffer.length}`);
+  }
+
+  // Get recent chat context for insights
+  getChatContext() {
+    if (!this.chatBuffer || this.chatBuffer.length === 0) {
+      return {
+        hasChat: false,
+        commentCount: 0,
+        chatRate: 0,
+        recentComments: []
+      };
+    }
+
+    const now = Date.now();
+    const recentComments = this.chatBuffer.filter(c => 
+      now - c.timestamp < 30000
+    );
+
+    return {
+      hasChat: true,
+      commentCount: recentComments.length,
+      chatRate: this.lastChatRate || 0,
+      recentComments: recentComments.slice(-10).map(c => ({
+        username: c.username,
+        text: c.text
+      })),
+      topKeywords: this.extractChatKeywords(recentComments)
+    };
+  }
+
+  // Extract common keywords from chat
+  extractChatKeywords(comments) {
+    if (!comments || comments.length === 0) return [];
+
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being']);
+    const wordCounts = {};
+
+    comments.forEach(c => {
+      const words = c.text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w));
+
+      words.forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+    });
+
+    // Sort by frequency and return top 5
+    return Object.entries(wordCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word, count]) => ({ word, count }));
+  }
+
   // Handle significant viewer change
   async handleSignificantChange(count, delta, timestamp) {
     const now = Date.now();
@@ -1246,6 +1497,9 @@ class CorrelationEngine {
         const keywords = this.extractKeywords(segment.text);
         const transcriptAnalysis = this.analyzeTranscriptQuality(segment.text);
         
+        // Get chat context
+        const chatContext = this.getChatContext();
+        
         // Prepare payload for AI insight generation with ENHANCED CONTEXT
         const payload = {
           transcript: truncatedTranscript,
@@ -1272,10 +1526,19 @@ class CorrelationEngine {
         recentInsights: this.recentInsights,
         winningTopics: this.winningTopics,
         transcriptQuality: transcriptAnalysis.quality,
-        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio
+        uniqueWordRatio: transcriptAnalysis.uniqueWordRatio,
+        // CHAT CONTEXT
+        chatData: chatContext.hasChat ? {
+          commentCount: chatContext.commentCount,
+          chatRate: chatContext.chatRate,
+          topKeywords: chatContext.topKeywords.map(k => k.word),
+          recentComments: chatContext.recentComments.map(c => 
+            `${c.username}: ${c.text.substring(0, 50)}`
+          ).slice(-5) // Last 5 comments
+        } : undefined
       };
 
-        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none');
+        console.log('🤖 Calling Claude | CID:', correlationId, '| Delta:', payload.viewerDelta, '| Keywords:', keywords.join(', ') || 'none', '| Chat:', chatContext.hasChat ? `${chatContext.commentCount} comments` : 'no chat');
         
         // [AI:FETCH:STARTING] diagnostic log with sanitized payload
         console.log('[AI:FETCH:STARTING]', {
