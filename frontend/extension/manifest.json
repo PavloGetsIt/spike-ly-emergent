@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Spikely",
-  "version": "2.1.4",
+  "version": "2.9.1",
   "description": "Real-time Live Stream Artificial Intelligence",
-  "permissions": ["storage", "activeTab", "tabs", "sidePanel", "scripting", "webNavigation", "contextMenus", "tabCapture", "offscreen"],
+  "permissions": ["storage", "activeTab", "tabs", "sidePanel", "scripting", "webNavigation", "contextMenus", "tabCapture", "offscreen", "alarms"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "web_accessible_resources": [{
     "resources": ["pcm-processor.js", "lvtContent.js"],
-    "matches": ["<all_urls>"]
+    "matches": ["https://*.tiktok.com/*"]
   }],
   "host_permissions": [
     "*://*.tiktok.com/*",
@@ -26,7 +26,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.tiktok.com/*"
+        "https://www.tiktok.com/*/live",
+        "https://www.tiktok.com/live/*",
+        "https://www.tiktok.com/@*/live*",
+        "https://www.tiktok.com/*live*"
       ],
       "js": ["lvtContent.js"],
       "run_at": "document_idle",
@@ -43,6 +46,18 @@
       "all_frames": true
     }
   ],
+  "content_scripts": [{
+    "matches": [
+      "https://*.tiktok.com/*",
+      "https://tiktok.com/*",
+      "https://*.twitch.tv/*",
+      "https://*.kick.com/*",
+      "https://*.youtube.com/*"
+    ],
+    "js": ["content_minimal.js"],
+    "run_at": "document_end",
+    "all_frames": true
+  }],
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",

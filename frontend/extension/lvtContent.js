@@ -1,36 +1,25 @@
 // ============================================================================
-// LVT PATCH R14: Dedicated DOM LVT Content Script for TikTok Live
+// LVT PATCH R15: Authoritative TikTok DOM LVT Content Script
 // ============================================================================
 
 (function() {
   'use strict';
   
-  // LVT PATCH R14: Guard against double injection
-  if (window.__spikelyLVT) {
-    console.log('[LVT:R14] Already initialized');
+  // LVT PATCH R15: Boot guard
+  if (window.__spikelyLVT_R15) {
     return;
   }
 
-  // LVT PATCH R14: Initialize only on TikTok Live pages
-  const isTikTokLive = window.location.hostname.includes('tiktok.com') && 
-                      (window.location.pathname.includes('live') || 
-                       document.querySelector('[data-e2e*="live"]'));
-  
-  if (!isTikTokLive) {
-    return; // Not a TikTok Live page
-  }
+  window.__spikelyLVT_R15 = true;
+  console.log('[LVT:R15] booted');
 
-  // LVT PATCH R14: Set global marker
-  window.__spikelyLVT = {
-    initialized: Date.now(),
-    viewerNode: null,
-    observer: null,
-    lastCount: 0
-  };
+  // State
+  let viewerNode = null;
+  let observer = null;
+  let lastValue = 0;
+  let retryCount = 0;
 
-  console.log('[LVT:R14] content script loaded on TikTok LIVE');
-
-  // LVT PATCH R14: Robust viewer count parser
+  // LVT PATCH R15: Parser with K/M suffix support
   function parseViewerCount(text) {
     if (!text) return null;
     
@@ -44,23 +33,30 @@
     if (token.includes('m')) num *= 1000000;
     
     const result = Math.round(num);
-    return (result >= 0 && result <= 500000) ? result : null;
+    
+    // LVT PATCH R15: Sanity bounds
+    if (result <= 0 || result > 5000000) {
+      console.log(`[LVT:R15] SANITY_BLOCKED candidate=${result}`);
+      return null;
+    }
+    
+    return result;
   }
 
-  // LVT PATCH R14: Find TikTok viewer node using working validation logic
+  // LVT PATCH R15: Find authoritative viewer node
   function findViewerNode() {
     const allElements = Array.from(document.querySelectorAll('*'));
     
     for (const element of allElements) {
       const text = element.textContent?.trim();
       
-      // LVT PATCH R14: Look for exact "Viewers · X" pattern
-      if (text && /^Viewers?\s*[·•]\s*\d+/i.test(text)) {
-        const match = text.match(/^Viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
+      // LVT PATCH R15: Primary - header text matching "Viewers · {X}"
+      if (text && /Viewers?\s*[·•]\s*\d+/i.test(text)) {
+        const match = text.match(/Viewers?\s*[·•]\s*(\d+(?:\.\d+)?[KkMm]?)/i);
         if (match) {
           const expectedNumber = match[1];
           
-          // Find the specific number element
+          // Find the specific element containing this number
           const container = element.closest('div, section, header');
           if (container) {
             const numberElements = container.querySelectorAll('span, div, strong');
@@ -79,103 +75,134 @@
     return null;
   }
 
-  // LVT PATCH R14: Emit viewer count update
-  function emitViewerUpdate(count) {
-    if (count === window.__spikelyLVT.lastCount) return;
+  // LVT PATCH R15: Emit viewer count update
+  function emitUpdate(value) {
+    if (value === lastValue) return;
     
-    window.__spikelyLVT.lastCount = count;
+    lastValue = value;
+    console.log(`[LVT:R15] emit value=${value}`);
     
-    console.log(`[LVT:R14] VIEWER_COUNT_UPDATE value=${count}`);
-    
-    // LVT PATCH R14: Send message with schema v2
     if (chrome?.runtime?.sendMessage) {
       chrome.runtime.sendMessage({
         type: 'VIEWER_COUNT_UPDATE',
-        value: count,
-        schemaVersion: 2,
-        source: 'dom-lvt',
-        platform: 'tiktok',
-        ts: Date.now()
+        value: value
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log('[LVT:R14] Send failed:', chrome.runtime.lastError.message);
+          console.log(`[LVT:R15] send error: ${chrome.runtime.lastError.message}`);
         }
       });
     }
   }
 
-  // LVT PATCH R14: Start DOM detection and observation
-  function startLVTDetection() {
-    const viewerNode = findViewerNode();
+  // LVT PATCH R15: Attach watcher
+  function attachWatcher(node) {
+    if (!node) return;
     
-    if (viewerNode) {
-      console.log('[LVT:R14] Viewer node found:', viewerNode.textContent?.trim());
-      window.__spikelyLVT.viewerNode = viewerNode;
-      
-      // LVT PATCH R14: Emit initial value
-      const initialCount = parseViewerCount(viewerNode.textContent?.trim());
-      if (initialCount !== null) {
-        emitViewerUpdate(initialCount);
-      }
-      
-      // LVT PATCH R14: Attach MutationObserver
-      if (window.__spikelyLVT.observer) {
-        window.__spikelyLVT.observer.disconnect();
-      }
-      
-      window.__spikelyLVT.observer = new MutationObserver(() => {
-        const text = viewerNode.textContent?.trim();
-        if (text) {
-          const count = parseViewerCount(text);
-          if (count !== null && count !== window.__spikelyLVT.lastCount) {
-            // LVT PATCH R14: Sanity check
-            if (window.__spikelyLVT.lastCount > 0 && count > window.__spikelyLVT.lastCount * 10) {
-              console.log(`[LVT:R14] sanity rejected value=${count}`);
-              return;
-            }
-            emitViewerUpdate(count);
-          }
-        }
-      });
-      
-      window.__spikelyLVT.observer.observe(viewerNode, {
-        childList: true,
-        characterData: true,
-        subtree: true
-      });
-      
-    } else {
-      console.log('[LVT:R14] No viewer node found, retrying...');
-      // LVT PATCH R14: Retry detection
-      setTimeout(startLVTDetection, 1000);
+    viewerNode = node;
+    console.log('[LVT:R15] viewer node detected');
+    
+    // Disconnect existing observer
+    if (observer) {
+      observer.disconnect();
     }
-  }
-
-  // LVT PATCH R14: Wait for DOM ready then start
-  if (document.readyState === 'complete') {
-    setTimeout(startLVTDetection, 100);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(startLVTDetection, 100);
+    
+    // Emit initial value
+    const initialText = node.textContent?.trim();
+    if (initialText) {
+      const initialValue = parseViewerCount(initialText);
+      if (initialValue !== null) {
+        emitUpdate(initialValue);
+      }
+    }
+    
+    // LVT PATCH R15: MutationObserver with debounce
+    let debounceTimer = null;
+    
+    observer = new MutationObserver(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (viewerNode && viewerNode.isConnected) {
+          const text = viewerNode.textContent?.trim();
+          if (text) {
+            const value = parseViewerCount(text);
+            if (value !== null) {
+              emitUpdate(value);
+            }
+          }
+        } else {
+          // Node disconnected, rebind
+          console.log('[LVT:R15] rebinding...');
+          viewerNode = null;
+          startDetection();
+        }
+      }, 250);
+    });
+    
+    observer.observe(node, {
+      childList: true,
+      characterData: true,
+      subtree: true
     });
   }
 
-  // LVT PATCH R14: Message listener for START_TRACKING
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'START_TRACKING') {
-      console.log('[LVT:R14] START_TRACKING received');
-      startLVTDetection();
-      sendResponse({ success: true, platform: 'tiktok' });
-    } else if (message.type === 'PING') {
-      sendResponse({ type: 'PONG', platform: 'tiktok' });
+  // LVT PATCH R15: Detection with retry
+  function startDetection() {
+    const node = findViewerNode();
+    
+    if (node) {
+      attachWatcher(node);
+      retryCount = 0;
+    } else {
+      retryCount++;
+      if (retryCount <= 15) {
+        setTimeout(startDetection, 1000);
+      }
     }
-  });
+  }
 
-  // LVT PATCH R14: Cleanup on page unload
-  window.addEventListener('beforeunload', () => {
-    if (window.__spikelyLVT?.observer) {
-      window.__spikelyLVT.observer.disconnect();
+  // LVT PATCH R15: SPA navigation handling
+  function handleNavigation() {
+    console.log('[LVT:R15] rebinding...');
+    
+    if (observer) {
+      observer.disconnect();
+      observer = null;
     }
+    
+    viewerNode = null;
+    retryCount = 0;
+    
+    setTimeout(startDetection, 1000);
+  }
+
+  // LVT PATCH R15: Hook SPA navigation
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function(...args) {
+    originalPushState.apply(history, args);
+    handleNavigation();
+  };
+  
+  history.replaceState = function(...args) {
+    originalReplaceState.apply(history, args);
+    handleNavigation();
+  };
+  
+  window.addEventListener('popstate', handleNavigation);
+
+  // LVT PATCH R15: Start detection
+  if (document.readyState === 'complete') {
+    setTimeout(startDetection, 100);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(startDetection, 100);
+    });
+  }
+
+  // LVT PATCH R15: Cleanup
+  window.addEventListener('beforeunload', () => {
+    if (observer) observer.disconnect();
   });
 
 })();
