@@ -26,11 +26,12 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.tiktok.com/@*/live",
-        "https://www.tiktok.com/@*/live?*",
-        "https://www.tiktok.com/live/*",
-        "https://m.tiktok.com/@*/live",
-        "https://m.tiktok.com/@*/live?*"
+        "https://tiktok.com/live*",
+        "https://tiktok.com/@*/live*",
+        "https://tiktok.com/*/live*",
+        "https://*.tiktok.com/live*",
+        "https://*.tiktok.com/@*/live*",
+        "https://*.tiktok.com/*/live*"
       ],
       "js": ["lvtContent.js"],
       "run_at": "document_idle",

@@ -2,9 +2,6 @@
 // LVT PATCH R15: Authoritative TikTok DOM LVT Content Script
 // ============================================================================
 
-console.log('[LVT:R15] === SCRIPT START ===');
-window.__SPIKELY_LVT_LOADED = true;
-
 (function() {
   'use strict';
   
@@ -19,7 +16,6 @@ window.__SPIKELY_LVT_LOADED = true;
 
   // LVT PATCH R15: Boot guard
   if (window.__spikelyLVT_R15) {
-    console.log('[LVT:R15] Already booted, skipping re-init');
     return;
   }
 

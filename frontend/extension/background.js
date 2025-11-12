@@ -853,198 +853,197 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
       if (DEBUG_HUME) {
         console.log(`[DEBUG_HUME] Request ${requestId} initiated at ${new Date().toISOString()}`);
-      }
-      
-      try {
-        // Ensure offscreen document exists for Hume AI processing
-        const existingContexts = await chrome.runtime.getContexts({});
-        let offscreenDocument = existingContexts.find(c => c.contextType === 'OFFSCREEN_DOCUMENT');
-        
-        if (!offscreenDocument) {
-          console.log('[Background] Creating offscreen document for Hume AI...');
-          try {
-            await chrome.offscreen.createDocument({
-              url: 'offscreen.html',
-              reasons: ['AUDIO_PLAYBACK'],
-              justification: 'Hume AI prosody analysis'
-            });
-            // Give it time to initialize
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (err) {
-            if (!err.message.includes('Only a single offscreen')) {
-              throw err;
+      }      
+        try {
+          // Ensure offscreen document exists for Hume AI processing
+          const existingContexts = await chrome.runtime.getContexts({});
+          let offscreenDocument = existingContexts.find(c => c.contextType === 'OFFSCREEN_DOCUMENT');
+          
+          if (!offscreenDocument) {
+            console.log('[Background] Creating offscreen document for Hume AI...');
+            try {
+              await chrome.offscreen.createDocument({
+                url: 'offscreen.html',
+                reasons: ['AUDIO_PLAYBACK'],
+                justification: 'Hume AI prosody analysis'
+              });
+              // Give it time to initialize
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (err) {
+              if (!err.message.includes('Only a single offscreen')) {
+                throw err;
+              }
             }
           }
-        }
-        
-        // Send to offscreen document for Hume AI processing with retry logic
-        const resp = await new Promise((resolve) => {
-          let retryCount = 0;
-          const maxRetries = 3;
           
-          function attemptSend() {
-            chrome.runtime.sendMessage({
-              type: 'HUME_ANALYZE_FETCH',
-              audioBase64: message.audioBase64
-            }, (r) => {
-              if (chrome.runtime.lastError) {
-                console.error('[Background] Hume message error (attempt', retryCount + 1, '):', chrome.runtime.lastError.message);
-                
-                // Check if it's a "port closed" error and retry
-                if (chrome.runtime.lastError.message.includes('message port closed') || 
-                    chrome.runtime.lastError.message.includes('Could not establish connection')) {
+          // Send to offscreen document for Hume AI processing with retry logic
+          const resp = await new Promise((resolve) => {
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            function attemptSend() {
+              chrome.runtime.sendMessage({
+                type: 'HUME_ANALYZE_FETCH',
+                audioBase64: message.audioBase64
+              }, (r) => {
+                if (chrome.runtime.lastError) {
+                  console.error('[Background] Hume message error (attempt', retryCount + 1, '):', chrome.runtime.lastError.message);
                   
-                  if (retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`[Background] Retrying Hume message (${retryCount}/${maxRetries}) in 500ms...`);
-                    setTimeout(attemptSend, 500 * retryCount); // Exponential backoff
-                    return;
+                  // Check if it's a "port closed" error and retry
+                  if (chrome.runtime.lastError.message.includes('message port closed') || 
+                      chrome.runtime.lastError.message.includes('Could not establish connection')) {
+                    
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      console.log(`[Background] Retrying Hume message (${retryCount}/${maxRetries}) in 500ms...`);
+                      setTimeout(attemptSend, 500 * retryCount); // Exponential backoff
+                      return;
+                    }
                   }
+                  
+                  resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
+                } else {
+                  resolve(r);
                 }
-                
-                resolve({ ok: false, reason: 'message_error', status: 0, message: chrome.runtime.lastError.message });
-              } else {
-                resolve(r);
-              }
+              });
+            }
+            
+            attemptSend();
+          });
+          
+          if (DEBUG_HUME && resp) {
+            console.log(`[DEBUG_HUME] Request ${requestId} received response:`, {
+              ok: resp.ok,
+              reason: resp.reason,
+              hasResult: !!resp.result,
+              timestamp: new Date().toISOString()
             });
           }
           
-          attemptSend();
-        });
-        
-        if (DEBUG_HUME && resp) {
-          console.log(`[DEBUG_HUME] Request ${requestId} received response:`, {
-            ok: resp.ok,
-            reason: resp.reason,
-            hasResult: !!resp.result,
-            timestamp: new Date().toISOString()
-          });
-        }
-        
-        if (!resp || !resp.ok) {
-          const reason = resp?.reason || 'api_error';
-          if (reason === 'rate_limit') {
-            humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 1000) * 2);
-            console.log(`[Background] Hume backoff set to ${humeState.backoffMs}ms (429)`);
-            sendResponse?.({ ok: false, reason: 'rate_limit', message: 'Too many requests' });
+          if (!resp || !resp.ok) {
+            const reason = resp?.reason || 'api_error';
+            if (reason === 'rate_limit') {
+              humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 1000) * 2);
+              console.log(`[Background] Hume backoff set to ${humeState.backoffMs}ms (429)`);
+              sendResponse?.({ ok: false, reason: 'rate_limit', message: 'Too many requests' });
+              return;
+            }
+            if (reason === 'payment_required') {
+              humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 5000) * 2);
+              console.log(`[Background] Hume backoff set to ${humeState.backoffMs}ms (402)`);
+              sendResponse?.({ ok: false, reason: 'payment_required', message: 'Payment required' });
+              return;
+            }
+            console.error('[Background] Hume fetch (offscreen) failed:', resp?.message || reason);
+            humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 2000) * 1.5);
+            sendResponse?.({ ok: false, reason, message: resp?.message || 'Fetch failed' });
             return;
           }
-          if (reason === 'payment_required') {
-            humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 5000) * 2);
-            console.log(`[Background] Hume backoff set to ${humeState.backoffMs}ms (402)`);
-            sendResponse?.({ ok: false, reason: 'payment_required', message: 'Payment required' });
-            return;
+          
+          const result = resp.result;
+          
+          // ==================== DEBUG LOGGING ====================
+          if (DEBUG_HUME) {
+            console.log(`[DEBUG_HUME] ========================================`);
+            console.log(`[DEBUG_HUME] Request ${requestId} - Full Response Object:`);
+            console.log(`[DEBUG_HUME] ========================================`);
+            console.log(`[DEBUG_HUME] Full result:`, JSON.stringify(result, null, 2));
+            
+            console.log(`[DEBUG_HUME] Prosody data:`, {
+              exists: !!result.prosody,
+              type: typeof result.prosody,
+              hasMetrics: !!result.prosody?.metrics,
+              hasTopEmotions: !!result.prosody?.topEmotions,
+              topEmotionsType: Array.isArray(result.prosody?.topEmotions) ? 'array' : typeof result.prosody?.topEmotions,
+              topEmotionsLength: result.prosody?.topEmotions?.length
+            });
+            
+            console.log(`[DEBUG_HUME] Burst data:`, {
+              exists: !!result.burst,
+              type: typeof result.burst,
+              hasTopEmotions: !!result.burst?.topEmotions,
+              topEmotionsType: Array.isArray(result.burst?.topEmotions) ? 'array' : typeof result.burst?.topEmotions,
+              topEmotionsLength: result.burst?.topEmotions?.length,
+              topEmotions: result.burst?.topEmotions
+            });
+            
+            console.log(`[DEBUG_HUME] Language data:`, {
+              exists: !!result.language,
+              type: typeof result.language,
+              hasTopEmotions: !!result.language?.topEmotions,
+              topEmotionsType: Array.isArray(result.language?.topEmotions) ? 'array' : typeof result.language?.topEmotions,
+              topEmotionsLength: result.language?.topEmotions?.length,
+              topEmotions: result.language?.topEmotions
+            });
           }
-          console.error('[Background] Hume fetch (offscreen) failed:', resp?.message || reason);
-          humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 2000) * 1.5);
-          sendResponse?.({ ok: false, reason, message: resp?.message || 'Fetch failed' });
-          return;
-        }
-        
-        const result = resp.result;
-        
-        // ==================== DEBUG LOGGING ====================
-        if (DEBUG_HUME) {
-          console.log(`[DEBUG_HUME] ========================================`);
-          console.log(`[DEBUG_HUME] Request ${requestId} - Full Response Object:`);
-          console.log(`[DEBUG_HUME] ========================================`);
-          console.log(`[DEBUG_HUME] Full result:`, JSON.stringify(result, null, 2));
+          // =======================================================
           
-          console.log(`[DEBUG_HUME] Prosody data:`, {
-            exists: !!result.prosody,
-            type: typeof result.prosody,
-            hasMetrics: !!result.prosody?.metrics,
-            hasTopEmotions: !!result.prosody?.topEmotions,
-            topEmotionsType: Array.isArray(result.prosody?.topEmotions) ? 'array' : typeof result.prosody?.topEmotions,
-            topEmotionsLength: result.prosody?.topEmotions?.length
-          });
+          // Clear backoff on success
+          humeState.backoffMs = 0;
           
-          console.log(`[DEBUG_HUME] Burst data:`, {
-            exists: !!result.burst,
-            type: typeof result.burst,
-            hasTopEmotions: !!result.burst?.topEmotions,
-            topEmotionsType: Array.isArray(result.burst?.topEmotions) ? 'array' : typeof result.burst?.topEmotions,
-            topEmotionsLength: result.burst?.topEmotions?.length,
-            topEmotions: result.burst?.topEmotions
-          });
+          const metrics = {
+            excitement: result.prosody?.metrics?.excitement || 0,
+            confidence: result.prosody?.metrics?.confidence || 0,
+            energy: result.prosody?.metrics?.energy || 0,
+            topEmotions: result.prosody?.topEmotions || [],
+            topBursts: result.burst?.topEmotions || [],
+            topLanguageEmotions: result.language?.topEmotions || [],
+            dominantSignal: result.meta?.dominantSignal || 'Unknown',
+            avgSignalStrength: result.meta?.avgSignalStrength || 0,
+            correlationQuality: result.meta?.correlationQuality || 'WEAK',
+            timestamp: Date.now()
+          };
           
-          console.log(`[DEBUG_HUME] Language data:`, {
-            exists: !!result.language,
-            type: typeof result.language,
-            hasTopEmotions: !!result.language?.topEmotions,
-            topEmotionsType: Array.isArray(result.language?.topEmotions) ? 'array' : typeof result.language?.topEmotions,
-            topEmotionsLength: result.language?.topEmotions?.length,
-            topEmotions: result.language?.topEmotions
-          });
-        }
-        // =======================================================
-        
-        // Clear backoff on success
-        humeState.backoffMs = 0;
-        
-        const metrics = {
-          excitement: result.prosody?.metrics?.excitement || 0,
-          confidence: result.prosody?.metrics?.confidence || 0,
-          energy: result.prosody?.metrics?.energy || 0,
-          topEmotions: result.prosody?.topEmotions || [],
-          topBursts: result.burst?.topEmotions || [],
-          topLanguageEmotions: result.language?.topEmotions || [],
-          dominantSignal: result.meta?.dominantSignal || 'Unknown',
-          avgSignalStrength: result.meta?.avgSignalStrength || 0,
-          correlationQuality: result.meta?.correlationQuality || 'WEAK',
-          timestamp: Date.now()
-        };
-        
-        console.log(`[Background] Prosody metrics received {quality: ${metrics.correlationQuality}, dominant: ${metrics.dominantSignal}, energy: ${metrics.energy.toFixed(2)}}`);
-        
-        // ==================== EXTENDED LOGGING ====================
-        if (DEBUG_HUME) {
-          console.log(`[DEBUG_HUME] Request ${requestId} - Parsed Metrics:`, {
-            timestamp: new Date().toISOString(),
-            excitement: metrics.excitement,
-            confidence: metrics.confidence,
-            energy: metrics.energy,
-            topEmotionsCount: metrics.topEmotions.length,
-            topBurstsCount: metrics.topBursts.length,
-            topLanguageEmotionsCount: metrics.topLanguageEmotions.length,
-            dominantSignal: metrics.dominantSignal,
-            correlationQuality: metrics.correlationQuality
-          });
+          console.log(`[Background] Prosody metrics received {quality: ${metrics.correlationQuality}, dominant: ${metrics.dominantSignal}, energy: ${metrics.energy.toFixed(2)}}`);
           
-          if (metrics.topBursts.length > 0) {
-            console.log(`[DEBUG_HUME] 💥 VOCAL BURSTS DETECTED:`, metrics.topBursts);
+          // ==================== EXTENDED LOGGING ====================
+          if (DEBUG_HUME) {
+            console.log(`[DEBUG_HUME] Request ${requestId} - Parsed Metrics:`, {
+              timestamp: new Date().toISOString(),
+              excitement: metrics.excitement,
+              confidence: metrics.confidence,
+              energy: metrics.energy,
+              topEmotionsCount: metrics.topEmotions.length,
+              topBurstsCount: metrics.topBursts.length,
+              topLanguageEmotionsCount: metrics.topLanguageEmotions.length,
+              dominantSignal: metrics.dominantSignal,
+              correlationQuality: metrics.correlationQuality
+            });
+            
+            if (metrics.topBursts.length > 0) {
+              console.log(`[DEBUG_HUME] 💥 VOCAL BURSTS DETECTED:`, metrics.topBursts);
+            }
+            if (metrics.topLanguageEmotions.length > 0) {
+              console.log(`[DEBUG_HUME] 📝 LANGUAGE EMOTIONS DETECTED:`, metrics.topLanguageEmotions);
+            }
           }
-          if (metrics.topLanguageEmotions.length > 0) {
-            console.log(`[DEBUG_HUME] 📝 LANGUAGE EMOTIONS DETECTED:`, metrics.topLanguageEmotions);
-          }
-        }
-        // ==========================================================
-        
-        // Add to correlation engine
-        correlationEngine.addProsodyMetrics(metrics);
-        
-        // Broadcast to side panel and web app
-        chrome.runtime.sendMessage({
-          type: 'PROSODY_METRICS',
-          metrics: metrics
-        }, () => { void chrome.runtime.lastError; });
-        
-        if (wsConnection?.readyState === WebSocket.OPEN) {
-          wsConnection.send(JSON.stringify({
+          // ==========================================================
+          
+          // Add to correlation engine
+          correlationEngine.addProsodyMetrics(metrics);
+          
+          // Broadcast to side panel and web app
+          chrome.runtime.sendMessage({
             type: 'PROSODY_METRICS',
             metrics: metrics
-          }));
+          }, () => { void chrome.runtime.lastError; });
+          
+          if (wsConnection?.readyState === WebSocket.OPEN) {
+            wsConnection.send(JSON.stringify({
+              type: 'PROSODY_METRICS',
+              metrics: metrics
+            }));
+          }
+          
+          sendResponse?.({ ok: true, metrics });
+        } catch (error) {
+          console.error('[Background] Hume error:', error);
+          humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 2000) * 1.5);
+          sendResponse?.({ ok: false, reason: 'network_error', message: error.message });
+        } finally {
+          humeState.inFlight = false;
+          console.log('[Background] Hume done (inFlight=false)');
         }
-        
-        sendResponse?.({ ok: true, metrics });
-      } catch (error) {
-        console.error('[Background] Hume error:', error);
-        humeState.backoffMs = Math.min(30000, (humeState.backoffMs || 2000) * 1.5);
-        sendResponse?.({ ok: false, reason: 'network_error', message: error.message });
-      } finally {
-        humeState.inFlight = false;
-        console.log('[Background] Hume done (inFlight=false)');
-      }
     })();
     return true; // Keep channel open for async response
   }
