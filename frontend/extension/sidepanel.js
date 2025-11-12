@@ -719,12 +719,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
   
-  // Always process VIEWER_COUNT_UPDATE (DOM LVT is independent of audio)
-  if (message.type === 'VIEWER_COUNT_UPDATE' || message.type === 'LVT_VIEWER_COUNT_UPDATE') {
-    handleMessage(message);
-    return;
-  }
-  
   // Gate ENGINE_STATUS on system started state
   if (message.type === 'ENGINE_STATUS') {
     console.debug('[ENGINE_STATUS:SP:RX]', message.status, message.meta);

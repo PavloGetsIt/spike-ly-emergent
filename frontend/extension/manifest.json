@@ -26,16 +26,23 @@
   "content_scripts": [
     {
       "matches": [
+<<<<<<< HEAD
         "https://tiktok.com/live*",
         "https://tiktok.com/@*/live*",
         "https://tiktok.com/*/live*",
         "https://*.tiktok.com/live*",
         "https://*.tiktok.com/@*/live*",
         "https://*.tiktok.com/*/live*"
+=======
+        "https://www.tiktok.com/*/live",
+        "https://www.tiktok.com/live/*",
+        "https://www.tiktok.com/@*/live*",
+        "https://www.tiktok.com/*live*"
+>>>>>>> parent of 0f14631 (001)
       ],
       "js": ["lvtContent.js"],
       "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": false
     },
     {
       "matches": [
