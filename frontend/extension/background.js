@@ -580,8 +580,6 @@ if (!canRegisterRuntimeListener) {
     })();
     return true;
   } else if (message.type === 'GET_LATEST_VIEWER') {
-    sendResponse({ last: lastViewer });
-  } else if (message.type === 'GET_LATEST_VIEWER') {
     // Provide latest viewer data to newly opened side panel
     if (lastViewer && lastViewer.count !== undefined) {
       console.log(`[VIEWER:BG] forwarded=${lastViewer.count} (get_latest)`);
