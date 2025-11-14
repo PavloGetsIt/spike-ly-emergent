@@ -1997,15 +1997,73 @@ console.log('[Spikely Side Panel] Initializing...');
 // Don't auto-request viewer data or start polling - wait for user to click Start
 // Everything stays at zero until "Start" is clicked
 
-// Wait for DOM to be ready before initializing
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('[VIEWER:SP] 🎯 DOMContentLoaded - starting initialization');
-    setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
-  });
-} else {
-  console.log('[VIEWER:SP] 🎯 DOM already ready - starting initialization');
-  setTimeout(initializeUIFeatures, 100); // Small delay to ensure all elements are rendered
-}
+// ============================================================================
+// LVT PATCH R15: Emergency Start Audio Button Fix
+// ============================================================================
+
+// LVT PATCH R15: Ensure button is wired after DOM is completely ready
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const audioButton = document.getElementById('startAudioBtn');
+    
+    if (audioButton) {
+      console.log('[LVT:R15] Start Audio button found, attaching listener');
+      
+      // LVT PATCH R15: Remove any existing listeners to prevent duplicates
+      audioButton.replaceWith(audioButton.cloneNode(true));
+      const freshButton = document.getElementById('startAudioBtn');
+      
+      freshButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        console.log('[LVT:R15] Start Audio button clicked');
+        
+        if (!isSystemStarted) {
+          console.log('[AUDIO:SP:TX] START_AUDIO_CAPTURE');
+          freshButton.disabled = true;
+          freshButton.textContent = 'Starting...';
+          
+          isSystemStarted = true;
+          
+          // Start viewer tracking
+          sendToActive('START_VIEWER_TRACKING');
+          
+          // Start audio capture
+          chrome.runtime.sendMessage({ type: 'START_AUDIO_CAPTURE' }, (response) => {
+            console.log('[AUDIO:SP:RX]', response);
+            
+            if (response?.success) {
+              audioIsCapturing = true;
+              updateAudioState(true);
+              freshButton.disabled = false;
+              console.log('[Spikely] ✅ Audio started');
+            } else {
+              console.log('[AUDIO:SP:RX] Failed:', response?.error);
+              updateAudioState(false);
+              freshButton.disabled = false;
+              freshButton.textContent = 'Start Audio';
+              isSystemStarted = false;
+            }
+          });
+          
+        } else {
+          // Stop system
+          console.log('[AUDIO:SP:TX] STOP_AUDIO_CAPTURE');
+          isSystemStarted = false;
+          
+          chrome.runtime.sendMessage({ type: 'STOP_AUDIO_CAPTURE' }, (response) => {
+            audioIsCapturing = false;
+            updateAudioState(false);
+            freshButton.disabled = false;
+            console.log('[Spikely] ✅ Audio stopped');
+          });
+        }
+      });
+      
+      console.log('[LVT:R15] Start Audio button listener attached');
+    } else {
+      console.log('[LVT:R15] Start Audio button not found in DOM');
+    }
+  }, 500); // LVT PATCH R15: Extra delay to ensure DOM is ready
+});
 
 connectToWebSocket();
